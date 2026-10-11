@@ -50,11 +50,46 @@ game with them on the table before buying hardware.
 - Screen dims or sleeps between interactions, wakes on touch or button.
 - Target: a full tournament day (8+ hours) on one charge.
 
-## Alternative: e-paper
+## Display options
 
-1.5–2.1" e-paper (e.g. LilyGO T-Echo, nRF52840) holds the number at zero
-power, has no glare, and could last weeks on a charge. The trade-offs are slower
-refresh and fewer touch options. Worth one prototype.
+Two product variants are worth prototyping in parallel:
+
+| | "Never charge it" (e-paper) | "Shiny" (AMOLED / LCD) |
+|---|---|---|
+| Look | Crisp like a printed card, B/W, no glow | Bright, colorful, animations |
+| Battery | Weeks to months; maybe a coin cell or AAA, no charging | One play day (~8 h) with sleep/dimming, so it needs charging |
+| Lighting | Reflective, great in bright shops, no light in the dark | Readable anywhere |
+| Refresh | Partial refresh about 0.3 s, fine for counting | Instant |
+| Input | Buttons / rotary encoder (small touch e-paper is rare) | Touch + a button or encoder |
+
+Middle option: a **Sharp Memory LCD**. It's always on, uses microwatts, refreshes
+fast with no ghosting, and has no backlight (reflective, like e-paper).
+
+Notes:
+- Color e-paper (B/W/red, Spectra 6) takes seconds to fully refresh and can't
+  partially refresh. That rules it out for a counter.
+- Touch film on e-paper lowers contrast. Small touch e-paper modules exist
+  (Waveshare 2.13" Touch e-Paper HAT, SPI + I2C), but buttons fit e-paper better.
+- AMOLED pixels are off when black, so a dark UI is both eye-catching and
+  easier on the battery than a backlit LCD.
+- On the e-paper variant, the enclosure and the art carry the looks: game-themed
+  shells and crisp faction/icon artwork.
+
+## Display test kit
+
+Prices are rough. Several of these are also useful for other projects.
+
+| Display | Example part | Approx. | Tests |
+|---|---|---|---|
+| 1.54" e-paper, 200×200 | Waveshare 1.54" e-Paper module (SPI) | $10–15 | Personal e-paper counter on the nRF52840 |
+| 2.13" touch e-paper | Waveshare 2.13" Touch e-Paper HAT | $20–25 | Whether touch on e-paper is worth it |
+| 1.8" AMOLED touch | Waveshare ESP32-S3-Touch-AMOLED-1.8 | $25–35 | The "shiny" personal counter |
+| ~1.9" LCD touch | LilyGO T-Display S3 (touch) | $20–25 | LCD vs AMOLED, battery life |
+| 2.8" LCD touch | ESP32-2432S028R "Cheap Yellow Display" | $12–15 | Shared two-player layout |
+| 2.7" memory LCD | Adafruit Sharp Memory Display 400×240 | $30–45 | The middle option |
+
+Measure actual current draw on each board (for example with a Nordic PPK2) for
+a scripted "8-hour game day" so the battery numbers are measured, not guessed.
 
 ## Updates and configuration
 
@@ -70,5 +105,5 @@ refresh and fewer touch options. Worth one prototype.
 
 - Personal device, shared device, or both (two screen sizes)?
 - Touch only, or touch plus a physical encoder or buttons?
-- LCD or e-paper?
+- E-paper, AMOLED/LCD, or both as separate variants?
 - Enclosure: 3D printed first; how thick can the battery be?
