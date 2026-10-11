@@ -32,8 +32,9 @@ game logic as portable C with a thin hardware layer.
 A 1.47" 172×320 screen can show one big number, but it's tight for touch
 targets (aim for ≥ 9 mm) and too small for a shared two-player layout.
 
-**Cheap test:** cut paper rectangles at 1.5", 2", 2.8", and 3.5" and play a
-game with them on the table before buying hardware.
+**Cheap test:** print [size-cutouts.pdf](size-cutouts.pdf) (A4, 100% scale; regenerate with
+`python3 tools/size_cutouts.py docs/size-cutouts.pdf`), cut out the outlines, and
+play a game with them on the table before buying hardware.
 
 ## Input
 
