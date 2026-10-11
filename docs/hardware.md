@@ -77,6 +77,11 @@ Notes:
 
 ## Display test kit
 
+**First prototype board: LilyGO T-Display S3 Touch** (ESP32-S3, 1.9" 170×320
+capacitive touch). It has LiPo charging and a battery connector on board, plus
+two side buttons that can serve as power/menu. Check the battery connector's
+polarity before plugging in a LiPo; JST pinouts vary between sellers.
+
 A 1.54" 240×240 IPS (already on hand) felt too small, so the test kit skips
 anything that size or smaller. The 1.54" is still fine for developing firmware.
 
