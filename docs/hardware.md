@@ -99,7 +99,7 @@ right; non-square is preferred):
 | 2.13" / 2.9" B/W e-paper module | WeAct Studio e-paper module, **black-white** version (driver board + pin header included) | ~$9–11 each | Cheapest e-paper prototype on the nRF52840 |
 | 2.41" AMOLED touch, 600×450 | Waveshare ESP32-S3 AMOLED 2.41" (confirm listing) | $35–45 | The premium variant |
 | 2.7" memory LCD, 400×240 | Adafruit Sharp Memory Display | $35–45 | Always-on low-power option (also for DigiPal) |
-| 2.13" reflective mono TFT, 122×250 | AliExpress "2.13 Reflective TFT Panel" (Osptek), with adapter; ask seller for controller IC | ~$14 shipped | Cheap reflective/no-backlight option, alternative to the Sharp |
+| 2.13" reflective mono TFT, 122×250 | AliExpress "2.13 Reflective TFT Panel" (Osptek), with adapter; ST7305 controller | ~$14 shipped | Cheap reflective/no-backlight option, alternative to the Sharp |
 | 2.8" LCD touch, 320×240 | ESP32-2432S028R "Cheap Yellow Display" | $12–15 | Shared mode: one device between both players |
 
 Skipped: 1.54" e-paper and 1.8" AMOLED (too close to the 1.54" IPS on hand).
