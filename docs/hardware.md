@@ -99,6 +99,10 @@ is the largest that feels right (3.5" is about half a phone).
 | WeAct 2.9" e-paper, Black-White (WeAct Studio store) | ₩9,030 + ₩3,819 shipping | E-paper, 2.9" strip | Both |
 | Estardyn 2.8" SPI TFT, with headers | ₩8,500 | Largest size, backlit color | Both |
 
+Optional extra: Estardyn 2.79" bar TFT, 142×428 (NV3007, SPI), ₩6,500. About
+22×67 mm: the same width as the 1.9" but much longer. The NV3007 controller is
+uncommon, so expect to port an init sequence.
+
 Not in this round: Good Display touch e-paper (2.13" ~₩30k+ with its driver
 board; revisit if e-paper wins), Osptek 4.2" (too big), AMOLED and Sharp
 (cost), Cheap Yellow Display (resistive).

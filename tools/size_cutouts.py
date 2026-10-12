@@ -26,6 +26,7 @@ DISPLAYS = [
     ("2.13\" e-paper / reflective", 2.13, 250, 122, False),
     ("2.41\" AMOLED", 2.41, 600, 450, False),
     ("2.7\" Sharp Memory LCD", 2.7, 400, 240, False),
+    ("2.79\" bar LCD (Estardyn)", 2.79, 428, 142, False),
     ("2.8\" LCD (Cheap Yellow)", 2.8, 320, 240, False),
     ("2.9\" e-paper (WeAct)", 2.9, 296, 128, False),
     ("2.8\" LCD - shared", 2.8, 320, 240, True),
