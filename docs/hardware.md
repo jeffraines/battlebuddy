@@ -67,8 +67,11 @@ Middle option: a **Sharp Memory LCD**. It's always on, uses microwatts, refreshe
 fast with no ghosting, and has no backlight (reflective, like e-paper).
 
 Notes:
-- Color e-paper (B/W/red, Spectra 6) takes seconds to fully refresh and can't
-  partially refresh. That rules it out for a counter.
+- Color e-paper (B/W/red, B/W/red/yellow "(B)"/"(G)" panels, Spectra 6) takes
+  10+ seconds to refresh, flashing, and can't partially refresh. That rules it
+  out for a counter; when buying, pick the black-white variant.
+- A raw e-paper panel needs a driver board (it generates the panel's high
+  voltages). Buy the "module"/"HAT" version, not "raw display only".
 - Touch film on e-paper lowers contrast. Small touch e-paper modules exist
   (Waveshare 2.13" Touch e-Paper HAT, SPI + I2C), but buttons fit e-paper better.
 - AMOLED pixels are off when black, so a dark UI is both eye-catching and
@@ -93,6 +96,7 @@ right; non-square is preferred):
 |---|---|---|---|
 | 1.9" LCD touch, 170×320 | LilyGO T-Display S3 (touch) | $20–25 | First working prototype, personal size |
 | 2.13" touch e-paper, 250×122 | Waveshare 2.13" Touch e-Paper HAT | $20–25 | The "never charge it" variant |
+| 2.13" / 2.9" B/W e-paper module | WeAct Studio e-paper module, **black-white** version (driver board + pin header included) | ~$9–11 each | Cheapest e-paper prototype on the nRF52840 |
 | 2.41" AMOLED touch, 600×450 | Waveshare ESP32-S3 AMOLED 2.41" (confirm listing) | $35–45 | The premium variant |
 | 2.7" memory LCD, 400×240 | Adafruit Sharp Memory Display | $35–45 | Always-on low-power option (also for DigiPal) |
 | 2.13" reflective mono TFT, 122×250 | AliExpress "2.13 Reflective TFT Panel" (Osptek), with adapter; ask seller for controller IC | ~$14 shipped | Cheap reflective/no-backlight option, alternative to the Sharp |
