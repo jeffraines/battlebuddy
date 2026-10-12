@@ -89,6 +89,18 @@ polarity before plugging in a LiPo; JST pinouts vary between sellers.
 A 1.54" 240×240 IPS (already on hand) felt too small, so the test kit skips
 anything that size or smaller. The 1.54" is still fine for developing firmware.
 
+**Phase 1 order (budget, ~₩30,000):** all driven from the nRF52840 with buttons.
+
+| Display | Price (KRW, shipped) | Track |
+|---|---|---|
+| WeAct 2.13" e-paper, Black-White | ₩12,350 | E-paper |
+| Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 | Reflective (also a cheaper Sharp alternative for DigiPal) |
+| Estardyn 2.0" TFT 240×320 (ST7789V) | ₩3,900 | Backlit LCD, 2.0" rectangle |
+
+Deferred: T-Display S3 Touch (touch + battery all-in-one, ~₩22,800), Good
+Display 2.13" touch e-paper, AMOLED, and Sharp Memory LCD (cost). Cheap Yellow
+Display skipped: the "R" variants use resistive touch with a stylus.
+
 Shortlist after comparing actual-size cutouts (1.9" is the smallest that feels
 right; non-square is preferred):
 
