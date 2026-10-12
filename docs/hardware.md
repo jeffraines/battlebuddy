@@ -101,8 +101,11 @@ phone-sized, 1.9" too narrow).
 
 Optional upgrade for the e-paper slot: Good Display 2.7" e-paper with **front
 light + touch** (GDEY027T91-FT11, 264×176), "with Adapter Board", ₩36,400 +
-shipping. It's the right size, readable in the dark, and has touch; confirm the
-adapter also breaks out the touch and front-light connections.
+shipping. It's the right size, readable in the dark, and has touch. Good
+Display's adapter (ESP32-FTS02, Pi-HAT form factor) has connectors for the
+panel, touch (FT6336U, I2C), and front light, and a pin header usable from the
+nRF52840. **Set the FL-SET switch to 3.3 V before powering**: the front light
+is rated 2.8–3.3 V and the switch's other position is 9–21 V.
 
 Dropped: Osptek 4.2" (too big), LilyGO T-Display S3 bare panel (8-bit parallel
 interface, a poor fit for the nRF52840; the 2.0" SPI TFT covers that size),
