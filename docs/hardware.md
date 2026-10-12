@@ -99,6 +99,7 @@ e-paper pick is a touch e-paper (no dead end if e-paper wins).
 | LilyGO T-Display S3 Touch, **full board** (not the bare-screen option) | ~₩20–30k | Touch LCD, 1.9", battery; handheld prototype | ESP32-S3 only (on board) |
 | Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective; DigiPal | Both |
 | Good Display touch e-paper, adapter board | see below | E-paper + touch | Both |
+| WeAct 2.9" e-paper, Black-White (WeAct Studio store) | ₩9,030 + ₩3,819 shipping | 2.9" e-paper size test; same SSD1680 controller as the Good Display 2.13" | Both |
 | Estardyn 2.0" TFT (optional) | ₩3,900 | Color LCD on the nRF52840 | Both |
 
 E-paper options:
@@ -112,7 +113,10 @@ E-paper options:
 Both use the SSD1680 e-paper controller and FT6336U touch (I2C), which Zephyr
 and the Arduino/ESP-IDF libraries support.
 
-Dropped: WeAct 2.9" (no touch, so not a final-display candidate), Osptek 4.2"
+Chosen e-paper route: Good Display 2.13" touch + WeAct 2.9" (cheaper than the
+2.7" front-light, and gives two e-paper sizes from one driver).
+
+Dropped: Osptek 4.2"
 (too big), LilyGO bare panel (parallel interface), AMOLED and Sharp (cost),
 Cheap Yellow Display (resistive).
 
