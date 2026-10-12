@@ -89,22 +89,24 @@ polarity before plugging in a LiPo; JST pinouts vary between sellers.
 A 1.54" 240×240 IPS (already on hand) felt too small, so the test kit skips
 anything that size or smaller. The 1.54" is still fine for developing firmware.
 
-**Phase 1 order (budget, ~₩60,000):** one display per size and type, driven
-from the nRF52840 (buttons, plus touch on the 4.2").
+**Phase 1 order (budget, ~₩33,000):** driven from the nRF52840 with buttons.
+Preferred size range from the cutouts: 2.0"–3.5" (2.8" feels right; 4.2" is
+phone-sized, 1.9" too narrow).
 
 | Display | Price (KRW) | Covers |
 |---|---|---|
-| Estardyn 2.0" TFT 240×320 (ST7789V) | ₩3,900 | Backlit color LCD, 2.0" |
-| Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective mono, 2.13" (also a cheaper Sharp alternative for DigiPal) |
+| Estardyn 2.0" TFT 240×320 (ST7789V, SPI) | ₩3,900 | Backlit color LCD, 2.0" |
+| Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective mono, 2.13"; DigiPal candidate |
 | WeAct 2.9" e-paper, Black-White | ~₩15,500 | E-paper, 2.9" strip |
-| Osptek 4.2" reflective TFT, B/W/R, touch (ST7306 + FT3269), with adapter | ₩23,100 + shipping | Large/shared size, touch on a reflective screen, color |
 
-Alternative e-paper pick: Good Display 2.13" touch e-paper (GDEY0213B74-T11,
-SSD1680 + FT6336U), ~₩20,500 shipped; choose an option with a driver board,
-not "EPD" (bare panel). Same size as the 2.13" reflective, but tests touch on e-paper.
+Optional upgrade for the e-paper slot: Good Display 2.7" e-paper with **front
+light + touch** (GDEY027T91-FT11, 264×176), "with Adapter Board", ₩36,400 +
+shipping. It's the right size, readable in the dark, and has touch; confirm the
+adapter also breaks out the touch and front-light connections.
 
-Deferred: T-Display S3 Touch (~₩22,800), AMOLED, Sharp Memory LCD (cost).
-Cheap Yellow Display skipped: the "R" variants use resistive touch with a stylus.
+Dropped: Osptek 4.2" (too big), LilyGO T-Display S3 bare panel (8-bit parallel
+interface, a poor fit for the nRF52840; the 2.0" SPI TFT covers that size),
+AMOLED and Sharp Memory LCD (cost), Cheap Yellow Display (resistive touch).
 
 Shortlist after comparing actual-size cutouts (1.9" is the smallest that feels
 right; non-square is preferred):
