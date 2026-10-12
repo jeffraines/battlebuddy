@@ -160,3 +160,13 @@ display drivers. LVGL sits on top of either.
 External SPI displays can also run on the LilyGO through its spare header pins.
 RAM on the nRF52840 (256 KB): use LVGL partial draw buffers for the color
 panels (a full 2.8" frame is 150 KB).
+
+## Nordic board on hand: Seeed XIAO nRF52840 Plus
+
+- 3.3 V I/O; power displays from the **3V3** pin (never the 5V/VUSB pin for the
+  ST7305 reflective panel).
+- Hardware SPI on D8 (SCK) / D10 (MOSI); the extra Plus pins cover CS, DC,
+  RST, BUSY and backlight.
+- Built-in LiPo charging (battery pads on the back), so the Nordic prototype
+  can run on battery too.
+- Zephyr board target: `xiao_ble`; the extra Plus pins go in a devicetree overlay.
