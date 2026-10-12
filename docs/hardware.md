@@ -89,27 +89,32 @@ polarity before plugging in a LiPo; JST pinouts vary between sellers.
 A 1.54" 240×240 IPS (already on hand) felt too small, so the test kit skips
 anything that size or smaller. The 1.54" is still fine for developing firmware.
 
-**Phase 1 order (budget, ~₩33,000):** driven from the nRF52840 with buttons.
-Preferred size range from the cutouts: 2.0"–3.5" (2.8" feels right; 4.2" is
-phone-sized, 1.9" too narrow).
+**Phase 1 order.** Requirements: one reflective, one touch, one e-paper, in
+different sizes. Everything except the LilyGO must work from both the ESP32 and
+the nRF52840 (3.3 V SPI/I2C). BattleBuddy's final display needs touch, so the
+e-paper pick is a touch e-paper (no dead end if e-paper wins).
 
-| Display | Price (KRW) | Covers |
-|---|---|---|
-| Estardyn 2.0" TFT 240×320 (ST7789V, SPI) | ₩3,900 | Backlit color LCD, 2.0" |
-| Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective mono, 2.13"; DigiPal candidate |
-| WeAct 2.9" e-paper, Black-White | ~₩15,500 | E-paper, 2.9" strip |
+| Display | Price (KRW) | Covers | MCU |
+|---|---|---|---|
+| LilyGO T-Display S3 Touch, **full board** (not the bare-screen option) | ~₩20–30k | Touch LCD, 1.9", battery; handheld prototype | ESP32-S3 only (on board) |
+| Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective; DigiPal | Both |
+| Good Display touch e-paper, adapter board | see below | E-paper + touch | Both |
+| Estardyn 2.0" TFT (optional) | ₩3,900 | Color LCD on the nRF52840 | Both |
 
-Optional upgrade for the e-paper slot: Good Display 2.7" e-paper with **front
-light + touch** (GDEY027T91-FT11, 264×176), "with Adapter Board", ₩36,400 +
-shipping. It's the right size, readable in the dark, and has touch. Good
-Display's adapter (ESP32-FTS02, Pi-HAT form factor) has connectors for the
-panel, touch (FT6336U, I2C), and front light, and a pin header usable from the
-nRF52840. **Set the FL-SET switch to 3.3 V before powering**: the front light
-is rated 2.8–3.3 V and the switch's other position is 9–21 V.
+E-paper options:
+- **2.7" front light + touch** (GDEY027T91-FT11), "with Adapter Board"
+  (ESP32-FTS02 adapter only, no ESP32), ₩36,400 + shipping. New size near
+  the 2.8" sweet spot, readable in the dark. Ask the seller whether the
+  ribbon cables to the adapter are included.
+- **2.13" touch** (GDEY0213B74-T11), with a driver-board option, ~₩20,500
+  shipped. Cheaper, but the same size as the reflective panel.
 
-Dropped: Osptek 4.2" (too big), LilyGO T-Display S3 bare panel (8-bit parallel
-interface, a poor fit for the nRF52840; the 2.0" SPI TFT covers that size),
-AMOLED and Sharp Memory LCD (cost), Cheap Yellow Display (resistive touch).
+Both use the SSD1680 e-paper controller and FT6336U touch (I2C), which Zephyr
+and the Arduino/ESP-IDF libraries support.
+
+Dropped: WeAct 2.9" (no touch, so not a final-display candidate), Osptek 4.2"
+(too big), LilyGO bare panel (parallel interface), AMOLED and Sharp (cost),
+Cheap Yellow Display (resistive).
 
 Shortlist after comparing actual-size cutouts (1.9" is the smallest that feels
 right; non-square is preferred):
