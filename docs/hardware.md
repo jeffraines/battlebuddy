@@ -89,8 +89,8 @@ polarity before plugging in a LiPo; JST pinouts vary between sellers.
 A 1.54" 240×240 IPS (already on hand) felt too small, so the test kit skips
 anything that size or smaller. The 1.54" is still fine for developing firmware.
 
-**Phase 1 order (final, ~₩55,000).** Covers touch, reflective, e-paper, and an
-odd bar shape across 1.9"–2.9".
+**Phase 1 order (final, ~₩63,000).** Covers touch, reflective, e-paper, an odd
+bar shape, and a 4:3 2.8" across 1.9"–2.9".
 
 | Display | Price (KRW) | Covers | MCU |
 |---|---|---|---|
@@ -98,9 +98,11 @@ odd bar shape across 1.9"–2.9".
 | Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective; DigiPal | Both |
 | WeAct 2.9" e-paper, Black-White (WeAct Studio store) | ₩9,030 + ₩3,819 shipping | E-paper, 2.9" strip | Both |
 | Estardyn 2.79" bar TFT, 142×428 (NV3007, SPI) | ₩6,500 | Long bar form factor, backlit color | Both |
+| Estardyn 2.8" TFT 240×320 (ST7789V, SPI), "2.8 Inch" variant | ₩8,500 | Largest number (43 mm short side), shared-mode layout; well-supported driver | Both |
 
 The NV3007 controller is uncommon, so expect to port its init sequence. The
-paper cutouts stand in for a 2.8" 4:3 screen (Estardyn 2.8" dropped).
+2.8" board can also run in 8080 parallel mode; check its mode jumpers are set
+for 4-wire SPI.
 
 Not in this round: Good Display touch e-paper (2.13" ~₩30k+ with its driver
 board; revisit if e-paper wins), Osptek 4.2" (too big), AMOLED and Sharp
