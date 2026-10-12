@@ -142,3 +142,21 @@ a scripted "8-hour game day" so the battery numbers are measured, not guessed.
 - Touch only, or touch plus a physical encoder or buttons?
 - E-paper, AMOLED/LCD, or both as separate variants?
 - Enclosure: 3D printed first; how thick can the battery be?
+
+## Driver support per platform
+
+The nRF52840 runs Zephyr (nRF Connect SDK), so Arduino libraries (TFT_eSPI,
+LovyanGFX, Arduino_GFX, GxEPD2) don't apply there; what matters is Zephyr's
+display drivers. LVGL sits on top of either.
+
+| Display | nRF52840 (Zephyr) | LilyGO ESP32-S3 (Arduino / ESP-IDF) |
+|---|---|---|
+| Estardyn 2.8" ST7789V | Built-in driver (`sitronix,st7789v`) | TFT_eSPI, LovyanGFX, Arduino_GFX |
+| WeAct 2.9" e-paper (SSD1680) | Built-in driver (`solomon,ssd16xx`) | GxEPD2 |
+| Osptek 2.13" reflective (ST7305) | No driver; port Osptek's demo init code into a small custom driver | No mainstream library; port the same demo code |
+| Estardyn 2.79" bar (NV3007) | No driver; custom driver from a vendor/Arduino_GFX init sequence | Possibly Arduino_GFX (unverified) |
+| LilyGO's own 1.9" + touch | n/a (part of the LilyGO board) | LilyGO examples (ST7789 parallel + CST816) |
+
+External SPI displays can also run on the LilyGO through its spare header pins.
+RAM on the nRF52840 (256 KB): use LVGL partial draw buffers for the color
+panels (a full 2.8" frame is 150 KB).
