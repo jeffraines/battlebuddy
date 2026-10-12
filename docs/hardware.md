@@ -89,19 +89,18 @@ polarity before plugging in a LiPo; JST pinouts vary between sellers.
 A 1.54" 240×240 IPS (already on hand) felt too small, so the test kit skips
 anything that size or smaller. The 1.54" is still fine for developing firmware.
 
-**Phase 1 order (final, ~₩60,000).** Sizes 1.9" / 2.13" / 2.8" / 2.9"; 2.8"
-is the largest that feels right (3.5" is about half a phone).
+**Phase 1 order (final, ~₩55,000).** Covers touch, reflective, e-paper, and an
+odd bar shape across 1.9"–2.9".
 
 | Display | Price (KRW) | Covers | MCU |
 |---|---|---|---|
 | LilyGO T-Display S3 Touch, **full board** (not the bare-screen option) + 3.7 V LiPo (JST 1.25 mm) | ~₩20–30k | 1.9" capacitive touch LCD, battery; handheld prototype | ESP32-S3 (on board) |
 | Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective; DigiPal | Both |
 | WeAct 2.9" e-paper, Black-White (WeAct Studio store) | ₩9,030 + ₩3,819 shipping | E-paper, 2.9" strip | Both |
-| Estardyn 2.8" SPI TFT, with headers | ₩8,500 | Largest size, backlit color | Both |
+| Estardyn 2.79" bar TFT, 142×428 (NV3007, SPI) | ₩6,500 | Long bar form factor, backlit color | Both |
 
-Optional extra: Estardyn 2.79" bar TFT, 142×428 (NV3007, SPI), ₩6,500. About
-22×67 mm: the same width as the 1.9" but much longer. The NV3007 controller is
-uncommon, so expect to port an init sequence.
+The NV3007 controller is uncommon, so expect to port its init sequence. The
+paper cutouts stand in for a 2.8" 4:3 screen (Estardyn 2.8" dropped).
 
 Not in this round: Good Display touch e-paper (2.13" ~₩30k+ with its driver
 board; revisit if e-paper wins), Osptek 4.2" (too big), AMOLED and Sharp
