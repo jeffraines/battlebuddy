@@ -86,17 +86,18 @@ polarity before plugging in a LiPo; JST pinouts vary between sellers.
 A 1.54" 240×240 IPS (already on hand) felt too small, so the test kit skips
 anything that size or smaller. The 1.54" is still fine for developing firmware.
 
+Shortlist after comparing actual-size cutouts (1.9" is the smallest that feels
+right; non-square is preferred):
+
 | Display | Example part | Approx. | Tests |
 |---|---|---|---|
-| 2.8" LCD touch, 320×240 | ESP32-2432S028R "Cheap Yellow Display" | $12–15 | Size, shared two-player layout, LCD look |
-| 1.9" LCD touch, 170×320 | LilyGO T-Display S3 (touch) | $20–25 | Personal-size tall rectangle, LiPo charging on board |
-| 2.13" touch e-paper, 250×122 | Waveshare 2.13" Touch e-Paper HAT | $20–25 | The e-paper variant, wide format, touch on e-paper |
-| 2.7" memory LCD, 400×240 | Adafruit Sharp Memory Display | $35–45 | Always-on, low-power middle option (shared with DigiPal) |
+| 1.9" LCD touch, 170×320 | LilyGO T-Display S3 (touch) | $20–25 | First working prototype, personal size |
+| 2.13" touch e-paper, 250×122 | Waveshare 2.13" Touch e-Paper HAT | $20–25 | The "never charge it" variant |
+| 2.41" AMOLED touch, 600×450 | Waveshare ESP32-S3 AMOLED 2.41" (confirm listing) | $35–45 | The premium variant |
+| 2.7" memory LCD, 400×240 | Adafruit Sharp Memory Display | $35–45 | Always-on low-power option (also for DigiPal) |
+| 2.8" LCD touch, 320×240 | ESP32-2432S028R "Cheap Yellow Display" | $12–15 | Shared mode: one device between both players |
 
-Later: an AMOLED touch board (~2" or larger, $30–40) for the "shiny" variant,
-once the LCDs have settled what size works.
-
-Skipped: 1.54" e-paper (same size as the 1.54" IPS on hand, which felt too small).
+Skipped: 1.54" e-paper and 1.8" AMOLED (too close to the 1.54" IPS on hand).
 
 Measure actual current draw on each board (for example with a Nordic PPK2) for
 a scripted "8-hour game day" so the battery numbers are measured, not guessed.
