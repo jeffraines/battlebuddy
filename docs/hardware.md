@@ -98,6 +98,7 @@ bar shape, and a 4:3 2.8" across 1.9"–2.9".
 | Osptek 2.13" reflective TFT (ST7305), with adapter | ~₩13,900 shipped | Reflective; DigiPal | Both |
 | WeAct 2.9" e-paper, Black-White (WeAct Studio store) | ₩9,030 + ₩3,819 shipping | E-paper, 2.9" strip | Both |
 | Estardyn 2.79" bar TFT, 142×428 (NV3007, SPI) | ₩6,500 | Long bar form factor, backlit color | Both |
+| 0.91" OLED 128×32 (SSD1306, I2C) | ₩2,160 | Debug/status display; small-OLED look | Both (built-in Zephyr driver) |
 | Estardyn 2.8" TFT 240×320 (ST7789V, SPI), "2.8 Inch" variant | ₩8,500 | Largest number (43 mm short side), shared-mode layout; well-supported driver | Both |
 
 The NV3007 controller is uncommon, so expect to port its init sequence. The
