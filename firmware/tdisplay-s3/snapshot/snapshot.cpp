@@ -205,11 +205,9 @@ int main(int argc, char **argv)
         save(frame, s, "match-banner");
     }
 
-    // Dice: a d20 that came up 20, with earlier rolls.
+    // Dice. Stills of each die, then numbered frames of whole rolls for GIFs.
     {
         DiceState d;
-        d.die = 6;
-        d.value = 20;
         const uint8_t hist[][2] = {{20, 6}, {7, 6}, {2, 0}, {4, 2}, {11, 6}, {1, 0}, {3, 1}};
         for (auto &h : hist) {
             d.history[d.history_count] = h[0];
@@ -219,24 +217,38 @@ int main(int argc, char **argv)
         bb_game_init(&g, bb_profile_find("riftbound"), 2);
         UiState s = state_for(g);
         s.dice = &d;
-        save(frame, s, "dice-d20");
 
-        d.die = 0;
-        d.value = 2;
-        save(frame, s, "dice-coin");
+        const uint8_t stills[][2] = {{6, 20}, {1, 3}, {2, 1}, {3, 0}, {4, 7}, {5, 12}, {0, 1}, {0, 0}};
+        const char *names[] = {"dice-d20", "dice-d4", "dice-d6", "dice-d8",
+                               "dice-d10", "dice-d12", "dice-coin", "dice-coin-new"};
+        for (int i = 0; i < 8; i++) {
+            d.die = stills[i][0];
+            d.value = stills[i][1];
+            save(frame, s, names[i]);
+        }
 
-        bb_game_init(&g, bb_profile_find("mtg"), 1);
-        UiState m = state_for(g);
-        m.dice = &d;
-        d.die = 2;
-        d.value = 3;
-        d.rolling = true;
-        save(frame, m, "dice-d6-rolling");
-
-        d.die = 1;
-        d.value = 4;
-        d.rolling = false;
-        save(frame, m, "dice-d4");
+        // A d20 roll that lands on 20, and a coin flip.
+        const uint8_t faces[] = {7, 13, 2, 18, 9, 15, 4, 11, 16, 6, 19, 14};
+        for (int roll = 0; roll < 2; roll++) {
+            d.die = roll == 0 ? 6 : 0;
+            char name[32];
+            int frame_no = 0;
+            for (int a = 0; a <= 1000; a += 40) {
+                d.rolling = true;
+                d.anim = (uint16_t)a;
+                d.value = roll == 0 ? faces[(a / 90) % 12] : (uint8_t)(1 + (a / 120) % 2);
+                snprintf(name, sizeof(name), "%s-%03d", roll == 0 ? "roll-d20" : "roll-coin", frame_no++);
+                save(frame, s, name);
+            }
+            d.rolling = false;
+            d.value = roll == 0 ? 20 : 2;
+            for (int p = 0; p <= 1000; p += 125) {
+                d.pop = (uint16_t)p;
+                snprintf(name, sizeof(name), "%s-%03d", roll == 0 ? "roll-d20" : "roll-coin", frame_no++);
+                save(frame, s, name);
+            }
+            d.pop = 1000;
+        }
     }
 
     // Menu with four players.

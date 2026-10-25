@@ -33,8 +33,9 @@ constexpr uint32_t kBatteryPollMs = 5000;
 constexpr uint32_t kToastMs = 1500;
 constexpr uint8_t kBrightness = 200;
 constexpr uint8_t kDimBrightness = 20;
-constexpr uint32_t kRollMs = 450;      // shuffle before showing a roll
-constexpr uint32_t kRollFrameMs = 60;
+constexpr uint32_t kRollMs = 900;      // tumble before showing a roll
+constexpr uint32_t kPopMs = 300;       // landing effect after a roll
+constexpr uint32_t kAnimFrameMs = 25;  // redraw rate while animating
 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
@@ -68,8 +69,10 @@ bool dirty = true;
 
 bool dice_open = false;
 DiceState dice;
-uint32_t roll_end_ms = 0;
-uint32_t roll_frame_ms = 0;
+uint32_t roll_start_ms = 0;
+uint32_t roll_face_ms = 0;  // when the shown face last changed
+uint32_t land_ms = 0;
+uint32_t anim_frame_ms = 0;
 
 uint32_t last_input_ms = 0;
 bool dimmed = false;
@@ -196,20 +199,36 @@ void start_roll(uint32_t now)
         return;
     }
     dice.rolling = true;
-    roll_end_ms = now + kRollMs;
-    roll_frame_ms = 0;
+    dice.anim = 0;
+    roll_start_ms = now;
+    roll_face_ms = 0;
+    anim_frame_ms = 0;
+    dirty = true;
 }
 
-// Shows random faces while rolling, then settles on the real result.
+// Tumbles with random faces that change more and more slowly, then lands on
+// the real result and plays a short pop.
 void update_roll(uint32_t now)
 {
     if (!dice.rolling) {
+        if (dice.pop < 1000) {
+            uint32_t e = now - land_ms;
+            dice.pop = e >= kPopMs ? 1000 : (uint16_t)(e * 1000 / kPopMs);
+            if (now - anim_frame_ms >= kAnimFrameMs || dice.pop == 1000) {
+                anim_frame_ms = now;
+                dirty = true;
+            }
+        }
         return;
     }
     uint8_t sides = bb_die_at(dice.die)->sides;
-    if ((int32_t)(now - roll_end_ms) >= 0) {
+    uint32_t elapsed = now - roll_start_ms;
+    if (elapsed >= kRollMs) {
         dice.value = bb_dice_roll(sides, hardware_random, nullptr);
         dice.rolling = false;
+        dice.anim = 1000;
+        dice.pop = 0;
+        land_ms = now;
         memmove(dice.history + 1, dice.history, DiceState::kHistory - 1);
         memmove(dice.history_die + 1, dice.history_die, DiceState::kHistory - 1);
         dice.history[0] = dice.value;
@@ -218,9 +237,18 @@ void update_roll(uint32_t now)
             dice.history_count++;
         }
         dirty = true;
-    } else if (now - roll_frame_ms >= kRollFrameMs) {
-        roll_frame_ms = now;
+        return;
+    }
+
+    dice.anim = (uint16_t)(elapsed * 1000 / kRollMs);
+    // Faces change every 40 ms at first, slowing to every ~200 ms near the end.
+    uint32_t face_interval = 40 + 160 * dice.anim / 1000 * dice.anim / 1000;
+    if (roll_face_ms == 0 || now - roll_face_ms >= face_interval) {
+        roll_face_ms = now;
         dice.value = bb_dice_roll(sides, hardware_random, nullptr);
+    }
+    if (now - anim_frame_ms >= kAnimFrameMs) {
+        anim_frame_ms = now;
         dirty = true;
     }
 }

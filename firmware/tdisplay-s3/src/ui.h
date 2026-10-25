@@ -25,8 +25,10 @@ struct DiceState {
     static constexpr int kHistory = 8;
 
     uint8_t die = 2;     // index into bb_die_at(); d6 by default
-    uint8_t value = 0;   // last roll, 0 = not rolled yet
-    bool rolling = false; // showing the shuffle before the result
+    uint8_t value = 0;   // last roll (or the face shown mid-roll), 0 = not rolled yet
+    bool rolling = false; // tumbling before the result
+    uint16_t anim = 0;    // roll progress while rolling, 0..1000
+    uint16_t pop = 1000;  // landing effect progress after a roll, 0..1000 (1000 = settled)
     uint8_t history[kHistory] = {}; // previous results, newest first
     uint8_t history_die[kHistory] = {};
     uint8_t history_count = 0;

@@ -1,6 +1,7 @@
 #include "ui.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -848,37 +849,134 @@ Rect dice_chip(int i)
     return {4 + i * (w + 4), kDiceChipY, w, kDiceChipH};
 }
 
-// A rough outline of the die behind the result, for flavour.
-void draw_die_shape(LGFX_Sprite &f, uint8_t sides, int cx, int cy, int r, uint32_t fill, uint32_t edge)
+// ---- Dice -------------------------------------------------------------------
+
+constexpr float kPi = 3.14159265f;
+
+// Unit-circle outline of each die's silhouette (x right, y down), and how much
+// of the radius is free for the number inside it.
+struct DieShape {
+    int n;
+    float px[6];
+    float py[6];
+    float inner; // fraction of the radius usable for the number
+};
+
+DieShape die_shape(uint8_t sides)
 {
+    DieShape d{};
+    auto regular = [&](int n, float start) {
+        d.n = n;
+        for (int i = 0; i < n; i++) {
+            float a = start + i * 2 * kPi / n;
+            d.px[i] = cosf(a);
+            d.py[i] = sinf(a);
+        }
+    };
     switch (sides) {
-    case 2:
-        f.fillCircle(cx, cy, r, fill);
-        f.drawCircle(cx, cy, r, edge);
-        f.drawCircle(cx, cy, r - 4, mix(fill, edge, 120));
-        break;
     case 4:
-        f.fillTriangle(cx, cy - r, cx - r, cy + r * 3 / 4, cx + r, cy + r * 3 / 4, fill);
-        f.drawTriangle(cx, cy - r, cx - r, cy + r * 3 / 4, cx + r, cy + r * 3 / 4, edge);
+        regular(3, -kPi / 2); // triangle, point up
+        d.inner = 0.48f;
         break;
     case 6:
-        f.fillRoundRect(cx - r * 4 / 5, cy - r * 4 / 5, r * 8 / 5, r * 8 / 5, 10, fill);
-        f.drawRoundRect(cx - r * 4 / 5, cy - r * 4 / 5, r * 8 / 5, r * 8 / 5, 10, edge);
+        regular(4, -kPi / 4); // square
+        d.inner = 0.66f;
         break;
-    default: {
-        // Hexagon for the rest.
-        int hx = r * 87 / 100, hy = r / 2;
-        int px[6] = {cx, cx + hx, cx + hx, cx, cx - hx, cx - hx};
-        int py[6] = {cy - r, cy - hy, cy + hy, cy + r, cy + hy, cy - hy};
-        for (int i = 0; i < 6; i++) {
-            f.fillTriangle(cx, cy, px[i], py[i], px[(i + 1) % 6], py[(i + 1) % 6], fill);
+    case 8:
+        regular(4, -kPi / 2); // diamond, stretched tall
+        for (int i = 0; i < 4; i++) {
+            d.px[i] *= 0.85f;
+            d.py[i] *= 1.1f;
         }
-        for (int i = 0; i < 6; i++) {
-            f.drawLine(px[i], py[i], px[(i + 1) % 6], py[(i + 1) % 6], edge);
+        d.inner = 0.5f;
+        break;
+    case 10: {
+        const float x[4] = {0.f, 0.82f, 0.f, -0.82f};
+        const float y[4] = {-1.05f, 0.12f, 0.85f, 0.12f}; // kite
+        d.n = 4;
+        for (int i = 0; i < 4; i++) {
+            d.px[i] = x[i];
+            d.py[i] = y[i];
         }
+        d.inner = 0.5f;
         break;
     }
+    case 12:
+        regular(5, -kPi / 2); // pentagon
+        d.inner = 0.62f;
+        break;
+    default:
+        regular(6, -kPi / 2); // d20: hexagon
+        d.inner = 0.6f;
+        break;
     }
+    return d;
+}
+
+// Draws a die silhouette rotated by angle and scaled to radius r.
+void draw_die_body(LGFX_Sprite &f, uint8_t sides, int cx, int cy, float r, float angle,
+                   uint32_t fill, uint32_t edge, uint32_t facet)
+{
+    DieShape d = die_shape(sides);
+    float c = cosf(angle), sn = sinf(angle);
+    int x[6], y[6];
+    for (int i = 0; i < d.n; i++) {
+        x[i] = cx + (int)lroundf((d.px[i] * c - d.py[i] * sn) * r);
+        y[i] = cy + (int)lroundf((d.px[i] * sn + d.py[i] * c) * r);
+    }
+    for (int i = 0; i < d.n; i++) {
+        f.fillTriangle(cx, cy, x[i], y[i], x[(i + 1) % d.n], y[(i + 1) % d.n], fill);
+    }
+    // Facet lines from the center give a bit of depth.
+    for (int i = 0; i < d.n; i++) {
+        f.drawLine(cx, cy, x[i], y[i], facet);
+    }
+    if (sides == 20) {
+        // The classic d20 look: a triangle face inside the hexagon.
+        for (int i = 0; i < 3; i++) {
+            int a = i * 2, b = (i * 2 + 2) % 6;
+            f.drawLine(x[a], y[a], x[b], y[b], facet);
+        }
+    }
+    for (int i = 0; i < d.n; i++) {
+        int j = (i + 1) % d.n;
+        f.drawLine(x[i], y[i], x[j], y[j], edge);
+        f.drawLine(x[i] + (cx > x[i] ? 1 : -1), y[i], x[j] + (cx > x[j] ? 1 : -1), y[j], edge);
+    }
+}
+
+// A coin seen edge-on as it flips: width follows |cos| of the flip angle.
+void draw_coin(LGFX_Sprite &f, const Theme &t, int cx, int cy, int r, float flip, uint8_t face,
+               bool settled)
+{
+    float squash = fabsf(cosf(flip));
+    int rx = (int)(r * squash);
+    bool heads = cosf(flip) >= 0 ? face != 2 : face == 2;
+    uint32_t rim = heads ? kWinColor : 0xC8CCD4;
+    uint32_t body = heads ? 0x5E4A1E : 0x4A505C; // bronze / steel
+    if (rx < 2) {
+        f.fillRect(cx - 1, cy - r, 3, r * 2, rim);
+        return;
+    }
+    f.fillEllipse(cx, cy, rx, r, body);
+    f.drawEllipse(cx, cy, rx, r, rim);
+    if (rx > 6) {
+        f.drawEllipse(cx, cy, rx - 4, r - 4, mix(body, rim, 140));
+    }
+    if (face != 0 && (settled || squash > 0.7f)) {
+        f.setFont(&fonts::FreeSansBold12pt7b);
+        f.setTextSize(squash * 0.85f);
+        f.setTextColor(settled ? t.text : mix(body, t.text, 150));
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(heads ? "HEADS" : "TAILS", cx, cy + 1);
+        f.setTextSize(1);
+    }
+}
+
+float ease_out_cubic(float t)
+{
+    float u = 1 - t;
+    return 1 - u * u * u;
 }
 
 void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
@@ -906,40 +1004,63 @@ void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.drawString(bb_die_at(i)->name, r.cx(), r.cy() + 1);
     }
 
-    // Result.
-    const int cx = kWidth / 2, cy = 98;
-    uint32_t edge = d.rolling ? t.muted : t.accent;
-    draw_die_shape(f, die->sides, cx, cy, 40, t.surface, edge);
-    uint32_t shadow = mix(t.surface, 0x000000, 160);
-    if (die->sides == 2) {
-        f.setFont(&fonts::FreeSansBold12pt7b);
-        f.setTextDatum(textdatum_t::middle_center);
-        const char *face = d.value == 0 ? "FLIP" : d.value == 1 ? "HEADS" : "TAILS";
-        f.setTextColor(d.rolling ? t.muted : t.text);
-        f.drawString(face, cx, cy);
-    } else if (d.value == 0) {
-        f.setFont(&fonts::FreeSansBold12pt7b);
-        f.setTextColor(t.muted);
-        f.setTextDatum(textdatum_t::middle_center);
-        f.drawString("ROLL", cx, cy);
-    } else {
-        snprintf(buf, sizeof(buf), "%d", d.value);
-        uint32_t c = d.rolling ? t.muted
-                     : d.value == die->sides && die->sides >= 6 ? kWinColor
-                     : d.value == 1 && die->sides >= 6           ? kLoss
-                                                                 : t.text;
-        draw_number(f, buf, cx, cy + 2, die->sides == 4 ? 46 : 64, die->sides == 4 ? 36 : 52, c, shadow);
+    // The die: tumbles while rolling (spin slows to a stop), pops when it lands.
+    const int cx = kWidth / 2, cy = 103;
+    const float base_r = 44;
+    float t_roll = d.rolling ? d.anim / 1000.0f : 1.0f;
+    float spin = d.rolling ? (1 - ease_out_cubic(t_roll)) * 3.2f * 2 * kPi : 0;
+    float pop = d.pop / 1000.0f;
+    float scale = d.rolling ? 0.92f + 0.08f * t_roll : 1 + 0.08f * (1 - ease_out_cubic(pop));
+    bool max_roll = !d.rolling && d.value == die->sides && die->sides >= 6;
+    bool min_roll = !d.rolling && d.value == 1 && die->sides >= 6;
+
+    if (!d.rolling && d.value && pop < 1 && (max_roll || min_roll)) {
+        // Glow rings that fade out as the pop settles.
+        uint32_t glow = max_roll ? kWinColor : kLoss;
+        for (int i = 0; i < 3; i++) {
+            int fade = (int)((1 - pop) * (220 - i * 60));
+            f.drawCircle(cx, cy, (int)(base_r * scale) + 4 + i * 3, mix(t.bg_bottom, glow, fade > 0 ? fade : 0));
+        }
     }
 
-    f.setFont(&fonts::FreeSans9pt7b);
-    f.setTextColor(t.muted);
-    f.setTextDatum(textdatum_t::middle_left);
-    f.drawString("Tap to roll", 10, cy);
-    f.setTextDatum(textdatum_t::middle_right);
-    f.drawString("KEY rolls", kWidth - 10, cy);
+    float r = base_r * scale;
+    if (die->sides == 2) {
+        float flip = d.rolling ? (1 - ease_out_cubic(t_roll)) * 7 * kPi : 0;
+        draw_coin(f, t, cx, cy, (int)(r * 0.95f), flip, d.value, !d.rolling && d.value);
+        if (!d.value) {
+            f.setFont(&fonts::FreeSansBold12pt7b);
+            f.setTextColor(t.text);
+            f.setTextDatum(textdatum_t::middle_center);
+            f.drawString("FLIP", cx, cy + 1);
+        }
+    } else {
+        // Triangles sit lower so they look centered.
+        int dy = die->sides == 4 ? (int)(r * 0.18f) : 0;
+        uint32_t edge = d.rolling ? mix(t.surface, t.accent, 150)
+                        : max_roll  ? kWinColor
+                        : min_roll  ? kLoss
+                                    : t.accent;
+        draw_die_body(f, die->sides, cx, cy + dy, r, spin, t.surface,
+                      edge, mix(t.surface, t.accent, 45));
+        DieShape shape = die_shape(die->sides);
+        int box = (int)(r * shape.inner * 2);
+        if (d.value == 0) {
+            f.setFont(&fonts::FreeSansBold12pt7b);
+            f.setTextColor(t.text);
+            f.setTextDatum(textdatum_t::middle_center);
+            bool narrow = die->sides == 4 || die->sides == 8 || die->sides == 10;
+            f.drawString(narrow ? "TAP" : "ROLL", cx, cy + dy + 2);
+        } else {
+            snprintf(buf, sizeof(buf), "%d", d.value);
+            uint32_t c = d.rolling ? t.muted : max_roll ? kWinColor : min_roll ? kLoss : t.text;
+            draw_number(f, buf, cx, cy + dy + 2, box, (int)(box * 0.8f), c,
+                        mix(t.surface, 0x000000, 160));
+        }
+    }
 
     // Previous rolls, newest first.
     f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextSize(1);
     f.setTextDatum(textdatum_t::bottom_left);
     int x = 8;
     for (int i = 0; i < d.history_count && x < kWidth - 40; i++) {
@@ -949,7 +1070,7 @@ void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
         } else {
             snprintf(buf, sizeof(buf), "%d", d.history[i]);
         }
-        f.setTextColor(i == 0 ? t.text : t.muted);
+        f.setTextColor(i == 0 && !d.rolling ? t.text : t.muted);
         x += f.drawString(buf, x, kHeight - 3) + 4;
         f.setTextColor(t.muted);
         x += f.drawString(hd->sides == 2 ? "" : hd->name, x, kHeight - 3) + 10;
