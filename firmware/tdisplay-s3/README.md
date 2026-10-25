@@ -34,9 +34,9 @@ Hold the board landscape, USB port on the right.
 | More → Flip | Rotates the whole screen 180° (USB port on the left) |
 | More → Sleep | Sleep now; KEY wakes |
 
-**Themed counters:** Magic and Commander put life inside a ring of five
-colored orbs that turns a notch with each change and flashes red for damage,
-green for gain. Lorcana surrounds lore with a diamond for each point toward
+**Themed counters:** Magic and Commander show a quiet row of five colored
+dots under life; on a change they ripple and the number briefly tints red
+(damage) or green (gain). Lorcana surrounds lore with a diamond for each point toward
 20, lighting up as lore is gained, with a sparkle on the newest. Flesh and
 Blood sets life on a bronze shield with a blood bar for how much is left; it
 shakes and flushes red when hit. Numbers roll like an odometer when they

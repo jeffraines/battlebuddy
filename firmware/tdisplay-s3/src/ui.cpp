@@ -509,7 +509,7 @@ void draw_rolling_number(LGFX_Sprite &f, int value, int prev, float prog, int di
     }
     float e = ease_out_cubic(prog);
     int travel = (int)(h * 0.95f);
-    f.setClipRect(cx - w / 2 - 4, cy - h / 2, w + 8, h + 4);
+    f.setClipRect(cx - w / 2 - 4, cy - h / 2, w + 8, h);
     char old[12];
     snprintf(old, sizeof(old), "%d", prev);
     draw_number(f, old, cx, cy - dir * (int)(e * travel), w, h, color, shadow);
@@ -517,27 +517,24 @@ void draw_rolling_number(LGFX_Sprite &f, int value, int prev, float prog, int di
     f.clearClipRect();
 }
 
-// Magic: five colored orbs on a ring around the life total. The ring turns a
-// notch toward each change and flashes red for damage, green for gain.
-void draw_mana_ring(LGFX_Sprite &f, const Theme &t, int cx, int cy, int rx, int ry, float prog, int dir)
+// Magic: a quiet row of five colored dots under the life total. On a change
+// they ripple in a short wave (left to right for a gain, right to left for
+// damage).
+void draw_mana_dots(LGFX_Sprite &f, const Theme &t, int cx, int y, int r, float prog, int dir)
 {
-    static const uint32_t kOrbs[5] = {0xF4EED2, 0x3D8FDA, 0x6C5F78, 0xDB4A3C, 0x41A552};
-    f.drawEllipse(cx, cy, rx, ry, mix(t.bg_bottom, t.accent, 80));
-    if (prog < 1) {
-        uint32_t flash = dir < 0 ? kLoss : kGain;
-        int a = (int)((1 - prog) * 220);
-        f.drawEllipse(cx, cy, rx + 3, ry + 3, mix(t.bg_bottom, flash, a));
-        f.drawEllipse(cx, cy, rx + 4, ry + 4, mix(t.bg_bottom, flash, a / 2));
-    }
-    float rot = prog < 1 ? (1 - ease_out_back(prog)) * (2 * kPi / 5) * -dir : 0;
-    int orb = ry / 7 < 3 ? 3 : ry / 7;
+    static const uint32_t kDots[5] = {0xF4EED2, 0x3D8FDA, 0x6C5F78, 0xDB4A3C, 0x41A552};
+    int gap = r * 4;
     for (int k = 0; k < 5; k++) {
-        float a = -kPi / 2 + k * 2 * kPi / 5 + rot;
-        int ox = cx + (int)(cosf(a) * rx);
-        int oy = cy + (int)(sinf(a) * ry);
-        f.fillCircle(ox, oy, orb + 1, mix(t.bg_bottom, 0x000000, 140));
-        f.fillCircle(ox, oy, orb, kOrbs[k]);
-        f.fillCircle(ox - orb / 3, oy - orb / 3, orb / 3 > 0 ? orb / 3 : 1, mix(kOrbs[k], 0xFFFFFF, 150));
+        int lift = 0;
+        if (prog < 1) {
+            // Each dot bobs once, one after another along the row.
+            int order = dir > 0 ? k : 4 - k;
+            float local = prog * 1.8f - order * 0.2f;
+            if (local > 0 && local < 1) {
+                lift = (int)(sinf(local * kPi) * r * 2.2f);
+            }
+        }
+        f.fillCircle(cx + (k - 2) * gap, y - lift, r, kDots[k]);
     }
 }
 
@@ -652,11 +649,17 @@ void draw_value(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, con
     int ry = max_h / 2;
     int rx = (int)(max_w * 0.46f) < (int)(max_h * 0.9f) ? (int)(max_w * 0.46f) : (int)(max_h * 0.9f);
     switch (skin) {
-    case SkinMana:
-        draw_mana_ring(f, t, cx, cy, rx, ry, prog, dir);
-        draw_rolling_number(f, value, prev, prog, dir, cx, cy + 1, (int)(rx * 1.45f), (int)(ry * 1.25f), color,
-                            shadow);
+    case SkinMana: {
+        // The number briefly takes the color of the change, then settles.
+        uint32_t c = color;
+        if (prog < 1) {
+            c = mix(color, dir < 0 ? kLoss : kGain, (int)((1 - prog) * 200));
+        }
+        int dot_r = max_h / 26 < 2 ? 2 : max_h / 26;
+        draw_rolling_number(f, value, prev, prog, dir, cx, cy - dot_r * 2, max_w, max_h - dot_r * 6, c, shadow);
+        draw_mana_dots(f, t, cx, cy + max_h / 2 - dot_r, dot_r, prog, dir);
         break;
+    }
     case SkinLore:
         draw_lore_ring(f, t, g, value, cx, cy, rx, ry, prog, dir);
         draw_rolling_number(f, value, prev, prog, dir, cx, cy + 1, (int)(rx * 1.4f), (int)(ry * 1.2f), color,
