@@ -5,6 +5,7 @@
 
 #include "../src/ui.h"
 #include "bb/game.h"
+#include "bb/match.h"
 #include "bb/profile.h"
 
 static const char *out_dir = ".";
@@ -42,6 +43,11 @@ static UiState state_for(const bb_game_t &g)
     s.flipped = false;
     s.menu = false;
     s.toast = nullptr;
+    s.match = nullptr;
+    s.best_of = 0;
+    s.timer_minutes = 0;
+    s.timer_running = false;
+    s.timer_left_s = 0;
     return s;
 }
 
@@ -160,6 +166,44 @@ int main(int argc, char **argv)
     bb_game_adjust(&g, 2, 0, -3, 0);
     save(frame, state_for(g), "commander-3p");
 
+    // Best of 3, 1-0 up, timer running: header shows score and clock.
+    bb_match_t match;
+    bb_match_init(&match, 3);
+    bb_match_record(&match, 0);
+    bb_game_init(&g, bb_profile_find("riftbound"), 2);
+    const uint8_t g2[][2] = {{0, HOLD}, {1, CONQUER}, {0, CONQUER}, {1, CONQUER}, {0, CONQUER}};
+    for (auto &e : g2) {
+        bb_game_adjust(&g, e[0], e[1], 1, 0);
+    }
+    {
+        UiState s = state_for(g);
+        s.match = &match;
+        s.best_of = 3;
+        s.timer_minutes = 50;
+        s.timer_running = true;
+        s.timer_left_s = 23 * 60 + 41;
+        save(frame, s, "match-timer");
+
+        // Same, facing: score and clock in a pill on the divider, over time.
+        s.layout = Layout::Facing;
+        s.timer_left_s = -(2 * 60 + 10);
+        save(frame, s, "match-facing-overtime");
+    }
+
+    // YOU reach 8: game-over banner, winning the match 2-0.
+    for (int i = 0; i < 6; i++) {
+        bb_game_adjust(&g, 0, i % 2 ? HOLD : CONQUER, 1, 0);
+    }
+    {
+        UiState s = state_for(g);
+        s.match = &match;
+        s.best_of = 3;
+        s.timer_minutes = 50;
+        s.timer_running = true;
+        s.timer_left_s = 4 * 60 + 2;
+        save(frame, s, "match-banner");
+    }
+
     // Menu with four players.
     bb_game_init(&g, bb_profile_find("riftbound"), 4);
     {
@@ -174,6 +218,8 @@ int main(int argc, char **argv)
         UiState s = state_for(g);
         s.menu = true;
         s.layout = Layout::Facing;
+        s.best_of = 3;
+        s.timer_minutes = 50;
         save(frame, s, "menu");
     }
 

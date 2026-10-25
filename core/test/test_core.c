@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "bb/game.h"
+#include "bb/match.h"
 #include "bb/profile.h"
 
 static int failures;
@@ -221,6 +222,57 @@ static void test_four_players(void)
     CHECK(g.value[3] == 1);
 }
 
+static void test_match(void)
+{
+    bb_match_t m;
+
+    bb_match_init(&m, 3);
+    CHECK(bb_match_winner(&m) == -1);
+    bb_match_record(&m, 1);
+    bb_match_record(&m, 0);
+    CHECK(bb_match_winner(&m) == -1);
+    bb_match_record(&m, 0);
+    CHECK(bb_match_winner(&m) == 0);
+    CHECK(m.games == 3 && m.winners[0] == 1 && m.winners[2] == 0);
+    bb_match_record(&m, 1); /* ignored: match is over */
+    CHECK(m.games == 3 && m.wins[1] == 1);
+
+    bb_match_init(&m, 1);
+    bb_match_record(&m, 1);
+    CHECK(bb_match_winner(&m) == 1);
+
+    bb_match_init(&m, 0);
+    CHECK(m.best_of == 1);
+    bb_match_init(&m, 9);
+    CHECK(m.best_of == BB_MATCH_MAX_GAMES);
+}
+
+static void test_game_winner(void)
+{
+    bb_game_t g;
+
+    bb_game_init(&g, bb_profile_find("riftbound"), 2);
+    CHECK(bb_game_winner(&g) == -1);
+    bb_game_adjust(&g, 1, CONQUER, 8, 0);
+    CHECK(bb_game_winner(&g) == 1);
+
+    bb_game_init(&g, bb_profile_find("mtg"), 2);
+    bb_game_adjust(&g, 0, 0, -20, 0);
+    CHECK(bb_game_winner(&g) == 1); /* YOU at 0: OPP wins */
+
+    bb_game_init(&g, bb_profile_find("mtg"), 1);
+    bb_game_adjust(&g, 0, 0, -20, 0);
+    CHECK(bb_game_winner(&g) == 1); /* solo: the untracked opponent wins */
+
+    bb_game_init(&g, bb_profile_find("lorcana"), 1);
+    bb_game_adjust(&g, 0, 0, 20, 0);
+    CHECK(bb_game_winner(&g) == 0);
+
+    bb_game_init(&g, bb_profile_find("mtg"), 3);
+    bb_game_adjust(&g, 0, 0, -20, 0);
+    CHECK(bb_game_winner(&g) == -1); /* no head-to-head result with 3+ players */
+}
+
 static void test_status(void)
 {
     bb_game_t g;
@@ -252,6 +304,8 @@ int main(void)
     test_two_players();
     test_kinds_and_tally();
     test_four_players();
+    test_match();
+    test_game_winner();
     test_status();
 
     if (failures) {

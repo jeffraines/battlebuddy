@@ -1,18 +1,21 @@
 // BattleBuddy prototype for the LilyGO T-Display-S3 Touch.
 //
 // Buttons (board held landscape):
-//   BOOT (GPIO0), short press: open/close the menu (game, players, layout, flip, restart, sleep)
-// Players: 1-4 (two teams for team games), side by side, facing, or in quadrants.
+//   BOOT (GPIO0), short press: open/close the menu
 //   BOOT, hold 1 s:            sleep
 //   KEY (GPIO14):              undo (closes the menu when it is open); wakes from sleep
 //   Circle below the screen:   open/close the menu
-// The game survives sleep (kept in RTC memory) but not a power cut or reset.
+// Menu: game, players (1-4, or two teams), layout, flip, best-of match, timer,
+// restart, sleep. The game, match and timer survive sleep (RTC memory and the
+// RTC clock) but not a power cut or reset.
 
 #include <Arduino.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
+#include <time.h>
 
 #include "bb/game.h"
+#include "bb/match.h"
 #include "bb/profile.h"
 #include "board.h"
 #include "display.h"
@@ -33,7 +36,10 @@ constexpr uint8_t kDimBrightness = 20;
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0003;
+constexpr uint32_t kSavedMagic = 0xBB0B0004;
+
+constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
+constexpr uint8_t kTimerChoices[] = {0, 30, 50, 60}; // minutes, 0 = off
 
 struct Saved {
     uint32_t magic;
@@ -41,6 +47,10 @@ struct Saved {
     int16_t step;
     Layout layout;
     bool flipped;
+    uint8_t best_of;       // 0 = match tracking off
+    uint8_t timer_minutes; // 0 = no timer
+    uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
+    bb_match_t match;
     bb_game_t game;
 };
 
@@ -77,6 +87,27 @@ UiAction touch_action;
 uint32_t touch_start_ms = 0;
 uint32_t last_repeat_ms = 0;
 
+// Seconds on the RTC clock, which keeps running through deep sleep.
+uint32_t now_s()
+{
+    return (uint32_t)time(nullptr);
+}
+
+int32_t timer_left_s()
+{
+    int32_t total = saved.timer_minutes * 60;
+    if (saved.match_start == 0) {
+        return total;
+    }
+    return total - (int32_t)(now_s() - saved.match_start);
+}
+
+void new_match()
+{
+    bb_match_init(&saved.match, saved.best_of ? saved.best_of : 1);
+    saved.match_start = 0;
+}
+
 UiState ui_state()
 {
     UiState s;
@@ -87,6 +118,11 @@ UiState ui_state()
     s.flipped = saved.flipped;
     s.menu = menu_open;
     s.toast = toast_until ? toast_text : nullptr;
+    s.match = saved.best_of && game.players <= 2 ? &saved.match : nullptr;
+    s.best_of = saved.best_of;
+    s.timer_minutes = saved.timer_minutes;
+    s.timer_running = saved.timer_minutes > 0;
+    s.timer_left_s = timer_left_s();
     return s;
 }
 
@@ -104,6 +140,7 @@ void start_game(size_t index, uint8_t players)
 {
     saved.profile_index = (uint8_t)(index % bb_profile_count());
     bb_game_init(&game, bb_profile_at(saved.profile_index), players);
+    new_match();
     dirty = true;
 }
 
@@ -165,8 +202,44 @@ void perform(const UiAction &a, uint32_t now)
     case UiAction::Adjust:
         if (bb_game_adjust(&game, a.player, a.kind, a.delta, now) != 0) {
             dirty = true;
+            if (saved.match_start == 0) {
+                saved.match_start = now_s(); // the timer starts with the first change
+            }
         }
         break;
+    case UiAction::NextGame: {
+        int winner = bb_game_winner(&game);
+        if (winner < 0) {
+            break;
+        }
+        bb_match_record(&saved.match, (uint8_t)winner);
+        if (bb_match_winner(&saved.match) >= 0) {
+            new_match();
+        }
+        bb_game_reset(&game);
+        dirty = true;
+        break;
+    }
+    case UiAction::MenuMatch: {
+        size_t i = 0;
+        while (i < sizeof(kBestOfChoices) && kBestOfChoices[i] != saved.best_of) {
+            i++;
+        }
+        saved.best_of = kBestOfChoices[(i + 1) % sizeof(kBestOfChoices)];
+        bb_match_init(&saved.match, saved.best_of ? saved.best_of : 1); // keeps the timer
+        dirty = true;
+        break;
+    }
+    case UiAction::MenuTimer: {
+        size_t i = 0;
+        while (i < sizeof(kTimerChoices) && kTimerChoices[i] != saved.timer_minutes) {
+            i++;
+        }
+        saved.timer_minutes = kTimerChoices[(i + 1) % sizeof(kTimerChoices)];
+        saved.match_start = 0; // restarts with the next change
+        dirty = true;
+        break;
+    }
     case UiAction::ToggleStep:
         saved.step = saved.step == 1 ? 5 : 1;
         dirty = true;
@@ -188,8 +261,9 @@ void perform(const UiAction &a, uint32_t now)
         break;
     case UiAction::MenuRestart:
         bb_game_reset(&game);
+        new_match();
         menu_open = false;
-        show_toast("New game", now);
+        show_toast("New match", now);
         break;
     case UiAction::MenuSleep:
         go_to_sleep();
@@ -316,6 +390,8 @@ void setup()
         saved.step = 1;
         saved.layout = Layout::SideYouLeft;
         saved.flipped = false;
+        saved.best_of = 1;
+        saved.timer_minutes = 0;
         start_game(0, 1);
     }
     saved.magic = 0; // only trusted again after the next sleep
@@ -355,6 +431,16 @@ void loop()
     if (toast_until && (int32_t)(now - toast_until) >= 0) {
         toast_until = 0;
         dirty = true;
+    }
+
+    // Redraw once a second while the timer is counting.
+    static int32_t shown_timer_s = 0;
+    if (saved.timer_minutes && saved.match_start) {
+        int32_t left = timer_left_s();
+        if (left != shown_timer_s) {
+            shown_timer_s = left;
+            dirty = true;
+        }
     }
 
     uint32_t idle = now - last_input_ms;

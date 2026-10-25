@@ -21,12 +21,22 @@ Hold the board landscape, USB port on the right.
 
 | Tile | Does |
 |---|---|
-| Game | Cycles Riftbound → Magic → Commander → Lorcana → Flesh and Blood (restarts) |
-| Players | *Just you* or *Both* on one screen (restarts) |
-| Layout | Two players only: *YOU left*, *YOU right*, or *Facing* (YOU along the bottom, OPP along the top upside down, for a device lying between you) |
+| Game | Cycles Riftbound → Riftbound 2v2 → Magic → Commander → Lorcana → Flesh and Blood (restarts) |
+| Players | *Just you*, *Two*, *Three*, *Four* (team games: one or two teams) (restarts) |
+| Layout | Two players: *YOU left*, *YOU right*, or *Facing* (opponent upside down along the top, for a device lying between you). Three or four: *Upright* or *Facing* (top row upside down) |
 | Flip | Rotates the whole screen 180° (USB port on the left) |
-| Restart | New game |
+| Match | *Off*, *Bo1*, *Bo3*, *Bo5*. One or two sides only |
+| Timer | *Off*, *30*, *50*, *60 min* countdown; starts with the first point |
+| Restart | New match |
 | Sleep | Sleep now; KEY wakes |
+
+**Matches and the timer:** when a game is decided (someone reaches the win
+target, or a life total hits 0), a banner shows who won the game and the match
+score. Tap to start the next game, or a new match once someone has won it.
+Undo before tapping if the result was a mistake. The match score and the
+countdown sit in the header (or a small pill on the middle line in facing and
+four-player layouts). The clock turns gold under 5 minutes and red with a `+`
+once time is up. It keeps running while the board sleeps.
 
 **Counting:**
 
@@ -38,6 +48,10 @@ Hold the board landscape, USB port on the right.
   step between 1 and 5. Hold to repeat.
 - Other games, two players: side by side, top half of a player's side +1,
   bottom half −1; facing, left third −1, right third +1 of your own strip.
+- Three or four players: each quarter has its own CONQUER/HOLD buttons (C/H)
+  or −/+ sides.
+- Riftbound 2v2 keeps one score per team, to 11. (The 11 is my assumption;
+  it's one number in `core/src/profile.c`.)
 
 For games other than Riftbound, quick taps are grouped: changes within 1.5 s
 of each other show as a pending `+3` / `-2`, then become one history entry

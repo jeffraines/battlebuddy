@@ -118,11 +118,11 @@ Rect kind_button(const UiState &s, uint8_t p, uint8_t kind)
     return {panel.x + (kind == 0 ? 6 : 82), 110, 72, 36};
 }
 
-constexpr int kMenuTiles = 6;
+constexpr int kMenuTiles = 8;
 
 Rect menu_tile(int i)
 {
-    return {6 + (i % 3) * 104, 30 + (i / 3) * 70, 100, 64};
+    return {4 + (i % 4) * 79, 30 + (i / 4) * 70, 75, 64};
 }
 
 // ---- Drawing helpers --------------------------------------------------------
@@ -179,14 +179,120 @@ void draw_battery(LGFX_Sprite &f, const Theme &t, int percent, int x = kWidth - 
     }
 }
 
-void draw_header(LGFX_Sprite &f, const Theme &t, const char *title, int battery_percent)
+void fit_font(LGFX_Sprite &f, const char *text, int max_w);
+
+// Match score ("1-0") and countdown ("28:14", "+2:10" over time). Returns false
+// when there is nothing to show.
+bool match_info(const UiState &s, char *score, size_t score_n, char *clock, size_t clock_n,
+                uint32_t *clock_color, const Theme &t)
+{
+    score[0] = clock[0] = '\0';
+    if (s.match) {
+        snprintf(score, score_n, "%d-%d", s.match->wins[0], s.match->wins[1]);
+    }
+    if (s.timer_running) {
+        int32_t left = s.timer_left_s;
+        int32_t a = left < 0 ? -left : left;
+        snprintf(clock, clock_n, "%s%ld:%02ld", left < 0 ? "+" : "", (long)(a / 60), (long)(a % 60));
+        *clock_color = left < 0 ? kLoss : left < 5 * 60 ? t.accent : t.text;
+    }
+    return score[0] || clock[0];
+}
+
+void draw_header(LGFX_Sprite &f, const Theme &t, const UiState &s, const char *title)
 {
     f.setFont(&fonts::FreeSansBold9pt7b);
     f.setTextSize(1);
     f.setTextColor(t.accent);
     f.setTextDatum(textdatum_t::middle_left);
     f.drawString(title, 8, kHeaderH / 2);
-    draw_battery(f, t, battery_percent);
+    draw_battery(f, t, s.battery_percent);
+
+    if (s.menu) {
+        return;
+    }
+    char score[8], clock[12];
+    uint32_t clock_color = t.text;
+    if (!match_info(s, score, sizeof(score), clock, sizeof(clock), &clock_color, t)) {
+        return;
+    }
+    f.setTextDatum(textdatum_t::middle_right);
+    int x = kWidth - 38;
+    if (clock[0]) {
+        f.setTextColor(clock_color);
+        x -= f.drawString(clock, x, kHeaderH / 2) + 10;
+    }
+    if (score[0]) {
+        f.setTextColor(t.muted);
+        f.drawString(score, x, kHeaderH / 2);
+    }
+}
+
+// Match score and countdown in a small pill on the row divider, for layouts
+// without a header.
+void draw_info_pill(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    char score[8], clock[12], text[24];
+    uint32_t clock_color = t.text;
+    if (!match_info(s, score, sizeof(score), clock, sizeof(clock), &clock_color, t)) {
+        return;
+    }
+    snprintf(text, sizeof(text), "%s%s%s", score, score[0] && clock[0] ? "  " : "", clock);
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    int w = f.textWidth(text) + 16;
+    Rect r{(kWidth - w) / 2, kStripH - 9, w, 18};
+    f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
+    f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, 160));
+    f.setTextDatum(textdatum_t::middle_center);
+    f.setTextColor(clock[0] && s.timer_left_s < 0 ? clock_color : t.text);
+    f.drawString(text, r.cx(), r.cy());
+}
+
+// Game-over banner: who won this game, the match score, what a tap does next.
+void draw_banner(LGFX_Sprite &f, const Theme &t, const UiState &s, int winner)
+{
+    const bb_game_t &g = *s.game;
+    const bb_match_t &m = *s.match;
+    char line1[32], line2[16], line3[32];
+
+    bb_match_t after = m;
+    bb_match_record(&after, (uint8_t)winner);
+    bool match_over = bb_match_winner(&after) >= 0;
+    const char *who = ui_player_label(g, (uint8_t)winner);
+    const char *verb = strcmp(who, "YOU") == 0 ? "WIN" : "WINS";
+
+    if (match_over && m.best_of > 1) {
+        snprintf(line1, sizeof(line1), "%s %s THE MATCH", who, verb);
+    } else {
+        snprintf(line1, sizeof(line1), "%s %s GAME %d", who, verb, m.games + 1);
+    }
+    snprintf(line2, sizeof(line2), "%d - %d", after.wins[0], after.wins[1]);
+    if (match_over) {
+        snprintf(line3, sizeof(line3), "Tap for a new match");
+    } else {
+        snprintf(line3, sizeof(line3), "Tap for game %d", m.games + 2);
+    }
+
+    Rect r{24, 36, kWidth - 48, 98};
+    f.fillRoundRect(r.x + 3, r.y + 4, r.w, r.h, 12, mix(t.bg_bottom, 0x000000, 160));
+    f.fillRoundRect(r.x, r.y, r.w, r.h, 12, t.surface);
+    f.drawRoundRect(r.x, r.y, r.w, r.h, 12, kWinColor);
+    f.drawRoundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 11, mix(t.surface, kWinColor, 120));
+
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::middle_center);
+    fit_font(f, line1, r.w - 20);
+    f.setTextColor(kWinColor);
+    f.drawString(line1, r.cx(), r.y + 22);
+
+    f.setFont(&fonts::FreeSansBold18pt7b);
+    f.setTextColor(t.text);
+    f.drawString(line2, r.cx(), r.y + 54);
+
+    f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextColor(t.muted);
+    f.drawString(line3, r.cx(), r.y + 84);
 }
 
 // Picks the largest of a few fonts that fits text into max_w.
@@ -690,13 +796,20 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
     static const char *const kTeamNames[] = {"One team", "Two teams"};
     const char *players = g.profile->teams ? kTeamNames[(g.players - 1) & 1] : kPlayerNames[g.players - 1];
 
-    const char *labels[kMenuTiles] = {"Game", "Players", "Layout", "Flip", "Restart", "Sleep"};
+    char match[8], timer[8];
+    snprintf(match, sizeof(match), s.best_of ? "Bo%d" : "Off", s.best_of);
+    snprintf(timer, sizeof(timer), s.timer_minutes ? "%d min" : "Off", s.timer_minutes);
+
+    const char *labels[kMenuTiles] = {"Game", "Players", "Layout", "Flip",
+                                      "Match", "Timer", "Restart", "Sleep"};
     const char *values[kMenuTiles] = {
         g.profile->name,
         players,
         g.players > 1 ? ui_layout_name(g, s.layout) : "-",
         s.flipped ? "On" : "Off",
-        "New game",
+        g.players <= 2 ? match : "-",
+        timer,
+        "New",
         "KEY wakes",
     };
 
@@ -708,7 +821,7 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
 
     for (int i = 0; i < kMenuTiles; i++) {
         Rect r = menu_tile(i);
-        bool enabled = !(i == 2 && g.players < 2);
+        bool enabled = !(i == 2 && g.players < 2) && !(i == 4 && g.players > 2);
         f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
         f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, enabled ? 140 : 40));
 
@@ -716,9 +829,9 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextSize(1);
         f.setTextColor(t.muted);
         f.setTextDatum(textdatum_t::middle_left);
-        f.drawString(labels[i], r.x + 9, r.y + 15);
+        f.drawString(labels[i], r.x + 8, r.y + 15);
 
-        fit_font(f, values[i], r.w - 12);
+        fit_font(f, values[i], r.w - 10);
         f.setTextColor(enabled ? t.accent : t.muted);
         f.setTextDatum(textdatum_t::middle_center);
         f.drawString(values[i], r.cx(), r.y + 44);
@@ -796,6 +909,11 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
         } else {
             draw_facing(frame, t, state);
         }
+        draw_info_pill(frame, t, state);
+        int winner = ui_banner_winner(state);
+        if (winner >= 0) {
+            draw_banner(frame, t, state, winner);
+        }
         if (state.toast) {
             draw_toast(frame, t, state.toast, kStripH);
         }
@@ -803,7 +921,7 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
     }
 
     draw_background(frame, t, !state.menu);
-    draw_header(frame, t, state.menu ? "MENU" : state.game->profile->name, state.battery_percent);
+    draw_header(frame, t, state, state.menu ? "MENU" : state.game->profile->name);
 
     if (state.menu) {
         draw_menu(frame, t, state);
@@ -816,9 +934,21 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
         draw_side_by_side(frame, t, state);
     }
 
+    int winner = ui_banner_winner(state);
+    if (winner >= 0) {
+        draw_banner(frame, t, state, winner);
+    }
     if (state.toast) {
         draw_toast(frame, t, state.toast, (kFooterTop + kHeight) / 2);
     }
+}
+
+int ui_banner_winner(const UiState &state)
+{
+    if (state.menu || !state.match) {
+        return -1;
+    }
+    return bb_game_winner(state.game);
 }
 
 UiAction ui_hit(const UiState &state, int x, int y)
@@ -832,20 +962,27 @@ UiAction ui_hit(const UiState &state, int x, int y)
             return a;
         }
         static const UiAction::Type kTileActions[kMenuTiles] = {
-            UiAction::MenuGame, UiAction::MenuPlayers, UiAction::MenuLayout,
-            UiAction::MenuFlip, UiAction::MenuRestart, UiAction::MenuSleep};
+            UiAction::MenuGame,  UiAction::MenuPlayers, UiAction::MenuLayout,  UiAction::MenuFlip,
+            UiAction::MenuMatch, UiAction::MenuTimer,   UiAction::MenuRestart, UiAction::MenuSleep};
         for (int i = 0; i < kMenuTiles; i++) {
             Rect r = menu_tile(i);
             // Tiles are hit-tested with the gaps included so near-misses still count.
             Rect padded{r.x - 2, r.y - 3, r.w + 4, r.h + 6};
             if (padded.contains(x, y)) {
-                if (kTileActions[i] == UiAction::MenuLayout && g.players < 2) {
+                if ((kTileActions[i] == UiAction::MenuLayout && g.players < 2) ||
+                    (kTileActions[i] == UiAction::MenuMatch && g.players > 2)) {
                     return a;
                 }
                 a.type = kTileActions[i];
                 return a;
             }
         }
+        return a;
+    }
+
+    // While the game-over banner shows, any tap moves on to the next game.
+    if (ui_banner_winner(state) >= 0) {
+        a.type = UiAction::NextGame;
         return a;
     }
 

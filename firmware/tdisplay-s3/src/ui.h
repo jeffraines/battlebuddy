@@ -4,6 +4,7 @@
 #include <LovyanGFX.hpp>
 
 #include "bb/game.h"
+#include "bb/match.h"
 
 // Landscape frame size for the T-Display-S3 (170x320 panel, rotated).
 constexpr int kWidth = 320;
@@ -26,6 +27,12 @@ struct UiState {
     bool flipped;        // whole screen rotated 180 degrees (menu label only)
     bool menu;           // menu screen instead of the counter
     const char *toast;   // short message, or nullptr
+
+    const bb_match_t *match; // best-of match in progress, or nullptr when off
+    int best_of;             // menu value: 0 = off, 1 / 3 / 5
+    int timer_minutes;       // menu value: 0 = off
+    bool timer_running;      // show the countdown
+    int32_t timer_left_s;    // seconds left; negative = over time
 };
 
 struct UiAction {
@@ -37,9 +44,12 @@ struct UiAction {
         MenuPlayers,
         MenuLayout,
         MenuFlip,
+        MenuMatch,
+        MenuTimer,
         MenuRestart,
         MenuSleep,
         MenuClose,
+        NextGame, // dismiss the game-over banner and record the result
     };
 
     Type type = None;
@@ -51,6 +61,9 @@ struct UiAction {
 
 // Draws the current screen into frame.
 void ui_draw(LGFX_Sprite &frame, const UiState &state);
+
+// Winner of the current game when the game-over banner should show, else -1.
+int ui_banner_winner(const UiState &state);
 
 // Maps a tap at screen coordinates (x, y) to an action. Uses the same layout
 // as ui_draw, so what is drawn is what is tapped.
