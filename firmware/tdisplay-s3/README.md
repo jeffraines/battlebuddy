@@ -8,23 +8,35 @@ CST816 capacitive touch, ESP32-S3). The counter logic lives in
 
 ## Controls
 
-Hold the board landscape.
+Hold the board landscape, USB port on the right.
 
 | Input | Action |
 |---|---|
-| Tap left third | −1 (or −5) |
-| Tap right third | +1 (or +5) |
-| Hold left/right | Repeat |
-| Tap middle | Switch step between 1 and 5 |
-| KEY button (GPIO14) | Undo |
-| BOOT button (GPIO0), short | Next game (Riftbound → Magic → Commander → Lorcana → Flesh and Blood) |
-| BOOT button, hold 1 s | Restart the current game |
+| **BOOT** button, short press | Open / close the menu |
+| **BOOT**, hold 1 s | Sleep |
+| **KEY** button | Undo (shows what was undone); closes the menu if open; wakes from sleep |
+| Circle below the screen | Open / close the menu |
+
+**Menu:** tap a row. *Game* cycles Riftbound → Magic → Commander → Lorcana →
+Flesh and Blood. *Players* switches between just you and both players (one
+screen, YOU on the left, OPP on the right). Both restart the game. *Restart
+game* and *Sleep* do what they say. Tap the header to close.
+
+**Counting:**
+
+- Riftbound: tap **CONQUER** or **HOLD** to score a point of that kind. The
+  buttons show how many points came from each. Mistakes are fixed with undo.
+- Other games, one player: left third −, right third +, middle switches the
+  step between 1 and 5. Hold to repeat.
+- Other games, two players: top half of a player's side +1, bottom half −1.
 
 Quick taps are grouped: changes within 1.5 s of each other show as a pending
-`+3` / `-2` under the number, then become one history entry along the bottom.
-Undo removes the pending change first, then history entries one by one.
+`+3` / `-2`, then become one history entry along the bottom (C = Conquer,
+H = Hold; colored by player in two-player mode).
 
-The screen dims after 30 s; the first touch or button press only wakes it.
+Each game has its own color theme. The screen dims after 30 s idle and the
+board sleeps after 10 minutes; the first touch or press after dimming only
+wakes the screen. The game survives sleep, but not a reset or power cut.
 
 ## Build and flash
 
@@ -47,8 +59,11 @@ These were set from LilyGO's pin map but haven't been tested on hardware yet:
   to `3` in `src/main.cpp`.
 - **Touch alignment:** if taps land on the wrong side, adjust
   `offset_rotation` in `src/display.h` (try 1, 2, 3).
-- **Battery reading:** the top-right shows `USB` above 4.3 V, otherwise a rough
-  percentage. Plug in a LiPo and compare.
+- **Battery reading:** the top-right shows a lightning bolt above 4.3 V (USB),
+  otherwise a rough charge level. Plug in a LiPo and compare.
+- **Circle key:** the serial monitor prints `touch raw x=.. y=..` for every
+  touch. The circle should report y ≥ 320; if it reports something else, change
+  `kRawHomeKeyY` in `src/main.cpp`.
 
 ## Previewing the UI without hardware
 

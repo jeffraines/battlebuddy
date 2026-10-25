@@ -171,3 +171,12 @@ panels (a full 2.8" frame is 150 KB).
 - Built-in LiPo charging (battery pads on the back), so the Nordic prototype
   can run on battery too.
 - Zephyr board target: `xiao_ble`; the extra Plus pins go in a devicetree overlay.
+
+## T-Display-S3 battery
+
+1-cell 3.7 V LiPo with a JST 1.25 mm 2-pin plug (or solder any LiPo to the
+pigtail that comes with the board). To sit behind the board, look for a flat
+cell no larger than the board's footprint (roughly 25 × 60 mm; measure yours):
+e.g. `602560`-ish sizes (6 × 25 × 60 mm) are around 1000–1200 mAh; a thicker
+`802560`-ish cell gets closer to 1400 mAh. Pick one with a protection circuit,
+and check the red wire matches the board's + marking before plugging in.

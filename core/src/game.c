@@ -2,83 +2,122 @@
 
 #include <string.h>
 
-void bb_game_init(bb_game_t *game, const bb_profile_t *profile)
+void bb_game_init(bb_game_t *game, const bb_profile_t *profile, uint8_t players)
 {
+    if (players < 1) {
+        players = 1;
+    } else if (players > BB_MAX_PLAYERS) {
+        players = BB_MAX_PLAYERS;
+    }
+
     memset(game, 0, sizeof(*game));
     game->profile = profile;
-    game->value = profile->start;
+    game->players = players;
+    for (uint8_t p = 0; p < players; p++) {
+        game->value[p] = profile->start;
+    }
 }
 
 void bb_game_reset(bb_game_t *game)
 {
-    bb_game_init(game, game->profile);
+    bb_game_init(game, game->profile, game->players);
 }
 
-int16_t bb_game_adjust(bb_game_t *game, int16_t delta, uint32_t now_ms)
+static void apply(bb_game_t *game, uint8_t player, uint8_t kind, int16_t delta)
 {
-    int32_t target = (int32_t)game->value + delta;
+    game->value[player] = (int16_t)(game->value[player] + delta);
+    if (game->profile->kind_count > 0) {
+        game->tally[player][kind] = (int16_t)(game->tally[player][kind] + delta);
+    }
+}
 
+int16_t bb_game_adjust(bb_game_t *game, uint8_t player, uint8_t kind, int16_t delta,
+                       uint32_t now_ms)
+{
+    if (player >= game->players) {
+        return 0;
+    }
+    if (kind >= game->profile->kind_count) {
+        kind = 0;
+    }
+
+    /* A change to a different player or kind starts a new history entry. */
+    if (game->pending.delta != 0 &&
+        (game->pending.player != player || game->pending.kind != kind)) {
+        bb_game_commit(game);
+    }
+
+    int32_t target = (int32_t)game->value[player] + delta;
     if (target < game->profile->min) {
         target = game->profile->min;
     } else if (target > game->profile->max) {
         target = game->profile->max;
     }
 
-    int16_t applied = (int16_t)(target - game->value);
-    game->value = (int16_t)target;
-    game->pending = (int16_t)(game->pending + applied);
+    int16_t applied = (int16_t)(target - game->value[player]);
+    apply(game, player, kind, applied);
+    game->pending.player = player;
+    game->pending.kind = kind;
+    game->pending.delta = (int16_t)(game->pending.delta + applied);
+    game->pending.value = game->value[player];
     game->last_change_ms = now_ms;
     return applied;
 }
 
 bool bb_game_commit(bb_game_t *game)
 {
-    if (game->pending == 0) {
+    if (game->pending.delta == 0) {
         return false;
     }
 
-    game->history[game->history_head] = (bb_entry_t){game->pending, game->value};
+    game->history[game->history_head] = game->pending;
     game->history_head = (uint16_t)((game->history_head + 1) % BB_HISTORY_LEN);
     if (game->history_count < BB_HISTORY_LEN) {
         game->history_count++;
     }
-    game->pending = 0;
+    game->pending.delta = 0;
     return true;
 }
 
 bool bb_game_tick(bb_game_t *game, uint32_t now_ms)
 {
-    if (game->pending == 0 || (uint32_t)(now_ms - game->last_change_ms) < BB_COMMIT_MS) {
+    if (game->pending.delta == 0 || (uint32_t)(now_ms - game->last_change_ms) < BB_COMMIT_MS) {
         return false;
     }
     return bb_game_commit(game);
 }
 
-bool bb_game_undo(bb_game_t *game)
+bool bb_game_undo(bb_game_t *game, bb_entry_t *reverted)
 {
-    if (game->pending != 0) {
-        game->value = (int16_t)(game->value - game->pending);
-        game->pending = 0;
-        return true;
-    }
-    if (game->history_count == 0) {
+    bb_entry_t e;
+
+    if (game->pending.delta != 0) {
+        e = game->pending;
+        game->pending.delta = 0;
+    } else if (game->history_count > 0) {
+        game->history_head = (uint16_t)((game->history_head + BB_HISTORY_LEN - 1) % BB_HISTORY_LEN);
+        game->history_count--;
+        e = game->history[game->history_head];
+    } else {
         return false;
     }
 
-    game->history_head = (uint16_t)((game->history_head + BB_HISTORY_LEN - 1) % BB_HISTORY_LEN);
-    game->history_count--;
-    game->value = (int16_t)(game->value - game->history[game->history_head].delta);
+    apply(game, e.player, e.kind, (int16_t)-e.delta);
+    if (reverted) {
+        *reverted = e;
+    }
     return true;
 }
 
-bb_status_t bb_game_status(const bb_game_t *game)
+bb_status_t bb_game_status(const bb_game_t *game, uint8_t player)
 {
     const bb_profile_t *p = game->profile;
+    int16_t v = game->value[player];
 
-    if (p->win_at != BB_NONE && game->value >= p->win_at) {
+    if (p->win_at != BB_NONE && v >= p->win_at) {
         return BB_STATUS_WON;
     }
-    if (p->lose_at != BB_NONE && game->value <= p->lose_at) {
+    if (p->lose_at != BB_NONE && v <= p->lose_at) {
         return BB_STATUS_LOST;
     }
     return BB_STATUS_PLAYING;

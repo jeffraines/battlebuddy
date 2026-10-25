@@ -12,7 +12,8 @@ Draft format (JSON for editing; may be packed as CBOR on-device):
   "version": 1,
   "players": 2,
   "counters": [
-    { "id": "points", "label": "Points", "start": 0, "min": 0, "win_at": 8, "primary": true }
+    { "id": "points", "label": "Points", "start": 0, "min": 0, "win_at": 8, "primary": true,
+      "kinds": ["Conquer", "Hold"] }
   ]
 }
 ```
@@ -32,6 +33,10 @@ Draft format (JSON for editing; may be packed as CBOR on-device):
 
 Starter set to define: Riftbound, Magic (20 / Commander 40), Lorcana (lore to
 20), Flesh and Blood, Star Wars: Unlimited.
+
+`kinds` (optional) names the ways a counter can change. Each change is tagged
+with one, and the device keeps a tally per kind (Riftbound: points from
+Conquer vs Hold).
 
 Every counter change is appended to a per-game history log so the device
 supports undo and can show how a total was reached.

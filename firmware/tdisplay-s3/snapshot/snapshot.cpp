@@ -1,5 +1,5 @@
-// Renders the counter UI for a few game states to PPM files, using the same
-// ui_draw() as the firmware. Lets the layout be checked without hardware.
+// Renders the UI for a few game states to PPM files, using the same ui_draw()
+// as the firmware. Lets the layout be checked without hardware.
 
 #include <stdio.h>
 
@@ -7,8 +7,14 @@
 #include "bb/game.h"
 #include "bb/profile.h"
 
-static void save_ppm(LGFX_Sprite &frame, const char *path)
+static const char *out_dir = ".";
+
+static void save(LGFX_Sprite &frame, const UiState &state, const char *name)
 {
+    ui_draw(frame, state);
+
+    char path[256];
+    snprintf(path, sizeof(path), "%s/%s.ppm", out_dir, name);
     FILE *f = fopen(path, "wb");
     if (!f) {
         perror(path);
@@ -26,52 +32,92 @@ static void save_ppm(LGFX_Sprite &frame, const char *path)
     printf("wrote %s\n", path);
 }
 
+static UiState state_for(const bb_game_t &g)
+{
+    UiState s;
+    s.game = &g;
+    s.step = 1;
+    s.battery_percent = 76;
+    s.menu = false;
+    s.toast = nullptr;
+    return s;
+}
+
 int main(int argc, char **argv)
 {
-    const char *dir = argc > 1 ? argv[1] : ".";
-    char path[256];
+    if (argc > 1) {
+        out_dir = argv[1];
+    }
     LGFX_Sprite frame;
     frame.setColorDepth(16);
     frame.createSprite(kWidth, kHeight);
 
-    bb_game_t game;
+    bb_game_t g;
+    enum { CONQUER = 0, HOLD = 1 };
 
-    // Magic mid-game: history plus a pending change, step 5.
-    bb_game_init(&game, bb_profile_find("mtg"));
-    bb_game_adjust(&game, -3, 0);
-    bb_game_commit(&game);
-    bb_game_adjust(&game, 2, 0);
-    bb_game_commit(&game);
-    bb_game_adjust(&game, -5, 0);
-    bb_game_commit(&game);
-    bb_game_adjust(&game, -2, 0);
-    ui_draw(frame, game, 5, 76);
-    snprintf(path, sizeof(path), "%s/mtg.ppm", dir);
-    save_ppm(frame, path);
+    // Riftbound, just yourself: two Conquers and a Hold, one Hold pending.
+    bb_game_init(&g, bb_profile_find("riftbound"), 1);
+    bb_game_adjust(&g, 0, CONQUER, 1, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 0, HOLD, 1, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 0, CONQUER, 1, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 0, HOLD, 1, 0);
+    save(frame, state_for(g), "riftbound-1p");
 
-    // Commander start, on USB.
-    bb_game_init(&game, bb_profile_find("mtg-commander"));
-    ui_draw(frame, game, 1, -1);
-    snprintf(path, sizeof(path), "%s/commander.ppm", dir);
-    save_ppm(frame, path);
+    // Riftbound, both players, you have won.
+    bb_game_init(&g, bb_profile_find("riftbound"), 2);
+    bb_game_adjust(&g, 1, HOLD, 2, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 0, CONQUER, 5, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 1, CONQUER, 3, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 0, HOLD, 3, 0);
+    bb_game_commit(&g);
+    save(frame, state_for(g), "riftbound-2p");
 
-    // Riftbound win.
-    bb_game_init(&game, bb_profile_find("riftbound"));
-    for (int i = 0; i < 8; i++) {
-        bb_game_adjust(&game, 1, 0);
-        bb_game_commit(&game);
+    // Magic, both players, opponent's change pending.
+    bb_game_init(&g, bb_profile_find("mtg"), 2);
+    bb_game_adjust(&g, 0, 0, -6, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 1, 0, -13, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 0, 0, 3, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 1, 0, -2, 0);
+    save(frame, state_for(g), "mtg-2p");
+
+    // Lorcana solo, step 5, showing an undo toast.
+    bb_game_init(&g, bb_profile_find("lorcana"), 1);
+    bb_game_adjust(&g, 0, 0, 7, 0);
+    bb_game_commit(&g);
+    {
+        UiState s = state_for(g);
+        s.step = 5;
+        s.toast = "Undo +2";
+        s.battery_percent = 15;
+        save(frame, s, "lorcana-toast");
     }
-    ui_draw(frame, game, 1, 42);
-    snprintf(path, sizeof(path), "%s/riftbound-win.ppm", dir);
-    save_ppm(frame, path);
 
-    // Magic loss with a negative total.
-    bb_game_init(&game, bb_profile_find("mtg"));
-    bb_game_adjust(&game, -27, 0);
-    bb_game_commit(&game);
-    ui_draw(frame, game, 1, 15);
-    snprintf(path, sizeof(path), "%s/mtg-lose.ppm", dir);
-    save_ppm(frame, path);
+    // Commander solo on USB power.
+    bb_game_init(&g, bb_profile_find("mtg-commander"), 1);
+    bb_game_adjust(&g, 0, 0, -9, 0);
+    bb_game_commit(&g);
+    {
+        UiState s = state_for(g);
+        s.battery_percent = -1;
+        save(frame, s, "commander");
+    }
+
+    // Menu, Riftbound theme.
+    bb_game_init(&g, bb_profile_find("riftbound"), 2);
+    {
+        UiState s = state_for(g);
+        s.menu = true;
+        save(frame, s, "menu");
+    }
 
     return 0;
 }
