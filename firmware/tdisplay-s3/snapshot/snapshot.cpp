@@ -49,6 +49,8 @@ static UiState state_for(const bb_game_t &g)
     s.timer_running = false;
     s.timer_left_s = 0;
     s.dice = nullptr;
+    s.picker = nullptr;
+    s.entry = nullptr;
     return s;
 }
 
@@ -249,6 +251,52 @@ int main(int argc, char **argv)
             }
             d.pop = 1000;
         }
+    }
+
+    // Game picker: the games, then Magic's formats bursting out.
+    {
+        bb_game_init(&g, bb_profile_find("riftbound"), 2);
+        UiState s = state_for(g);
+        PickerState pk;
+        s.picker = &pk;
+        save(frame, s, "picker");
+        pk.family = 1;
+        pk.origin = 1;
+        pk.anim = 350;
+        save(frame, s, "picker-burst");
+        pk.anim = 1000;
+        save(frame, s, "picker-formats");
+        pk.family = 0;
+        pk.origin = 0;
+        save(frame, s, "picker-riftbound");
+    }
+
+    // Digimon: YOU have 3 memory; then OPP's turn with 5.
+    bb_game_init(&g, bb_profile_find("digimon"), 2);
+    bb_game_adjust(&g, 0, 0, -3, 0);
+    bb_game_commit(&g);
+    save(frame, state_for(g), "digimon-you");
+    bb_game_adjust(&g, 0, 0, 8, 0);
+    bb_game_commit(&g);
+    save(frame, state_for(g), "digimon-opp");
+
+    // Yu-Gi-Oh!: a fresh game shows how to start; then two players, then the number pad.
+    bb_game_init(&g, bb_profile_find("yugioh"), 2);
+    save(frame, state_for(g), "yugioh-new");
+    bb_game_adjust(&g, 1, 0, -2500, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 0, 0, -1800, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 1, 0, 1000, 0);
+    bb_game_commit(&g);
+    save(frame, state_for(g), "yugioh-2p");
+    {
+        UiState s = state_for(g);
+        EntryState e;
+        e.player = 1;
+        e.amount = 2400;
+        s.entry = &e;
+        save(frame, s, "yugioh-entry");
     }
 
     // Menu with four players.

@@ -9,8 +9,8 @@ table already do. "Unsure" marks rules that need checking before building.
 |---|---|---|---|
 | Life / score | One number per player, up or down, win/lose threshold | Magic, Lorcana, FaB, SWU | Done |
 | Typed score | Each point tagged with how it was earned, in order | Riftbound (Conquer / Hold) | Done |
-| Shared gauge | One marker that moves between the two players | Digimon (memory) | Idea |
-| Amount entry | Type an amount (e.g. −1800) instead of tapping | Yu-Gi-Oh! (8000 LP) | Idea |
+| Shared gauge | One marker that moves between the two players | Digimon (memory) | Done |
+| Amount entry | Type an amount (e.g. −1800) instead of tapping | Yu-Gi-Oh! (8000 LP) | Done |
 | Secondary counters | Extra per-player counters next to life | Magic (poison, commander damage, energy), others | Idea |
 | Coin / dice | Quick random results | Pokémon (coin flips), casual play | Done |
 | Turn / clock | Whose turn, turn count, per-player chess clock | Any; events | Idea |

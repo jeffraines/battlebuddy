@@ -34,6 +34,20 @@ struct DiceState {
     uint8_t history_count = 0;
 };
 
+// The game picker: a grid of games; a game with several formats bursts open
+// into format tiles.
+struct PickerState {
+    int family = -1;      // -1 = the list of games, else that game's formats
+    uint16_t anim = 1000; // format tiles bursting out of the game tile, 0..1000
+    int origin = 0;       // tile the formats burst out of
+};
+
+// The number pad for typing an amount (Yu-Gi-Oh! LP).
+struct EntryState {
+    uint8_t player = 0;
+    int32_t amount = 0;
+};
+
 struct UiState {
     const bb_game_t *game;
     int step;            // single-player +/- step (1 or 5)
@@ -50,6 +64,8 @@ struct UiState {
     int32_t timer_left_s;    // seconds left; negative = over time
 
     const DiceState *dice; // dice screen instead of the counter, or nullptr
+    const PickerState *picker; // game picker, or nullptr
+    const EntryState *entry;   // number pad, or nullptr
 };
 
 struct UiAction {
@@ -70,6 +86,18 @@ struct UiAction {
         DiceSelect, // choose die `kind`
         DiceRoll,
         DiceClose,
+        PickFamily,  // open game `kind` (its formats, or the game itself if it has one)
+        PickProfile, // start profile index `kind`
+        PickerBack,
+        PickerClose,
+        GaugeSet,   // move the shared marker to `delta`
+        GaugePass,  // pass the turn: marker to 3 on the other side
+        OpenEntry,  // number pad for `player`
+        EntryDigit, // `kind` 0-9, or 10 for "00"
+        EntryDelete,
+        EntryApply, // apply the amount with sign `delta` (+1 / -1)
+        EntryHalve,
+        EntryClose,
     };
 
     Type type = None;

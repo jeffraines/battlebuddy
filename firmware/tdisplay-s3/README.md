@@ -21,7 +21,7 @@ Hold the board landscape, USB port on the right.
 
 | Tile | Does |
 |---|---|
-| Game | Cycles Riftbound → Riftbound 2v2 → Magic → Commander → Lorcana → Flesh and Blood (restarts) |
+| Game | Opens the game picker: one tile per game, in that game's colors. Games with several formats (Riftbound 1v1 / 2v2, Magic Standard / Commander) burst open into format tiles; tap one to start. BOOT or the header steps back |
 | Players | *Just you*, *Two*, *Three*, *Four* (team games: one or two teams) (restarts) |
 | Layout | Two players: *YOU left*, *YOU right*, or *Facing* (opponent upside down along the top, for a device lying between you). Three or four: *Upright* or *Facing* (top row upside down) |
 | Flip | Rotates the whole screen 180° (USB port on the left) |
@@ -55,6 +55,14 @@ between faces. Good for casual play; at a sanctioned event, use physical dice.
   bottom half −1; facing, left third −1, right third +1 of your own strip.
 - Three or four players: each quarter has its own CONQUER/HOLD buttons (C/H)
   or −/+ sides.
+- Digimon: a shared memory gauge from YOU's 10 to OPP's 10. Tap a spot on the
+  gauge to jump there, or use the YOU / OPP arrows (hold to repeat). The
+  marker's side shows whose turn it is (it stays with that player at 0).
+  PASS leaves the opponent 3 memory.
+- Yu-Gi-Oh!: 8000 LP. Tap a player to open the number pad, type the amount,
+  then − (damage) or + (gain). 1/2 halves that player's LP; DEL deletes a
+  digit; X or BOOT closes without changing anything. Each entry is one
+  history entry, so undo reverses it exactly.
 - Riftbound 2v2 keeps one score per team, to 11. (The 11 is my assumption;
   it's one number in `core/src/profile.c`.)
 

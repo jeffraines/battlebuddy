@@ -68,6 +68,11 @@ bool bb_game_undo(bb_game_t *game, bb_entry_t *reverted);
 
 bb_status_t bb_game_status(const bb_game_t *game, uint8_t player);
 
+/* For BB_STYLE_GAUGE games: whose turn it is (0 = YOU, 1 = OPP). The marker's
+ * side decides it; at 0 the turn stays with whoever's side it was last on
+ * (YOU at the start of the game). */
+uint8_t bb_gauge_owner(const bb_game_t *game);
+
 /* Copies up to max entries into out, newest first. Returns the number copied. */
 size_t bb_game_history(const bb_game_t *game, bb_entry_t *out, size_t max);
 

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "bb/dice.h"
 #include "bb/game.h"
@@ -312,6 +313,56 @@ static void test_dice(void)
     CHECK(bb_dice_roll(1, lcg, &seed) == 1);
 }
 
+static void test_families(void)
+{
+    CHECK(bb_family_count() == 6);
+    CHECK(strcmp(bb_family_name(0), "Riftbound") == 0);
+    CHECK(strcmp(bb_family_name(1), "Magic") == 0);
+    CHECK(bb_family_name(6) == NULL);
+
+    size_t idx[4];
+    CHECK(bb_family_profiles(0, idx, 4) == 2);
+    CHECK(bb_profile_at(idx[1]) == bb_profile_find("riftbound-2v2"));
+    CHECK(bb_family_profiles(1, idx, 4) == 2);
+    CHECK(bb_profile_at(idx[1]) == bb_profile_find("mtg-commander"));
+    CHECK(bb_family_profiles(2, idx, 4) == 1);
+    CHECK(bb_profile_at(idx[0]) == bb_profile_find("digimon"));
+
+    CHECK(bb_family_of(bb_profile_find("mtg-commander")) == 1);
+    CHECK(bb_family_of(bb_profile_find("fab")) == 5);
+    CHECK(bb_profile_find("yugioh")->style == BB_STYLE_AMOUNT);
+}
+
+static void test_gauge(void)
+{
+    bb_game_t g;
+    bb_game_init(&g, bb_profile_find("digimon"), 2);
+    CHECK(g.value[0] == 0 && bb_gauge_owner(&g) == 0); /* YOU start */
+
+    /* YOU pay 3 from 0: marker moves to OPP's side, their turn. */
+    bb_game_adjust(&g, 0, 0, 3, 0);
+    CHECK(bb_gauge_owner(&g) == 1);
+    bb_game_commit(&g);
+
+    /* OPP pays exactly 3 back to 0: still OPP's turn. */
+    bb_game_adjust(&g, 0, 0, -3, 0);
+    CHECK(g.value[0] == 0 && bb_gauge_owner(&g) == 1);
+    bb_game_commit(&g);
+    CHECK(bb_gauge_owner(&g) == 1);
+
+    /* One more: YOU's side now. */
+    bb_game_adjust(&g, 0, 0, -1, 0);
+    CHECK(bb_gauge_owner(&g) == 0);
+
+    /* Clamped to 10 either side. */
+    bb_game_adjust(&g, 0, 0, -20, 0);
+    CHECK(g.value[0] == -10);
+
+    /* Undo back to 0 restores whose turn it was. */
+    bb_game_undo(&g, NULL);
+    CHECK(g.value[0] == 0 && bb_gauge_owner(&g) == 1);
+}
+
 static void test_status(void)
 {
     bb_game_t g;
@@ -346,6 +397,8 @@ int main(void)
     test_match();
     test_game_winner();
     test_dice();
+    test_families();
+    test_gauge();
     test_status();
 
     if (failures) {

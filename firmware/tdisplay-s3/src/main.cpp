@@ -5,8 +5,9 @@
 //   BOOT, hold 1 s:            sleep
 //   KEY (GPIO14):              undo; rolls on the dice screen; closes the menu; wakes from sleep
 //   Circle below the screen:   open/close the dice
-// Menu: game, players (1-4, or two teams), layout, flip, best-of match, timer,
-// restart, dice. The game, match and timer survive sleep (RTC memory and the
+// Menu: game (opens the game picker), players (1-4, or two teams), layout,
+// flip, best-of match, timer, restart, dice. Yu-Gi-Oh! opens a number pad on
+// tap; Digimon shows a shared memory gauge. The game, match and timer survive sleep (RTC memory and the
 // RTC clock) but not a power cut or reset.
 
 #include <Arduino.h>
@@ -38,11 +39,13 @@ constexpr uint8_t kDimBrightness = 20;
 constexpr uint32_t kRollMs = 900;      // tumble before showing a roll
 constexpr uint32_t kPopMs = 300;       // landing effect after a roll
 constexpr uint32_t kAnimFrameMs = 25;  // redraw rate while animating
+constexpr uint32_t kBurstMs = 260;     // game picker: formats bursting out of a game tile
+constexpr int32_t kMaxEntry = 32000;   // number pad limit (fits the counter's range)
 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0004;
+constexpr uint32_t kSavedMagic = 0xBB0B0005;
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
 constexpr uint8_t kTimerChoices[] = {0, 30, 50, 60}; // minutes, 0 = off
@@ -71,6 +74,13 @@ bool dirty = true;
 
 bool dice_open = false;
 DiceState dice;
+
+bool picker_open = false;
+PickerState picker;
+uint32_t burst_start_ms = 0;
+
+bool entry_open = false;
+EntryState entry;
 uint32_t roll_start_ms = 0;
 uint32_t roll_face_ms = 0;  // when the shown face last changed
 uint32_t land_ms = 0;
@@ -140,6 +150,8 @@ UiState ui_state()
     s.timer_running = saved.timer_minutes > 0;
     s.timer_left_s = timer_left_s();
     s.dice = dice_open ? &dice : nullptr;
+    s.picker = picker_open ? &picker : nullptr;
+    s.entry = entry_open ? &entry : nullptr;
     return s;
 }
 
@@ -156,7 +168,11 @@ void show_toast(const char *msg, uint32_t now)
 void start_game(size_t index, uint8_t players)
 {
     saved.profile_index = (uint8_t)(index % bb_profile_count());
-    bb_game_init(&game, bb_profile_at(saved.profile_index), players);
+    const bb_profile_t *profile = bb_profile_at(saved.profile_index);
+    if (profile->style == BB_STYLE_GAUGE) {
+        players = 2; // a shared gauge always has two sides
+    }
+    bb_game_init(&game, profile, players);
     new_match();
     dirty = true;
 }
@@ -278,16 +294,94 @@ void undo(uint32_t now)
     show_toast(msg, now);
 }
 
+void adjust(uint8_t player, uint8_t kind, int16_t delta, uint32_t now)
+{
+    if (bb_game_adjust(&game, player, kind, delta, now) != 0) {
+        dirty = true;
+        if (saved.match_start == 0) {
+            saved.match_start = now_s(); // the timer starts with the first change
+        }
+    }
+}
+
 void perform(const UiAction &a, uint32_t now)
 {
     switch (a.type) {
     case UiAction::Adjust:
-        if (bb_game_adjust(&game, a.player, a.kind, a.delta, now) != 0) {
-            dirty = true;
-            if (saved.match_start == 0) {
-                saved.match_start = now_s(); // the timer starts with the first change
-            }
+        adjust(a.player, a.kind, a.delta, now);
+        break;
+    case UiAction::PickFamily: {
+        size_t idx[4];
+        size_t n = bb_family_profiles(a.kind, idx, 4);
+        if (n == 1) {
+            start_game(idx[0], game.players);
+            picker_open = false;
+        } else {
+            picker.family = a.kind;
+            picker.origin = a.kind;
+            picker.anim = 0;
+            burst_start_ms = now;
         }
+        dirty = true;
+        break;
+    }
+    case UiAction::PickProfile:
+        start_game(a.kind, game.players); // clamped to the new game's limit
+        picker_open = false;
+        dirty = true;
+        break;
+    case UiAction::PickerBack:
+        picker.family = -1;
+        dirty = true;
+        break;
+    case UiAction::PickerClose:
+        picker_open = false;
+        dirty = true;
+        break;
+    case UiAction::GaugeSet:
+        adjust(0, 0, (int16_t)(a.delta - game.value[0]), now);
+        break;
+    case UiAction::GaugePass: {
+        // Passing leaves the opponent 3 memory on their side.
+        int16_t target = bb_gauge_owner(&game) == 0 ? 3 : -3;
+        adjust(0, 0, (int16_t)(target - game.value[0]), now);
+        break;
+    }
+    case UiAction::OpenEntry:
+        entry_open = true;
+        entry.player = a.player;
+        entry.amount = 0;
+        dirty = true;
+        break;
+    case UiAction::EntryDigit: {
+        int32_t next = a.kind == 10 ? entry.amount * 100 : entry.amount * 10 + a.kind;
+        if (next <= kMaxEntry) {
+            entry.amount = next;
+            dirty = true;
+        }
+        break;
+    }
+    case UiAction::EntryDelete:
+        entry.amount /= 10;
+        dirty = true;
+        break;
+    case UiAction::EntryApply:
+        if (entry.amount > 0) {
+            adjust(entry.player, 0, (int16_t)(a.delta * entry.amount), now);
+            bb_game_commit(&game); // a typed amount is one history entry on its own
+        }
+        entry_open = false;
+        dirty = true;
+        break;
+    case UiAction::EntryHalve:
+        adjust(entry.player, 0, (int16_t)-(game.value[entry.player] / 2), now);
+        bb_game_commit(&game);
+        entry_open = false;
+        dirty = true;
+        break;
+    case UiAction::EntryClose:
+        entry_open = false;
+        dirty = true;
         break;
     case UiAction::NextGame: {
         int winner = bb_game_winner(&game);
@@ -327,7 +421,11 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuGame:
-        start_game(saved.profile_index + 1, game.players); // clamped to the new game's limit
+        menu_open = false;
+        picker_open = true;
+        picker.family = -1;
+        picker.anim = 1000;
+        dirty = true;
         break;
     case UiAction::MenuPlayers:
         start_game(saved.profile_index, game.players < game.profile->max_players ? game.players + 1 : 1);
@@ -377,8 +475,10 @@ void perform(const UiAction &a, uint32_t now)
 
 void toggle_menu()
 {
-    if (dice_open) {
-        dice_open = false; // BOOT backs out of the dice to the counter
+    if (picker_open && picker.family >= 0) {
+        picker.family = -1; // BOOT steps back from a game's formats to the games
+    } else if (picker_open || entry_open || dice_open) {
+        picker_open = entry_open = dice_open = false; // BOOT backs out to the counter
     } else {
         menu_open = !menu_open;
     }
@@ -387,7 +487,7 @@ void toggle_menu()
 
 void toggle_dice()
 {
-    menu_open = false;
+    menu_open = picker_open = entry_open = false;
     dice_open = !dice_open;
     dirty = true;
 }
@@ -548,8 +648,9 @@ void loop()
     poll_button(
         key_button, now,
         [now] {
-            if (menu_open) {
-                toggle_menu();
+            if (menu_open || picker_open || entry_open) {
+                menu_open = picker_open = entry_open = false;
+                dirty = true;
             } else if (dice_open) {
                 start_roll(now);
             } else {
@@ -564,6 +665,12 @@ void loop()
         dirty = true;
     }
     update_roll(now);
+
+    if (picker_open && picker.anim < 1000) {
+        uint32_t e = now - burst_start_ms;
+        picker.anim = e >= kBurstMs ? 1000 : (uint16_t)(e * 1000 / kBurstMs);
+        dirty = true;
+    }
     if (toast_until && (int32_t)(now - toast_until) >= 0) {
         toast_until = 0;
         dirty = true;

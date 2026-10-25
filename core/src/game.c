@@ -140,3 +140,19 @@ size_t bb_game_history(const bb_game_t *game, bb_entry_t *out, size_t max)
     }
     return n;
 }
+
+uint8_t bb_gauge_owner(const bb_game_t *game)
+{
+    if (game->value[0] != 0) {
+        return game->value[0] < 0 ? 0 : 1;
+    }
+    /* The pending change (if any) produced the current 0; look at what came before. */
+    for (uint16_t i = 0; i < game->history_count; i++) {
+        size_t idx = (game->history_head + BB_HISTORY_LEN - 1 - i) % BB_HISTORY_LEN;
+        int16_t v = game->history[idx].value;
+        if (v != 0) {
+            return v < 0 ? 0 : 1;
+        }
+    }
+    return 0;
+}

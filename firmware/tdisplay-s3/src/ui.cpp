@@ -35,6 +35,12 @@ const Theme kThemes[] = {
     // Ink blue and violet with gold.
     {"lorcana", 0x0B0F2E, 0x2D1B4E, 0x1C1840, 0xE8C25A, 0x7FB2FF, 0xF07FB0, 0xF4F0FF, 0x8A88AA,
      {0xE8C25A, 0x7FB2FF}},
+    // Deep navy with digital orange and cyan.
+    {"digimon", 0x07131F, 0x0E2A3A, 0x0F2333, 0xF28C28, 0x2EC4F1, 0xF2545B, 0xEAF6FF, 0x7F95A8,
+     {0xF28C28, 0x2EC4F1}},
+    // Dark umber with gold.
+    {"yugioh", 0x140F05, 0x3A2A0A, 0x2E2410, 0xE6B422, 0x7FB2FF, 0xE8604C, 0xFFF4DA, 0x9C8C6A,
+     {0xE6B422, 0x7FB2FF}},
     // Black and blood red with bronze.
     {"fab", 0x140808, 0x3C1210, 0x2E1210, 0xD4A24C, 0x6FB5E0, 0xE04B3A, 0xF4E6DC, 0x907670,
      {0xD4A24C, 0x6FB5E0}},
@@ -89,6 +95,10 @@ bool has_kinds(const bb_game_t &g) { return g.profile->kind_count >= 2; }
 bool facing(const UiState &s) { return s.game->players == 2 && s.layout == Layout::Facing; }
 
 bool quads(const UiState &s) { return s.game->players > 2; }
+
+bool amount_style(const bb_game_t &g) { return g.profile->style == BB_STYLE_AMOUNT; }
+
+bool gauge_style(const bb_game_t &g) { return g.profile->style == BB_STYLE_GAUGE; }
 
 // Which player is drawn on the left in the side-by-side layout.
 uint8_t left_player(const UiState &s) { return s.layout == Layout::SideYouRight ? 1 : 0; }
@@ -211,7 +221,7 @@ void draw_header(LGFX_Sprite &f, const Theme &t, const UiState &s, const char *t
     f.drawString(title, 8, kHeaderH / 2);
     draw_battery(f, t, s.battery_percent);
 
-    if (s.menu || s.dice) {
+    if (s.menu || s.dice || s.picker || s.entry) {
         return;
     }
     char score[8], clock[12];
@@ -496,6 +506,16 @@ void draw_footer(LGFX_Sprite &f, const Theme &t, const bb_game_t &g)
     size_t n = bb_game_history(&g, recent, 8);
     char buf[16];
 
+    if (n == 0 && g.pending.delta == 0 && amount_style(g)) {
+        f.setFont(&fonts::FreeSans9pt7b);
+        f.setTextSize(1);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::bottom_center);
+        f.drawString(g.players > 1 ? "Tap a player to enter an amount" : "Tap to enter an amount",
+                     kWidth / 2, kHeight - 3);
+        return;
+    }
+
     f.setFont(&fonts::FreeSans9pt7b);
     f.setTextSize(1);
     f.setTextDatum(textdatum_t::bottom_left);
@@ -539,9 +559,11 @@ void draw_single(LGFX_Sprite &f, const Theme &t, const UiState &s)
         draw_kind_button(f, t, s, 0, 1);
         draw_track(f, t, g, 0, 10, kFooterTop + 2, 300, 17, 4, 1);
     } else {
-        uint32_t hint = mix(t.bg_bottom, t.accent, 110);
-        draw_plus_minus(f, 28, 87, false, hint, 10);
-        draw_plus_minus(f, kWidth - 28, 87, true, hint, 10);
+        if (!amount_style(g)) {
+            uint32_t hint = mix(t.bg_bottom, t.accent, 110);
+            draw_plus_minus(f, 28, 87, false, hint, 10);
+            draw_plus_minus(f, kWidth - 28, 87, true, hint, 10);
+        }
         draw_number(f, buf, kWidth / 2, 80, 200, 90, vc, shadow);
         if (s.step != 1) {
             snprintf(buf, sizeof(buf), "x%d", s.step);
@@ -599,6 +621,8 @@ void draw_side_by_side(LGFX_Sprite &f, const Theme &t, const UiState &s)
             draw_kind_button(f, t, s, p, 0);
             draw_kind_button(f, t, s, p, 1);
             draw_track(f, t, g, p, panel.x + 9, kFooterTop + 2, 142, 17, 2, 1);
+        } else if (amount_style(g)) {
+            draw_number(f, buf, panel.cx(), 92, 140, 80, vc, shadow);
         } else {
             uint32_t hint = mix(t.bg_bottom, t.accent, 110);
             draw_plus_minus(f, panel.x + panel.w - 16, 58, true, hint, 6);
@@ -645,9 +669,11 @@ void draw_strip(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p)
             f.drawString(status, 154, 72);
         }
     } else {
-        uint32_t hint = mix(t.bg_bottom, t.accent, 110);
-        draw_plus_minus(f, 28, 48, false, hint, 9);
-        draw_plus_minus(f, kWidth - 28, 48, true, hint, 9);
+        if (!amount_style(g)) {
+            uint32_t hint = mix(t.bg_bottom, t.accent, 110);
+            draw_plus_minus(f, 28, 48, false, hint, 9);
+            draw_plus_minus(f, kWidth - 28, 48, true, hint, 9);
+        }
         draw_number(f, buf, kWidth / 2, 46, 180, 70, vc, shadow);
         if (status[0]) {
             f.setFont(&fonts::FreeSansBold9pt7b);
@@ -748,10 +774,12 @@ void draw_quadrant(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, 
             f.setTextDatum(textdatum_t::middle_right);
             f.drawString(status, x0 + kQuadW - 8, 11);
         }
-        uint32_t hint = mix(t.bg_bottom, t.accent, 110);
-        draw_plus_minus(f, x0 + 14, 50, false, hint, 6);
-        draw_plus_minus(f, x0 + kQuadW - 14, 50, true, hint, 6);
-        draw_number(f, buf, x0 + kQuadW / 2, 50, 96, 56, vc, shadow);
+        if (!amount_style(g)) {
+            uint32_t hint = mix(t.bg_bottom, t.accent, 110);
+            draw_plus_minus(f, x0 + 14, 50, false, hint, 6);
+            draw_plus_minus(f, x0 + kQuadW - 14, 50, true, hint, 6);
+        }
+        draw_number(f, buf, x0 + kQuadW / 2, 50, amount_style(g) ? 136 : 96, 56, vc, shadow);
     }
 }
 
@@ -824,7 +852,8 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
 
     for (int i = 0; i < kMenuTiles; i++) {
         Rect r = menu_tile(i);
-        bool enabled = !(i == 2 && g.players < 2) && !(i == 4 && g.players > 2);
+        bool enabled = !(i == 2 && (g.players < 2 || gauge_style(g))) && !(i == 4 && g.players > 2) &&
+                       !(i == 1 && gauge_style(g));
         f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
         f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, enabled ? 140 : 40));
 
@@ -1079,6 +1108,375 @@ void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
     }
 }
 
+// ---- Close mark ---------------------------------------------------------------
+
+void draw_close_mark(LGFX_Sprite &f, const Theme &t)
+{
+    for (int i = -1; i <= 1; i++) {
+        f.drawLine(kWidth - 52 + i, 7, kWidth - 42 + i, 17, t.muted);
+        f.drawLine(kWidth - 42 + i, 7, kWidth - 52 + i, 17, t.muted);
+    }
+}
+
+// ---- Game picker -----------------------------------------------------------
+
+Rect picker_tile(int i)
+{
+    return {6 + (i % 3) * 104, 30 + (i / 3) * 70, 100, 64};
+}
+
+Rect format_tile(int i, int n)
+{
+    int w = (kWidth - 12 - (n - 1) * 8) / n;
+    return {6 + i * (w + 8), 32, w, 132};
+}
+
+// One line describing a profile, e.g. "First to 8", "Life 20", "8000 LP".
+void profile_summary(const bb_profile_t *p, char *buf, size_t n)
+{
+    if (p->style == BB_STYLE_GAUGE) {
+        snprintf(buf, n, "Memory gauge");
+    } else if (p->style == BB_STYLE_AMOUNT) {
+        snprintf(buf, n, "%d LP", p->start);
+    } else if (p->win_at != BB_NONE) {
+        snprintf(buf, n, p->teams ? "Teams, first to %d" : "First to %d", p->win_at);
+    } else {
+        snprintf(buf, n, "Life %d", p->start);
+    }
+}
+
+Rect lerp_rect(Rect a, Rect b, float t)
+{
+    return {a.x + (int)((b.x - a.x) * t), a.y + (int)((b.y - a.y) * t),
+            a.w + (int)((b.w - a.w) * t), a.h + (int)((b.h - a.h) * t)};
+}
+
+// A tile drawn in the game's own colors.
+void draw_game_tile(LGFX_Sprite &f, const bb_profile_t *p, Rect r, const char *title,
+                    const char *sub, bool current)
+{
+    const Theme &t = theme_for(p);
+    f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.bg_top);
+    for (int y = 3; y < r.h - 3; y++) {
+        f.drawFastHLine(r.x + 3, r.y + y, r.w - 6, mix(t.bg_top, t.bg_bottom, y * 256 / r.h));
+    }
+    f.drawRoundRect(r.x, r.y, r.w, r.h, 8, current ? t.accent : mix(t.bg_bottom, t.accent, 120));
+    if (current) {
+        f.drawRoundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 7, t.accent);
+    }
+
+    if (r.w < 30 || r.h < 24) {
+        return; // too small mid-animation for text
+    }
+    int title_y = sub ? r.cy() - 8 : r.cy();
+    fit_font(f, title, r.w - 12);
+    f.setTextColor(t.accent);
+    f.setTextDatum(textdatum_t::middle_center);
+    f.drawString(title, r.cx(), title_y);
+    if (sub) {
+        f.setFont(&fonts::Font2);
+        f.setTextSize(1);
+        f.setTextColor(t.text);
+        f.drawString(sub, r.cx(), r.cy() + 14);
+    }
+}
+
+void draw_picker(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    const PickerState &pk = *s.picker;
+    draw_close_mark(f, t);
+    size_t current_family = bb_family_of(s.game->profile);
+    char sub[24];
+
+    if (pk.family < 0) {
+        for (int i = 0; i < (int)bb_family_count() && i < 6; i++) {
+            size_t idx[4];
+            size_t n = bb_family_profiles((size_t)i, idx, 4);
+            const bb_profile_t *p = bb_profile_at(idx[0]);
+            if (n > 1) {
+                snprintf(sub, sizeof(sub), "%d formats", (int)n);
+            } else {
+                profile_summary(p, sub, sizeof(sub));
+            }
+            draw_game_tile(f, p, picker_tile(i), bb_family_name((size_t)i), sub,
+                           (size_t)i == current_family);
+        }
+        return;
+    }
+
+    // Formats burst out of the game's tile.
+    size_t idx[4];
+    int n = (int)bb_family_profiles((size_t)pk.family, idx, 4);
+    float e = ease_out_cubic(pk.anim / 1000.0f);
+    Rect origin = picker_tile(pk.origin);
+    for (int i = 0; i < n; i++) {
+        const bb_profile_t *p = bb_profile_at(idx[i]);
+        profile_summary(p, sub, sizeof(sub));
+        Rect r = lerp_rect(origin, format_tile(i, n), e);
+        draw_game_tile(f, p, r, p->format ? p->format : p->name, sub, p == s.game->profile);
+    }
+}
+
+UiAction picker_hit(const UiState &s, int x, int y)
+{
+    const PickerState &pk = *s.picker;
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = (pk.family >= 0 && x < kWidth - 70) ? UiAction::PickerBack : UiAction::PickerClose;
+        return a;
+    }
+    if (pk.family < 0) {
+        for (int i = 0; i < (int)bb_family_count() && i < 6; i++) {
+            if (picker_tile(i).contains(x, y)) {
+                a.type = UiAction::PickFamily;
+                a.kind = (uint8_t)i;
+                return a;
+            }
+        }
+        return a;
+    }
+    size_t idx[4];
+    int n = (int)bb_family_profiles((size_t)pk.family, idx, 4);
+    for (int i = 0; i < n; i++) {
+        if (format_tile(i, n).contains(x, y)) {
+            a.type = UiAction::PickProfile;
+            a.kind = (uint8_t)idx[i];
+            return a;
+        }
+    }
+    return a;
+}
+
+// ---- Shared gauge (Digimon memory) ------------------------------------------
+
+constexpr int kGaugeY = 64;
+constexpr int kGaugeH = 28;
+constexpr int kCellW = 14;
+constexpr int kCellStep = 15;
+
+int gauge_cell_x(int i)
+{
+    return 3 + i * kCellStep; // i = 0..20 for values -10..10
+}
+
+Rect gauge_button(int i)
+{
+    return {4 + i * 106, 118, 100, 32};
+}
+
+void draw_gauge(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    const bb_game_t &g = *s.game;
+    int v = g.value[0];
+    uint8_t owner = bb_gauge_owner(&g);
+    uint32_t oc = player_color(t, owner);
+    char buf[24];
+
+    // Whose turn, and how much memory they have.
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::middle_left);
+    f.setTextColor(t.p1);
+    f.drawString("YOU", 8, 40);
+    f.setTextDatum(textdatum_t::middle_right);
+    f.setTextColor(t.p2);
+    f.drawString("OPP", kWidth - 8, 40);
+
+    snprintf(buf, sizeof(buf), "%s  %d", owner == 0 ? "YOUR TURN" : "OPP'S TURN", v < 0 ? -v : v);
+    f.setFont(&fonts::FreeSansBold12pt7b);
+    f.setTextColor(oc);
+    f.setTextDatum(textdatum_t::middle_center);
+    f.drawString(buf, kWidth / 2, 40);
+
+    // The track: YOU's 10..1 on the left, 0, OPP's 1..10 on the right.
+    f.setFont(&fonts::Font0);
+    for (int i = 0; i <= 20; i++) {
+        int val = i - 10;
+        int x = gauge_cell_x(i);
+        uint32_t side = val < 0 ? t.p1 : val > 0 ? t.p2 : t.accent;
+        if (val == v) {
+            f.fillRoundRect(x - 1, kGaugeY - 3, kCellW + 2, kGaugeH + 6, 3, side);
+            f.fillTriangle(x + kCellW / 2 - 6, kGaugeY - 12, x + kCellW / 2 + 6, kGaugeY - 12,
+                           x + kCellW / 2, kGaugeY - 5, side);
+        } else {
+            int strength = val == 0 ? 90 : 40 + (10 - (val < 0 ? -val : val)) * 4;
+            f.fillRoundRect(x, kGaugeY, kCellW, kGaugeH, 3, mix(t.surface, side, strength));
+        }
+        snprintf(buf, sizeof(buf), "%d", val < 0 ? -val : val);
+        f.setTextColor(val == v ? t.text : t.muted);
+        f.drawString(buf, x + kCellW / 2, kGaugeY + kGaugeH + 9);
+    }
+
+    // Buttons: move toward YOU, pass the turn, move toward OPP.
+    for (int i = 0; i < 3; i++) {
+        Rect r = gauge_button(i);
+        uint32_t c = i == 0 ? t.p1 : i == 2 ? t.p2 : t.accent;
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, c, 200));
+        f.setFont(&fonts::FreeSansBold9pt7b);
+        f.setTextColor(c);
+        f.setTextDatum(textdatum_t::middle_center);
+        if (i == 1) {
+            f.drawString("PASS", r.cx(), r.cy() + 1);
+        } else {
+            int ax = i == 0 ? r.x + 18 : r.x + r.w - 18;
+            int dir = i == 0 ? -1 : 1;
+            f.fillTriangle(ax + dir * 7, r.cy(), ax - dir * 5, r.cy() - 8, ax - dir * 5, r.cy() + 8, c);
+            f.drawString(i == 0 ? "YOU" : "OPP", r.cx() + (i == 0 ? 8 : -8), r.cy() + 1);
+        }
+    }
+}
+
+UiAction gauge_hit(const UiState &s, int x, int y)
+{
+    UiAction a;
+    if (y >= kGaugeY - 14 && y < kGaugeY + kGaugeH + 14) {
+        int i = (x - 3) / kCellStep;
+        a.type = UiAction::GaugeSet;
+        a.delta = (int16_t)((i < 0 ? 0 : i > 20 ? 20 : i) - 10);
+        return a;
+    }
+    for (int i = 0; i < 3; i++) {
+        Rect r = gauge_button(i);
+        Rect padded{r.x - 2, r.y - 4, r.w + 4, r.h + 8};
+        if (padded.contains(x, y)) {
+            if (i == 1) {
+                a.type = UiAction::GaugePass;
+            } else {
+                a.type = UiAction::Adjust;
+                a.delta = i == 0 ? -1 : 1;
+                a.repeat = true;
+            }
+            return a;
+        }
+    }
+    (void)s;
+    return a;
+}
+
+// ---- Number pad (Yu-Gi-Oh! LP) ---------------------------------------------
+
+const char *const kKeyLabels[4][4] = {
+    {"7", "8", "9", "-"},
+    {"4", "5", "6", "+"},
+    {"1", "2", "3", "1/2"},
+    {"0", "00", "DEL", "X"},
+};
+
+Rect key_rect(int row, int col)
+{
+    return {120 + col * 49, 28 + row * 35, 46, 32};
+}
+
+void draw_entry(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    const bb_game_t &g = *s.game;
+    const EntryState &e = *s.entry;
+    int lp = g.value[e.player];
+    char buf[24];
+
+    draw_close_mark(f, t);
+
+    // Who, their LP now, the amount typed, and what - / + would make it.
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::middle_left);
+    f.setTextColor(player_color(t, e.player));
+    f.drawString(g.players > 1 ? ui_player_label(g, e.player) : "LP", 8, 38);
+    snprintf(buf, sizeof(buf), "%d", lp);
+    f.setTextColor(t.muted);
+    f.setTextDatum(textdatum_t::middle_right);
+    f.drawString(buf, 112, 38);
+
+    snprintf(buf, sizeof(buf), "%ld", (long)e.amount);
+    draw_number(f, buf, 60, 84, 104, 46, e.amount ? t.text : t.muted, mix(t.bg_bottom, 0x000000, 128));
+
+    int32_t minus = lp - e.amount < g.profile->min ? g.profile->min : lp - e.amount;
+    int32_t plus = lp + e.amount > g.profile->max ? g.profile->max : lp + e.amount;
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextDatum(textdatum_t::middle_left);
+    snprintf(buf, sizeof(buf), "- %ld", (long)minus);
+    f.setTextColor(kLoss);
+    f.drawString(buf, 8, 128);
+    snprintf(buf, sizeof(buf), "+ %ld", (long)plus);
+    f.setTextColor(kGain);
+    f.drawString(buf, 8, 152);
+
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 4; col++) {
+            Rect r = key_rect(row, col);
+            const char *label = kKeyLabels[row][col];
+            uint32_t fill = t.surface;
+            uint32_t text = t.text;
+            if (col == 3 && row == 0) {
+                fill = mix(t.surface, kLoss, 90);
+                text = kLoss;
+            } else if (col == 3 && row == 1) {
+                fill = mix(t.surface, kGain, 90);
+                text = kGain;
+            } else if (col == 3) {
+                text = t.accent;
+            } else if (row == 3 && col == 2) {
+                text = t.muted;
+            }
+            f.fillRoundRect(r.x, r.y, r.w, r.h, 6, fill);
+            f.drawRoundRect(r.x, r.y, r.w, r.h, 6, mix(t.surface, t.accent, 90));
+            if (strlen(label) > 2) {
+                f.setFont(&fonts::FreeSansBold9pt7b);
+            } else {
+                f.setFont(&fonts::FreeSansBold12pt7b);
+            }
+            if (col == 3 && row < 2) {
+                f.fillRect(r.cx() - 9, r.cy() - 2, 18, 4, text); // bold minus / plus
+                if (row == 1) {
+                    f.fillRect(r.cx() - 2, r.cy() - 9, 4, 18, text);
+                }
+                continue;
+            }
+            f.setTextColor(text);
+            f.setTextDatum(textdatum_t::middle_center);
+            f.drawString(label, r.cx(), r.cy() + 1);
+        }
+    }
+}
+
+UiAction entry_hit(const UiState &s, int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = UiAction::EntryClose;
+        return a;
+    }
+    for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 4; col++) {
+            Rect r = key_rect(row, col);
+            Rect padded{r.x - 1, r.y - 1, r.w + 3, r.h + 3};
+            if (!padded.contains(x, y)) {
+                continue;
+            }
+            if (col < 3 && row < 3) {
+                a.type = UiAction::EntryDigit;
+                a.kind = (uint8_t)(7 - row * 3 + col);
+            } else if (row == 3 && col < 2) {
+                a.type = UiAction::EntryDigit;
+                a.kind = col == 0 ? 0 : 10;
+            } else if (row == 3 && col == 2) {
+                a.type = UiAction::EntryDelete;
+            } else if (row == 3) {
+                a.type = UiAction::EntryClose;
+            } else if (row == 2) {
+                a.type = UiAction::EntryHalve;
+            } else {
+                a.type = UiAction::EntryApply;
+                a.delta = row == 0 ? -1 : 1;
+            }
+            a.player = s.entry->player;
+            return a;
+        }
+    }
+    return a;
+}
+
 // Kind buttons only respond to taps on the button itself (plus a small margin),
 // so a tap next to a button does nothing rather than hitting the wrong one.
 constexpr int kTapMargin = 2;
@@ -1139,6 +1537,26 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
 {
     const Theme &t = theme_for(state.game->profile);
 
+    if (state.picker) {
+        draw_background(frame, t, false);
+        char title[32] = "GAME";
+        if (state.picker->family >= 0) {
+            char name[24];
+            upper(name, sizeof(name), bb_family_name((size_t)state.picker->family), 20);
+            snprintf(title, sizeof(title), "< %s", name);
+        }
+        draw_header(frame, t, state, title);
+        draw_picker(frame, t, state);
+        return;
+    }
+
+    if (state.entry && !state.menu) {
+        draw_background(frame, t, false);
+        draw_header(frame, t, state, "LIFE POINTS");
+        draw_entry(frame, t, state);
+        return;
+    }
+
     if (state.dice && !state.menu) {
         draw_background(frame, t, false);
         draw_header(frame, t, state, "DICE");
@@ -1146,7 +1564,7 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
         return;
     }
 
-    if (!state.menu && (facing(state) || quads(state))) {
+    if (!state.menu && !gauge_style(*state.game) && (facing(state) || quads(state))) {
         if (quads(state)) {
             draw_quads(frame, t, state);
         } else {
@@ -1163,7 +1581,7 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
         return;
     }
 
-    draw_background(frame, t, !state.menu);
+    draw_background(frame, t, !state.menu && !gauge_style(*state.game));
     draw_header(frame, t, state, state.menu ? "MENU" : state.game->profile->name);
 
     if (state.menu) {
@@ -1171,7 +1589,9 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
         return;
     }
 
-    if (state.game->players == 1) {
+    if (gauge_style(*state.game)) {
+        draw_gauge(frame, t, state);
+    } else if (state.game->players == 1) {
         draw_single(frame, t, state);
     } else {
         draw_side_by_side(frame, t, state);
@@ -1212,7 +1632,8 @@ UiAction ui_hit(const UiState &state, int x, int y)
             // Tiles are hit-tested with the gaps included so near-misses still count.
             Rect padded{r.x - 2, r.y - 3, r.w + 4, r.h + 6};
             if (padded.contains(x, y)) {
-                if ((kTileActions[i] == UiAction::MenuLayout && g.players < 2) ||
+                if ((kTileActions[i] == UiAction::MenuLayout && (g.players < 2 || gauge_style(g))) ||
+                    (kTileActions[i] == UiAction::MenuPlayers && gauge_style(g)) ||
                     (kTileActions[i] == UiAction::MenuMatch && g.players > 2)) {
                     return a;
                 }
@@ -1221,6 +1642,13 @@ UiAction ui_hit(const UiState &state, int x, int y)
             }
         }
         return a;
+    }
+
+    if (state.picker) {
+        return picker_hit(state, x, y);
+    }
+    if (state.entry) {
+        return entry_hit(state, x, y);
     }
 
     if (state.dice) {
@@ -1247,6 +1675,10 @@ UiAction ui_hit(const UiState &state, int x, int y)
         return a;
     }
 
+    if (gauge_style(g)) {
+        return gauge_hit(state, x, y);
+    }
+
     if (quads(state)) {
         // Map to the touched quarter's own (upright) coordinates.
         bool top = y < kStripH;
@@ -1259,6 +1691,10 @@ UiAction ui_hit(const UiState &state, int x, int y)
         }
         int qx = lx % kQuadW;
         a.player = p;
+        if (amount_style(g)) {
+            a.type = UiAction::OpenEntry;
+            return a;
+        }
         if (has_kinds(g)) {
             return kind_hit(state, p, qx, ly); // quadrant coordinates
         } else if (qx < 64) {
@@ -1282,6 +1718,10 @@ UiAction ui_hit(const UiState &state, int x, int y)
             return kind_hit(state, p, lx, ly);
         }
         a.player = p;
+        if (amount_style(g)) {
+            a.type = UiAction::OpenEntry;
+            return a;
+        }
         if (lx < kWidth / 3) {
             a.type = UiAction::Adjust;
             a.delta = -1;
@@ -1308,6 +1748,10 @@ UiAction ui_hit(const UiState &state, int x, int y)
     if (has_kinds(g)) {
         // Kind buttons only; mistakes are fixed with undo.
         return kind_hit(state, p, x, y);
+    }
+    if (amount_style(g)) {
+        a.type = UiAction::OpenEntry;
+        return a;
     }
 
     if (g.players == 1) {
