@@ -18,6 +18,17 @@ paper, or a fiddly token track.
 
 ## Status
 
-Concept / prototyping. See [docs/hardware.md](docs/hardware.md) for the
+Prototyping. The first working prototype runs on the LilyGO T-Display-S3 Touch:
+see [firmware/tdisplay-s3](firmware/tdisplay-s3).
+
+## Layout
+
+- `core/`: portable C counter logic (game profiles, grouped changes, undo
+  history) with host tests (`make -C core test`).
+- `firmware/tdisplay-s3/`: PlatformIO firmware for the T-Display-S3 Touch.
+- `docs/`: hardware notes and game profile format.
+- `tools/`: printable display size cutouts.
+
+See [docs/hardware.md](docs/hardware.md) for the
 hardware decisions and open questions, and [docs/game-profiles.md](docs/game-profiles.md)
 for how games are described.

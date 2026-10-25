@@ -1,0 +1,9 @@
+{
+  "name": "battlebuddy-core",
+  "version": "0.1.0",
+  "description": "Portable counter, undo history and game profiles for BattleBuddy",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include"
+  }
+}

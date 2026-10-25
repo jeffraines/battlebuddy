@@ -1,0 +1,3 @@
+core/build/
+.pio/
+firmware/*/snapshot/build/
