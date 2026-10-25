@@ -679,6 +679,16 @@ void draw_value(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, con
     }
 }
 
+// Whether counter values are drawn with something around or under them
+// (themed frame or d20) rather than as plain digits.
+bool framed_value(const Theme &t, const UiState &s)
+{
+    if (!counter_style_plain(*s.game) || s.counter_style == 2) {
+        return false;
+    }
+    return s.counter_style == 1 || t.skin != SkinPlain;
+}
+
 uint32_t value_color(const Theme &t, bb_status_t s)
 {
     switch (s) {
@@ -930,7 +940,16 @@ void draw_single(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setFont(&fonts::FreeSansBold12pt7b);
         f.setTextColor(sc);
         f.setTextDatum(textdatum_t::middle_center);
-        f.drawString(buf, has_kinds(g) ? 86 : kWidth / 2, has_kinds(g) ? 32 : 136);
+        if (has_kinds(g)) {
+            f.drawString(buf, 86, 32);
+        } else if (framed_value(t, s)) {
+            // The frame (dots, diamonds, shield) sits around and below the
+            // number, so put the change in the free top-right corner instead.
+            f.setTextDatum(textdatum_t::middle_right);
+            f.drawString(buf, kWidth - 14, 46);
+        } else {
+            f.drawString(buf, kWidth / 2, 136);
+        }
     }
 }
 

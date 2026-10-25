@@ -422,6 +422,16 @@ int main(int argc, char **argv)
             }
             spin[0] = 1000;
         }
+        // Pending changes next to framed values (Magic +3, Lorcana +2, FaB -4).
+        for (const char *id : {"mtg", "lorcana", "fab"}) {
+            bb_game_init(&g, bb_profile_find(id), 1);
+            bb_game_adjust(&g, 0, 0, id[0] == 'f' ? -4 : (id[0] == 'l' ? 2 : 3), 0);
+            UiState ps = state_for(g);
+            char name[32];
+            snprintf(name, sizeof(name), "pending-%s", id);
+            save(frame, ps, name);
+        }
+
         // Yu-Gi-Oh! LP counting down after 1800 damage.
         bb_game_init(&g, bb_profile_find("yugioh"), 2);
         bb_game_adjust(&g, 0, 0, -1800, 0);
