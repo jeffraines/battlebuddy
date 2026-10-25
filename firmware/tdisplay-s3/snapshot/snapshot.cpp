@@ -44,9 +44,10 @@ static UiState state_for(const bb_game_t &g)
     s.vivid = false;
     s.menu = false;
     s.menu_page = 0;
-    s.spindown = false;
+    s.counter_style = 0;
     s.spin = nullptr;
     s.spin_dir = nullptr;
+    s.prev = nullptr;
     s.end_prompt = false;
     s.toast = nullptr;
     s.match = nullptr;
@@ -384,45 +385,56 @@ int main(int argc, char **argv)
         save(frame, s, "end-prompt");
     }
 
-    // Spin-down d20 counters: Magic solo, mid-spin; Magic two players; Commander four.
+    // Themed counters: Magic, Commander, Lorcana, FaB, at rest and mid-change.
     {
         uint16_t spin[4] = {1000, 1000, 1000, 1000};
         int8_t dir[4] = {-1, -1, 1, -1};
-        bb_game_init(&g, bb_profile_find("mtg"), 1);
-        bb_game_adjust(&g, 0, 0, -3, 0);
+        int16_t prev[4] = {20, 20, 40, 40};
+        struct Case { const char *id; uint8_t players; int16_t d0, d1; const char *name; };
+        const Case cases[] = {{"mtg", 1, -3, 0, "theme-mtg"},        {"mtg", 2, -6, -13, "theme-mtg-2p"},
+                              {"mtg-commander", 4, -11, -4, "theme-cmd-4p"}, {"lorcana", 1, 7, 0, "theme-lorcana"},
+                              {"lorcana", 2, 12, 5, "theme-lorcana-2p"}, {"fab", 1, -9, 0, "theme-fab"},
+                              {"fab", 2, -16, -31, "theme-fab-2p"}};
+        for (const Case &c : cases) {
+            bb_game_init(&g, bb_profile_find(c.id), c.players);
+            bb_game_adjust(&g, 0, 0, c.d0, 0);
+            bb_game_commit(&g);
+            if (c.players > 1) {
+                bb_game_adjust(&g, 1, 0, c.d1, 0);
+                bb_game_commit(&g);
+            }
+            UiState s = state_for(g);
+            s.spin = spin;
+            s.spin_dir = dir;
+            s.prev = prev;
+            for (int p = 0; p < 4; p++) {
+                spin[p] = 1000;
+            }
+            save(frame, s, c.name);
+            // Mid-change frames for the first player: animation strips.
+            char name[48];
+            dir[0] = c.d0 < 0 ? -1 : 1;
+            prev[0] = (int16_t)(g.value[0] + 1 * (c.d0 < 0 ? 1 : -1));
+            for (int i = 0; i <= 10; i++) {
+                spin[0] = (uint16_t)(i * 100);
+                snprintf(name, sizeof(name), "%s-anim-%02d", c.name, i);
+                save(frame, s, name);
+            }
+            spin[0] = 1000;
+        }
+        // Yu-Gi-Oh! LP counting down after 1800 damage.
+        bb_game_init(&g, bb_profile_find("yugioh"), 2);
+        bb_game_adjust(&g, 0, 0, -1800, 0);
         bb_game_commit(&g);
         UiState s = state_for(g);
-        s.spindown = true;
+        prev[0] = 8000;
+        dir[0] = -1;
         s.spin = spin;
         s.spin_dir = dir;
-        save(frame, s, "spindown-1p");
-        char name[32];
-        for (int i = 0; i <= 10; i++) {
-            spin[0] = (uint16_t)(i * 100);
-            snprintf(name, sizeof(name), "spin-%03d", i);
-            save(frame, s, name);
-        }
+        s.prev = prev;
+        spin[0] = 350;
+        save(frame, s, "yugioh-countdown");
         spin[0] = 1000;
-        bb_game_init(&g, bb_profile_find("mtg"), 2);
-        bb_game_adjust(&g, 0, 0, -6, 0);
-        bb_game_commit(&g);
-        bb_game_adjust(&g, 1, 0, -13, 0);
-        bb_game_commit(&g);
-        UiState s2 = state_for(g);
-        s2.spindown = true;
-        s2.spin = spin;
-        s2.spin_dir = dir;
-        spin[1] = 300;
-        save(frame, s2, "spindown-2p");
-        spin[1] = 1000;
-        bb_game_init(&g, bb_profile_find("mtg-commander"), 4);
-        bb_game_adjust(&g, 2, 0, -11, 0);
-        bb_game_commit(&g);
-        UiState s4 = state_for(g);
-        s4.spindown = true;
-        s4.spin = spin;
-        s4.spin_dir = dir;
-        save(frame, s4, "spindown-4p");
     }
 
     // Each die's own roll: frames for d4, d6, d8, d10, d12, d20.

@@ -57,9 +57,10 @@ struct UiState {
     bool vivid;          // Look setting: vivid colors and glows instead of subdued
     bool menu;           // menu screen instead of the counter
     int menu_page;       // 0 = main settings, 1 = more
-    bool spindown;       // Counter setting: life shown on a spinning d20 instead of plain digits
-    const uint16_t *spin;  // per-player spin animation progress (0..1000, 1000 = still), or nullptr
+    int counter_style;   // Counter setting: 0 = themed (each game's own look), 1 = d20, 2 = digits
+    const uint16_t *spin;  // per-player change animation progress (0..1000, 1000 = still), or nullptr
     const int8_t *spin_dir; // per-player direction of the last change (+1 / -1)
+    const int16_t *prev;    // per-player value before the last change, or nullptr
     bool end_prompt;     // "who won?" screen
     const char *toast;   // short message, or nullptr
 

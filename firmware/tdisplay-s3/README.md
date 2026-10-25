@@ -30,9 +30,17 @@ Hold the board landscape, USB port on the right.
 | Dice | Opens the dice |
 | Undo | Undoes the last change (same as KEY) |
 | More → Look | *Subdued* (the game's palette as is) or *Vivid* (more saturated colors and glowing text) |
-| More → Counter | *Digits* or *d20*: life sits on a d20 that spins a face toward each change, like a spin-down die. For plain life counters (Magic, Commander, Lorcana, FaB) |
+| More → Counter | For plain life counters (Magic, Commander, Lorcana, FaB). *Themed* (default): each game's own look, below. *d20*: life on a d20 that spins a face toward each change. *Digits*: just the number |
 | More → Flip | Rotates the whole screen 180° (USB port on the left) |
 | More → Sleep | Sleep now; KEY wakes |
+
+**Themed counters:** Magic and Commander put life inside a ring of five
+colored orbs that turns a notch with each change and flashes red for damage,
+green for gain. Lorcana surrounds lore with a diamond for each point toward
+20, lighting up as lore is gained, with a sparkle on the newest. Flesh and
+Blood sets life on a bronze shield with a blood bar for how much is left; it
+shakes and flushes red when hit. Numbers roll like an odometer when they
+change, and Yu-Gi-Oh! LP count down (or up) to the new total.
 
 **Matches and the timer:** when a game is decided (someone reaches the win
 target, or a life total hits 0), a banner shows who won the game and the match

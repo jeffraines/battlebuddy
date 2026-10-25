@@ -42,12 +42,12 @@ constexpr uint32_t kCelebrateMs = 1100; // longer effect for the top or bottom f
 constexpr uint32_t kAnimFrameMs = 25;  // redraw rate while animating
 constexpr uint32_t kBurstMs = 260;     // game picker: formats bursting out of a game tile
 constexpr int32_t kMaxEntry = 32000;   // number pad limit (fits the counter's range)
-constexpr uint32_t kSpinMs = 380;      // d20 counter: spin to the new face
+constexpr uint32_t kSpinMs = 420;      // counter change animation (roll, spin, shake, LP count)
 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0007;
+constexpr uint32_t kSavedMagic = 0xBB0B0008;
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
 constexpr uint8_t kTimerChoices[] = {0, 30, 50, 60}; // minutes, 0 = off
@@ -59,7 +59,7 @@ struct Saved {
     Layout layout;
     bool flipped;
     bool vivid;
-    bool spindown;
+    uint8_t counter_style; // 0 = themed, 1 = d20, 2 = digits
     uint8_t best_of;       // 0 = match tracking off
     uint8_t timer_minutes; // 0 = no timer
     uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
@@ -80,6 +80,7 @@ bool dirty = true;
 
 uint16_t spin[BB_MAX_PLAYERS] = {1000, 1000, 1000, 1000};
 int8_t spin_dir[BB_MAX_PLAYERS] = {1, 1, 1, 1};
+int16_t prev_value[BB_MAX_PLAYERS] = {};
 uint32_t spin_start_ms[BB_MAX_PLAYERS] = {};
 
 bool dice_open = false;
@@ -154,9 +155,10 @@ UiState ui_state()
     s.flipped = saved.flipped;
     s.vivid = saved.vivid;
     s.menu_page = menu_page;
-    s.spindown = saved.spindown;
+    s.counter_style = saved.counter_style;
     s.spin = spin;
     s.spin_dir = spin_dir;
+    s.prev = prev_value;
     s.end_prompt = end_prompt;
     s.menu = menu_open;
     s.toast = toast_until ? toast_text : nullptr;
@@ -315,8 +317,12 @@ void undo(uint32_t now)
 
 void adjust(uint8_t player, uint8_t kind, int16_t delta, uint32_t now)
 {
+    int16_t before = player < BB_MAX_PLAYERS ? game.value[player] : 0;
     int16_t applied = bb_game_adjust(&game, player, kind, delta, now);
     if (applied != 0) {
+        if (player < BB_MAX_PLAYERS) {
+            prev_value[player] = before;
+        }
         dirty = true;
         if (player < BB_MAX_PLAYERS) {
             spin[player] = 0;
@@ -468,7 +474,7 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuCounter:
-        saved.spindown = !saved.spindown;
+        saved.counter_style = (uint8_t)((saved.counter_style + 1) % 3);
         dirty = true;
         break;
     case UiAction::MenuSleep:
@@ -712,7 +718,7 @@ void setup()
         saved.layout = Layout::SideYouLeft;
         saved.flipped = false;
         saved.vivid = false;
-        saved.spindown = false;
+        saved.counter_style = 0;
         saved.best_of = 1;
         saved.timer_minutes = 0;
         start_game(0, 1);
@@ -762,13 +768,11 @@ void loop()
         if (spin[p] < 1000) {
             uint32_t e = now - spin_start_ms[p];
             spin[p] = e >= kSpinMs ? 1000 : (uint16_t)(e * 1000 / kSpinMs);
-            if (saved.spindown && now - anim_frame_ms >= kAnimFrameMs) {
+            if (now - anim_frame_ms >= kAnimFrameMs || spin[p] == 1000) {
                 dirty = true;
+                anim_frame_ms = now;
             }
         }
-    }
-    if (dirty && saved.spindown) {
-        anim_frame_ms = now;
     }
 
     if (picker_open && picker.anim < 1000) {

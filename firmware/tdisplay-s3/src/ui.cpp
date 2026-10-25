@@ -8,6 +8,14 @@
 
 namespace {
 
+// How a game's life / score is framed with the Themed counter style.
+enum Skin : uint8_t {
+    SkinPlain,  // just the number
+    SkinMana,   // Magic: a ring of five colored orbs
+    SkinLore,   // Lorcana: a ring of diamonds filling toward 20
+    SkinShield, // Flesh and Blood: a bronze shield and a blood bar
+};
+
 // Colors are RGB888 in uint32_t; LovyanGFX treats uint32_t colors as RGB888.
 struct Theme {
     const char *profile_id;
@@ -22,6 +30,7 @@ struct Theme {
     uint32_t kind[BB_MAX_KINDS]; // e.g. Conquer / Hold slots on the score track
     const lgfx::IFont *title_font;  // game name on picker tiles
     const lgfx::IFont *header_font; // game name in the header bar
+    Skin skin;
     bool vivid;                    // set by styled(): richer colors and glows
 };
 
@@ -29,25 +38,25 @@ struct Theme {
 const Theme kThemes[] = {
     // Navy and teal with gold trim; gold = Conquer, violet = Hold.
     {"riftbound", 0x0A1428, 0x0B3A44, 0x10283A, 0xC8AA6E, 0x0AC8B9, 0xE8604C, 0xF0E6D2, 0x7E8A96,
-     {0xE0B85A, 0xA78BFA}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
+     {0xE0B85A, 0xA78BFA}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, SkinPlain, false},
     // Charcoal and warm brown with amber.
     {"mtg", 0x15110E, 0x33221A, 0x2A1E17, 0xE0A040, 0x6FB5E0, 0xE8604C, 0xF2E8DC, 0x8C8072,
-     {0xE0A040, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
+     {0xE0A040, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, SkinMana, false},
     // Charcoal and plum with lilac.
     {"mtg-commander", 0x120F1A, 0x2E1F40, 0x251A36, 0xC9A0FF, 0x6FB5E0, 0xE8604C, 0xF0EAFA, 0x8A7FA0,
-     {0xC9A0FF, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
+     {0xC9A0FF, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, SkinMana, false},
     // Ink blue and violet with gold.
     {"lorcana", 0x0B0F2E, 0x2D1B4E, 0x1C1840, 0xE8C25A, 0x7FB2FF, 0xF07FB0, 0xF4F0FF, 0x8A88AA,
-     {0xE8C25A, 0x7FB2FF}, &fonts::Satisfy_24, &fonts::Satisfy_24, false},
+     {0xE8C25A, 0x7FB2FF}, &fonts::Satisfy_24, &fonts::Satisfy_24, SkinLore, false},
     // Deep navy with digital orange and cyan.
     {"digimon", 0x07131F, 0x0E2A3A, 0x0F2333, 0xF28C28, 0x2EC4F1, 0xF2545B, 0xEAF6FF, 0x7F95A8,
-     {0xF28C28, 0x2EC4F1}, &fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b, false},
+     {0xF28C28, 0x2EC4F1}, &fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b, SkinPlain, false},
     // Dark umber with gold.
     {"yugioh", 0x140F05, 0x3A2A0A, 0x2E2410, 0xE6B422, 0x7FB2FF, 0xE8604C, 0xFFF4DA, 0x9C8C6A,
-     {0xE6B422, 0x7FB2FF}, &fonts::FreeSerifBoldItalic12pt7b, &fonts::FreeSerifBoldItalic9pt7b, false},
+     {0xE6B422, 0x7FB2FF}, &fonts::FreeSerifBoldItalic12pt7b, &fonts::FreeSerifBoldItalic9pt7b, SkinPlain, false},
     // Black and blood red with bronze.
     {"fab", 0x140808, 0x3C1210, 0x2E1210, 0xD4A24C, 0x6FB5E0, 0xE04B3A, 0xF4E6DC, 0x907670,
-     {0xD4A24C, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
+     {0xD4A24C, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, SkinShield, false},
 };
 
 // Exact id match first, then a family prefix ("riftbound-2v2" uses "riftbound").
@@ -480,30 +489,191 @@ void draw_title(LGFX_Sprite &f, const Theme &t, const char *text, int x, int cy,
 
 bool counter_style_plain(const bb_game_t &g);
 void draw_close_mark(LGFX_Sprite &f, const Theme &t);
+float ease_out_cubic(float t);
 void draw_die_body(LGFX_Sprite &f, uint8_t sides, int cx, int cy, float r, float angle,
                    uint32_t fill, uint32_t edge, uint32_t facet, float sx, float sy);
 float ease_out_back(float t);
 
-// A counter value: plain digits, or (with the d20 Counter setting) on a d20
-// that spins a face's worth toward the change, like turning a spin-down die.
+void draw_text_glow(LGFX_Sprite &f, const Theme &t, const char *text, int x, int y, uint32_t color);
+
+// A number that rolls like an odometer from prev to value: the old number
+// slides out and the new one slides in (up for a gain, down for a loss).
+void draw_rolling_number(LGFX_Sprite &f, int value, int prev, float prog, int dir, int cx, int cy, int w,
+                         int h, uint32_t color, uint32_t shadow)
+{
+    char buf[12];
+    snprintf(buf, sizeof(buf), "%d", value);
+    if (prog >= 1 || value == prev) {
+        draw_number(f, buf, cx, cy, w, h, color, shadow);
+        return;
+    }
+    float e = ease_out_cubic(prog);
+    int travel = (int)(h * 0.95f);
+    f.setClipRect(cx - w / 2 - 4, cy - h / 2, w + 8, h + 4);
+    char old[12];
+    snprintf(old, sizeof(old), "%d", prev);
+    draw_number(f, old, cx, cy - dir * (int)(e * travel), w, h, color, shadow);
+    draw_number(f, buf, cx, cy + dir * (int)((1 - e) * travel), w, h, color, shadow);
+    f.clearClipRect();
+}
+
+// Magic: five colored orbs on a ring around the life total. The ring turns a
+// notch toward each change and flashes red for damage, green for gain.
+void draw_mana_ring(LGFX_Sprite &f, const Theme &t, int cx, int cy, int rx, int ry, float prog, int dir)
+{
+    static const uint32_t kOrbs[5] = {0xF4EED2, 0x3D8FDA, 0x6C5F78, 0xDB4A3C, 0x41A552};
+    f.drawEllipse(cx, cy, rx, ry, mix(t.bg_bottom, t.accent, 80));
+    if (prog < 1) {
+        uint32_t flash = dir < 0 ? kLoss : kGain;
+        int a = (int)((1 - prog) * 220);
+        f.drawEllipse(cx, cy, rx + 3, ry + 3, mix(t.bg_bottom, flash, a));
+        f.drawEllipse(cx, cy, rx + 4, ry + 4, mix(t.bg_bottom, flash, a / 2));
+    }
+    float rot = prog < 1 ? (1 - ease_out_back(prog)) * (2 * kPi / 5) * -dir : 0;
+    int orb = ry / 7 < 3 ? 3 : ry / 7;
+    for (int k = 0; k < 5; k++) {
+        float a = -kPi / 2 + k * 2 * kPi / 5 + rot;
+        int ox = cx + (int)(cosf(a) * rx);
+        int oy = cy + (int)(sinf(a) * ry);
+        f.fillCircle(ox, oy, orb + 1, mix(t.bg_bottom, 0x000000, 140));
+        f.fillCircle(ox, oy, orb, kOrbs[k]);
+        f.fillCircle(ox - orb / 3, oy - orb / 3, orb / 3 > 0 ? orb / 3 : 1, mix(kOrbs[k], 0xFFFFFF, 150));
+    }
+}
+
+void fill_diamond(LGFX_Sprite &f, int x, int y, int sz, uint32_t c)
+{
+    f.fillTriangle(x, y - sz, x - sz, y, x + sz, y, c);
+    f.fillTriangle(x, y + sz, x - sz, y, x + sz, y, c);
+}
+
+// Lorcana: a diamond for each lore toward the win, lighting up as lore is
+// gained; the newest one sparkles.
+void draw_lore_ring(LGFX_Sprite &f, const Theme &t, const bb_game_t &g, int value, int cx, int cy, int rx,
+                    int ry, float prog, int dir)
+{
+    int n = g.profile->win_at != BB_NONE ? g.profile->win_at : 20;
+    if (n > 24) {
+        n = 24;
+    }
+    int sz = ry / 10 < 2 ? 2 : ry / 10;
+    for (int i = 0; i < n; i++) {
+        float a = -kPi / 2 + i * 2 * kPi / n;
+        int x = cx + (int)(cosf(a) * rx);
+        int y = cy + (int)(sinf(a) * ry);
+        bool lit = i < value;
+        fill_diamond(f, x, y, sz, lit ? t.accent : mix(t.bg_bottom, t.accent, 55));
+        if (lit && i == value - 1 && prog < 1 && dir > 0) {
+            int len = (int)(sz * 4 * (1 - ease_out_cubic(prog))) + sz;
+            uint32_t c = mix(t.bg_bottom, 0xFFFFFF, (int)((1 - prog) * 255));
+            f.drawLine(x - len, y, x + len, y, c);
+            f.drawLine(x, y - len, x, y + len, c);
+            f.drawLine(x - len / 2, y - len / 2, x + len / 2, y + len / 2, c);
+            f.drawLine(x - len / 2, y + len / 2, x + len / 2, y - len / 2, c);
+        }
+    }
+}
+
+// Flesh and Blood: a bronze shield behind the life total that shakes and
+// flushes red when hit, and a blood bar showing life left of the starting total.
+void draw_shield(LGFX_Sprite &f, const Theme &t, const bb_game_t &g, int value, int cx, int cy, int sw, int sh,
+                 float prog, int dir)
+{
+    static const float kX[7] = {-1.f, 1.f, 1.f, 0.72f, 0.f, -0.72f, -1.f};
+    static const float kY[7] = {-1.f, -1.f, 0.1f, 0.62f, 1.f, 0.62f, 0.1f};
+    int shake = prog < 1 && dir < 0 ? (int)(sinf(prog * 7 * kPi) * 5 * (1 - prog)) : 0;
+    cx += shake;
+    uint32_t fill = t.surface;
+    if (prog < 1) {
+        fill = mix(t.surface, dir < 0 ? kLoss : kGain, (int)((1 - prog) * 110));
+    }
+    int x[7], y[7];
+    for (int i = 0; i < 7; i++) {
+        x[i] = cx + (int)(kX[i] * sw);
+        y[i] = cy + (int)(kY[i] * sh);
+    }
+    for (int i = 0; i < 7; i++) {
+        f.fillTriangle(cx, cy, x[i], y[i], x[(i + 1) % 7], y[(i + 1) % 7], fill);
+    }
+    for (int i = 0; i < 7; i++) {
+        int j = (i + 1) % 7;
+        f.drawLine(x[i], y[i], x[j], y[j], t.accent);
+        f.drawLine(x[i] + (x[i] < cx ? 1 : -1), y[i] + 1, x[j] + (x[j] < cx ? 1 : -1), y[j] + (y[j] > cy ? -1 : 1),
+                   mix(t.surface, t.accent, 120));
+    }
+    // Blood bar in the shield's tail.
+    const uint32_t kBlood = 0xC0162E, kBloodLow = 0xFF3B30;
+    int start = g.profile->start > 0 ? g.profile->start : 40;
+    int bw = (int)(sw * 1.1f), bh = sh / 11 < 3 ? 3 : sh / 11;
+    int bx = cx - bw / 2, by = cy + (int)(sh * 0.40f);
+    float frac = value <= 0 ? 0 : value >= start ? 1 : value / (float)start;
+    f.fillRoundRect(bx - 1, by - 1, bw + 2, bh + 2, 2, mix(t.bg_bottom, 0x000000, 140));
+    if (frac > 0) {
+        f.fillRoundRect(bx, by, (int)(bw * frac) > 2 ? (int)(bw * frac) : 2, bh, 2, frac < 0.25f ? kBloodLow : kBlood);
+    }
+}
+
+// A counter value, drawn according to the Counter setting: the game's own
+// look (Themed), on a spinning d20, or plain digits. Typed amounts (Yu-Gi-Oh!
+// LP) count toward the new value instead.
 void draw_value(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, const char *text, int cx,
                 int cy, int max_w, int max_h, uint32_t color, uint32_t shadow)
 {
-    if (!s.spindown || !counter_style_plain(*s.game)) {
+    const bb_game_t &g = *s.game;
+    float prog = s.spin ? s.spin[p] / 1000.0f : 1.0f;
+    int dir = s.spin_dir ? s.spin_dir[p] : 1;
+    int value = g.value[p];
+    int prev = s.prev ? s.prev[p] : value;
+
+    if (amount_style(g)) {
+        int shown = prog < 1 ? prev + (int)((value - prev) * ease_out_cubic(prog)) : value;
+        char buf[12];
+        snprintf(buf, sizeof(buf), "%d", shown);
+        draw_number(f, buf, cx, cy, max_w, max_h, color, shadow);
+        return;
+    }
+    if (!counter_style_plain(g)) {
         draw_number(f, text, cx, cy, max_w, max_h, color, shadow);
         return;
     }
-    float r = max_h / 2.0f;
-    if (r > max_w / 1.8f) {
-        r = max_w / 1.8f;
+
+    if (s.counter_style == 1) {
+        float r = max_h / 2.0f;
+        if (r > max_w / 1.8f) {
+            r = max_w / 1.8f;
+        }
+        float angle = prog < 1 ? (1 - ease_out_back(prog)) * (kPi / 3) * -dir : 0;
+        draw_die_body(f, 20, cx, cy, r, angle, t.surface, t.accent, mix(t.surface, t.accent, 45), 1, 1);
+        draw_number(f, text, cx, cy + 2, (int)(r * 1.25f), (int)(r * 0.95f), color, shadow);
+        return;
     }
-    float angle = 0;
-    if (s.spin && s.spin[p] < 1000) {
-        float e = ease_out_back(s.spin[p] / 1000.0f);
-        angle = (1 - e) * (kPi / 3) * (s.spin_dir ? -s.spin_dir[p] : -1);
+
+    Skin skin = s.counter_style == 2 ? SkinPlain : t.skin;
+    int ry = max_h / 2;
+    int rx = (int)(max_w * 0.46f) < (int)(max_h * 0.9f) ? (int)(max_w * 0.46f) : (int)(max_h * 0.9f);
+    switch (skin) {
+    case SkinMana:
+        draw_mana_ring(f, t, cx, cy, rx, ry, prog, dir);
+        draw_rolling_number(f, value, prev, prog, dir, cx, cy + 1, (int)(rx * 1.45f), (int)(ry * 1.25f), color,
+                            shadow);
+        break;
+    case SkinLore:
+        draw_lore_ring(f, t, g, value, cx, cy, rx, ry, prog, dir);
+        draw_rolling_number(f, value, prev, prog, dir, cx, cy + 1, (int)(rx * 1.4f), (int)(ry * 1.2f), color,
+                            shadow);
+        break;
+    case SkinShield: {
+        int sh = (int)(ry * 1.06f);
+        int sw = (int)(sh * 0.85f);
+        draw_shield(f, t, g, value, cx, cy, sw, sh, prog, dir);
+        draw_rolling_number(f, value, prev, prog, dir, cx, cy - sh / 5, (int)(sw * 1.6f), (int)(sh * 0.95f), color,
+                            shadow);
+        break;
     }
-    draw_die_body(f, 20, cx, cy, r, angle, t.surface, t.accent, mix(t.surface, t.accent, 45), 1, 1);
-    draw_number(f, text, cx, cy + 2, (int)(r * 1.25f), (int)(r * 0.95f), color, shadow);
+    default:
+        draw_rolling_number(f, value, prev, prog, dir, cx, cy, max_w, max_h, color, shadow);
+        break;
+    }
 }
 
 uint32_t value_color(const Theme &t, bb_status_t s)
@@ -799,7 +969,7 @@ void draw_side_by_side(LGFX_Sprite &f, const Theme &t, const UiState &s)
             draw_kind_button(f, t, s, p, 1);
             draw_track(f, t, g, p, panel.x + 9, kFooterTop + 2, 142, 17, 2, 1);
         } else if (amount_style(g)) {
-            draw_number(f, buf, panel.cx(), 92, 140, 80, vc, shadow);
+            draw_value(f, t, s, p, buf, panel.cx(), 92, 140, 80, vc, shadow);
         } else {
             uint32_t hint = mix(t.bg_bottom, t.accent, 110);
             draw_plus_minus(f, panel.x + panel.w - 16, 58, true, hint, 6);
@@ -1012,6 +1182,7 @@ bool counter_style_plain(const bb_game_t &g)
 
 void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
 {
+    static const char *const kCounterNames[] = {"Themed", "d20", "Digits"};
     const bb_game_t &g = *s.game;
     static const char *const kPlayerNames[] = {"Just you", "Two", "Three", "Four"};
     static const char *const kTeamNames[] = {"One team", "Two teams"};
@@ -1040,7 +1211,7 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
     } else {
         MenuTile tiles[kMenuTiles] = {
             {"Look", s.vivid ? "Vivid" : "Subdued", UiAction::MenuLook, true},
-            {"Counter", counter_style_plain(g) ? (s.spindown ? "d20" : "Digits") : "-", UiAction::MenuCounter,
+            {"Counter", counter_style_plain(g) ? kCounterNames[s.counter_style % 3] : "-", UiAction::MenuCounter,
              counter_style_plain(g)},
             {"Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true},
             {"Sleep", "KEY wakes", UiAction::MenuSleep, true},
