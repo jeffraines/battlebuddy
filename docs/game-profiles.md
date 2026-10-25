@@ -38,5 +38,9 @@ Starter set to define: Riftbound, Magic (20 / Commander 40), Lorcana (lore to
 with one, and the device keeps a tally per kind (Riftbound: points from
 Conquer vs Hold).
 
+`group` (default true) merges rapid taps into one history entry (five taps of
+−1 become −5). Riftbound sets it to false so every point is recorded on its
+own, in order.
+
 Every counter change is appended to a per-game history log so the device
 supports undo and can show how a total was reached.

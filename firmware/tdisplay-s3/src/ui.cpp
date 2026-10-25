@@ -11,26 +11,32 @@ struct Theme {
     const char *profile_id;
     uint32_t bg_top;
     uint32_t bg_bottom;
-    uint32_t surface; // buttons, menu rows, toast
+    uint32_t surface; // buttons, menu tiles, toast
     uint32_t accent;  // titles, borders, ornaments
     uint32_t p1;      // "YOU" in two-player mode
     uint32_t p2;      // "OPP" in two-player mode
     uint32_t text;
     uint32_t muted;
+    uint32_t kind[BB_MAX_KINDS]; // e.g. Conquer / Hold slots on the score track
 };
 
 // Per-game palettes. Colors only; no game logos or artwork.
 const Theme kThemes[] = {
-    // Navy and teal with gold trim.
-    {"riftbound", 0x0A1428, 0x0B3A44, 0x10283A, 0xC8AA6E, 0x0AC8B9, 0xE8604C, 0xF0E6D2, 0x7E8A96},
+    // Navy and teal with gold trim; gold = Conquer, violet = Hold.
+    {"riftbound", 0x0A1428, 0x0B3A44, 0x10283A, 0xC8AA6E, 0x0AC8B9, 0xE8604C, 0xF0E6D2, 0x7E8A96,
+     {0xE0B85A, 0xA78BFA}},
     // Charcoal and warm brown with amber.
-    {"mtg", 0x15110E, 0x33221A, 0x2A1E17, 0xE0A040, 0x6FB5E0, 0xE8604C, 0xF2E8DC, 0x8C8072},
+    {"mtg", 0x15110E, 0x33221A, 0x2A1E17, 0xE0A040, 0x6FB5E0, 0xE8604C, 0xF2E8DC, 0x8C8072,
+     {0xE0A040, 0x6FB5E0}},
     // Charcoal and plum with lilac.
-    {"mtg-commander", 0x120F1A, 0x2E1F40, 0x251A36, 0xC9A0FF, 0x6FB5E0, 0xE8604C, 0xF0EAFA, 0x8A7FA0},
+    {"mtg-commander", 0x120F1A, 0x2E1F40, 0x251A36, 0xC9A0FF, 0x6FB5E0, 0xE8604C, 0xF0EAFA, 0x8A7FA0,
+     {0xC9A0FF, 0x6FB5E0}},
     // Ink blue and violet with gold.
-    {"lorcana", 0x0B0F2E, 0x2D1B4E, 0x1C1840, 0xE8C25A, 0x7FB2FF, 0xF07FB0, 0xF4F0FF, 0x8A88AA},
+    {"lorcana", 0x0B0F2E, 0x2D1B4E, 0x1C1840, 0xE8C25A, 0x7FB2FF, 0xF07FB0, 0xF4F0FF, 0x8A88AA,
+     {0xE8C25A, 0x7FB2FF}},
     // Black and blood red with bronze.
-    {"fab", 0x140808, 0x3C1210, 0x2E1210, 0xD4A24C, 0x6FB5E0, 0xE04B3A, 0xF4E6DC, 0x907670},
+    {"fab", 0x140808, 0x3C1210, 0x2E1210, 0xD4A24C, 0x6FB5E0, 0xE04B3A, 0xF4E6DC, 0x907670,
+     {0xD4A24C, 0x6FB5E0}},
 };
 
 const Theme &theme_for(const bb_profile_t *profile)
@@ -46,9 +52,11 @@ const Theme &theme_for(const bb_profile_t *profile)
 constexpr uint32_t kGain = 0x5BD96A;
 constexpr uint32_t kLoss = 0xF0564A;
 constexpr uint32_t kWinColor = 0xFFD45A;
+constexpr uint32_t kInk = 0x10141C; // dark text on filled slots
 
 constexpr int kHeaderH = 24;
 constexpr int kFooterTop = 150;
+constexpr int kStripH = kHeight / 2; // facing layout: one strip per player
 
 uint32_t mix(uint32_t a, uint32_t b, int t256)
 {
@@ -69,41 +77,52 @@ struct Rect {
 
 bool has_kinds(const bb_game_t &g) { return g.profile->kind_count >= 2; }
 
-Rect player_panel(const bb_game_t &g, uint8_t p)
+bool facing(const UiState &s) { return s.game->players == 2 && s.layout == Layout::Facing; }
+
+// Which player is drawn on the left in the side-by-side layout.
+uint8_t left_player(const UiState &s) { return s.layout == Layout::SideYouRight ? 1 : 0; }
+
+Rect player_panel(const UiState &s, uint8_t p)
 {
-    if (g.players == 1) {
+    if (s.game->players == 1) {
         return {0, kHeaderH, kWidth, kFooterTop - kHeaderH};
     }
-    return {p * kWidth / 2, kHeaderH, kWidth / 2, kFooterTop - kHeaderH};
+    int side = p == left_player(s) ? 0 : 1;
+    return {side * kWidth / 2, kHeaderH, kWidth / 2, kFooterTop - kHeaderH};
 }
 
-// Kind buttons (e.g. Conquer / Hold) for player p.
-Rect kind_button(const bb_game_t &g, uint8_t p, uint8_t kind)
+// Kind buttons (e.g. Conquer / Hold). Facing-layout rects are in strip coordinates.
+Rect kind_button(const UiState &s, uint8_t p, uint8_t kind)
 {
-    if (g.players == 1) {
+    if (facing(s)) {
+        return {206, kind == 0 ? 5 : 45, 108, 35};
+    }
+    if (s.game->players == 1) {
         return {176, kind == 0 ? 30 : 92, 138, 56};
     }
-    Rect panel = player_panel(g, p);
+    Rect panel = player_panel(s, p);
     return {panel.x + (kind == 0 ? 6 : 82), 110, 72, 36};
 }
 
-constexpr int kMenuRowY = 28;
-constexpr int kMenuRowH = 30;
-constexpr int kMenuRowGap = 4;
-constexpr int kMenuRows = 4;
+constexpr int kMenuTiles = 6;
 
-Rect menu_row(int i)
+Rect menu_tile(int i)
 {
-    return {6, kMenuRowY + i * (kMenuRowH + kMenuRowGap), kWidth - 12, kMenuRowH};
+    return {6 + (i % 3) * 104, 30 + (i / 3) * 70, 100, 64};
 }
 
 // ---- Drawing helpers --------------------------------------------------------
 
+void draw_gradient(LGFX_Sprite &f, const Theme &t, int h)
+{
+    for (int y = 0; y < h; y++) {
+        f.drawFastHLine(0, y, kWidth, mix(t.bg_top, t.bg_bottom, y * 256 / h));
+    }
+}
+
 void draw_background(LGFX_Sprite &f, const Theme &t, bool brackets)
 {
-    for (int y = 0; y < kHeight; y++) {
-        f.drawFastHLine(0, y, kWidth, mix(t.bg_top, t.bg_bottom, y * 256 / kHeight));
-    }
+    draw_gradient(f, t, kHeight);
 
     // Header rule, brightest in the middle.
     for (int x = 0; x < kWidth; x++) {
@@ -154,6 +173,20 @@ void draw_header(LGFX_Sprite &f, const Theme &t, const char *title, int battery_
     f.setTextDatum(textdatum_t::middle_left);
     f.drawString(title, 8, kHeaderH / 2);
     draw_battery(f, t, battery_percent);
+}
+
+// Picks the largest of a few fonts that fits text into max_w.
+void fit_font(LGFX_Sprite &f, const char *text, int max_w)
+{
+    static const lgfx::IFont *const kFonts[] = {
+        &fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b, &fonts::FreeSans9pt7b, &fonts::Font2};
+    f.setTextSize(1);
+    for (const lgfx::IFont *font : kFonts) {
+        f.setFont(font);
+        if (f.textWidth(text) <= max_w) {
+            return;
+        }
+    }
 }
 
 // Draws a value in the 75 px numeric font, shrunk if needed to fit max_w x max_h.
@@ -232,34 +265,95 @@ void draw_plus_minus(LGFX_Sprite &f, int cx, int cy, bool plus, uint32_t color, 
     }
 }
 
-void draw_kind_button(LGFX_Sprite &f, const Theme &t, const bb_game_t &g, uint8_t p, uint8_t kind)
+void draw_kind_button(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, uint8_t kind)
 {
-    Rect r = kind_button(g, p, kind);
+    const bb_game_t &g = *s.game;
+    Rect r = kind_button(s, p, kind);
     char name[12];
     char buf[20];
+    uint32_t kc = t.kind[kind];
 
     f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
-    f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, 200));
+    f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, kc, 200));
     f.setTextDatum(textdatum_t::middle_center);
 
     if (g.players == 1) {
         upper(name, sizeof(name), g.profile->kinds[kind], 10);
         f.setFont(&fonts::FreeSansBold9pt7b);
-        f.setTextColor(t.accent);
+        f.setTextColor(kc);
         f.drawString(name, r.cx(), r.y + 17);
         snprintf(buf, sizeof(buf), "%d", g.tally[0][kind]);
         f.setFont(&fonts::FreeSansBold12pt7b);
         f.setTextColor(t.text);
         f.drawString(buf, r.cx(), r.y + 39);
     } else {
-        upper(name, sizeof(name), g.profile->kinds[kind], 4);
+        upper(name, sizeof(name), g.profile->kinds[kind], facing(s) ? 10 : 4);
         snprintf(buf, sizeof(buf), "%s %d", name, g.tally[p][kind]);
         f.setFont(&fonts::FreeSansBold9pt7b);
-        f.setTextColor(t.text);
+        f.setTextSize(1);
+        f.setTextColor(kc);
         f.drawString(buf, r.cx(), r.cy());
     }
 }
 
+// The order a player's points came in, oldest first (kind per point).
+size_t point_track(const bb_game_t &g, uint8_t p, uint8_t *kinds, size_t max)
+{
+    bb_entry_t h[BB_HISTORY_LEN + 1];
+    size_t n = bb_game_history(&g, h, BB_HISTORY_LEN);
+    if (g.pending.delta != 0) {
+        // Newest first, so the pending change goes in front.
+        memmove(h + 1, h, n * sizeof(h[0]));
+        h[0] = g.pending;
+        n++;
+    }
+
+    size_t count = 0;
+    for (size_t i = n; i-- > 0;) {
+        const bb_entry_t &e = h[i];
+        if (e.player != p) {
+            continue;
+        }
+        for (int d = e.delta; d > 0 && count < max; d--) {
+            kinds[count++] = e.kind;
+        }
+        for (int d = e.delta; d < 0 && count > 0; d++) {
+            count--;
+        }
+    }
+    return count;
+}
+
+// Slots for each point toward the win, filled with the kind's initial in order.
+void draw_track(LGFX_Sprite &f, const Theme &t, const bb_game_t &g, uint8_t p, int x, int y,
+                int slot_w, int slot_h, int gap, int per_row)
+{
+    int slots = g.profile->win_at != BB_NONE ? g.profile->win_at : 8;
+    if (slots > 10) {
+        slots = 10;
+    }
+    uint8_t kinds[10];
+    size_t n = point_track(g, p, kinds, slots);
+
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::middle_center);
+    for (int i = 0; i < slots; i++) {
+        int sx = x + (i % per_row) * (slot_w + gap);
+        int sy = y + (i / per_row) * (slot_h + gap);
+        if ((size_t)i < n) {
+            uint32_t kc = t.kind[kinds[i]];
+            char letter[2] = {g.profile->kinds[kinds[i]][0], '\0'};
+            f.fillRoundRect(sx, sy, slot_w, slot_h, 4, kc);
+            f.setTextColor(kInk);
+            f.drawString(letter, sx + slot_w / 2, sy + slot_h / 2 + 1);
+        } else {
+            f.drawRoundRect(sx, sy, slot_w, slot_h, 4, mix(t.bg_bottom, t.accent, 70));
+        }
+    }
+}
+
+// Mixed history for games without kinds, newest first.
 void draw_footer(LGFX_Sprite &f, const Theme &t, const bb_game_t &g)
 {
     bb_entry_t recent[8];
@@ -272,23 +366,19 @@ void draw_footer(LGFX_Sprite &f, const Theme &t, const bb_game_t &g)
     int x = 8;
     for (size_t i = 0; i < n && x < kWidth - 30; i++) {
         const bb_entry_t &e = recent[i];
-        if (has_kinds(g)) {
-            snprintf(buf, sizeof(buf), "%+d%c", e.delta, g.profile->kinds[e.kind][0]);
-        } else {
-            snprintf(buf, sizeof(buf), "%+d", e.delta);
-        }
+        snprintf(buf, sizeof(buf), "%+d", e.delta);
         uint32_t c = g.players > 1 ? player_color(t, e.player) : (e.delta > 0 ? kGain : kLoss);
         f.setTextColor(c);
         x += f.drawString(buf, x, kHeight - 3) + 9;
     }
 }
 
-void draw_toast(LGFX_Sprite &f, const Theme &t, const char *msg)
+void draw_toast(LGFX_Sprite &f, const Theme &t, const char *msg, int cy)
 {
     f.setFont(&fonts::FreeSansBold9pt7b);
     f.setTextSize(1);
     int w = f.textWidth(msg) + 24;
-    Rect r{(kWidth - w) / 2, kFooterTop - 2, w, kHeight - kFooterTop};
+    Rect r{(kWidth - w) / 2, cy - 10, w, 20};
     f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
     f.drawRoundRect(r.x, r.y, r.w, r.h, 8, t.accent);
     f.setTextColor(t.text);
@@ -307,10 +397,11 @@ void draw_single(LGFX_Sprite &f, const Theme &t, const UiState &s)
     uint32_t shadow = mix(t.bg_bottom, 0x000000, 128);
 
     if (has_kinds(g)) {
-        // Number on the left, kind buttons on the right.
-        draw_number(f, buf, 86, 80, 150, 90, vc, shadow);
-        draw_kind_button(f, t, g, 0, 0);
-        draw_kind_button(f, t, g, 0, 1);
+        // Number on the left, kind buttons on the right, point track along the bottom.
+        draw_number(f, buf, 86, 82, 150, 90, vc, shadow);
+        draw_kind_button(f, t, s, 0, 0);
+        draw_kind_button(f, t, s, 0, 1);
+        draw_track(f, t, g, 0, 10, kFooterTop + 2, 34, 17, 4, 8);
     } else {
         uint32_t hint = mix(t.bg_bottom, t.accent, 110);
         draw_plus_minus(f, 28, 87, false, hint, 10);
@@ -323,18 +414,19 @@ void draw_single(LGFX_Sprite &f, const Theme &t, const UiState &s)
             f.setTextDatum(textdatum_t::middle_center);
             f.drawString(buf, kWidth / 2, kHeaderH / 2);
         }
+        draw_footer(f, t, g);
     }
 
     uint32_t sc = status_text(g, 0, buf, sizeof(buf));
-    if (buf[0]) {
+    if (buf[0] && !(has_kinds(g) && g.pending.delta != 0)) {
         f.setFont(&fonts::FreeSansBold12pt7b);
         f.setTextColor(sc);
         f.setTextDatum(textdatum_t::middle_center);
-        f.drawString(buf, has_kinds(g) ? 86 : kWidth / 2, 136);
+        f.drawString(buf, has_kinds(g) ? 86 : kWidth / 2, has_kinds(g) ? 32 : 136);
     }
 }
 
-void draw_double(LGFX_Sprite &f, const Theme &t, const UiState &s)
+void draw_side_by_side(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
     const bb_game_t &g = *s.game;
     char buf[16];
@@ -349,7 +441,7 @@ void draw_double(LGFX_Sprite &f, const Theme &t, const UiState &s)
     }
 
     for (uint8_t p = 0; p < 2; p++) {
-        Rect panel = player_panel(g, p);
+        Rect panel = player_panel(s, p);
 
         f.setFont(&fonts::FreeSansBold9pt7b);
         f.setTextSize(1);
@@ -368,8 +460,9 @@ void draw_double(LGFX_Sprite &f, const Theme &t, const UiState &s)
         uint32_t vc = value_color(t, bb_game_status(&g, p));
         if (has_kinds(g)) {
             draw_number(f, buf, panel.cx(), 72, 140, 64, vc, shadow);
-            draw_kind_button(f, t, g, p, 0);
-            draw_kind_button(f, t, g, p, 1);
+            draw_kind_button(f, t, s, p, 0);
+            draw_kind_button(f, t, s, p, 1);
+            draw_track(f, t, g, p, panel.x + 9, kFooterTop + 2, 16, 17, 2, 8);
         } else {
             uint32_t hint = mix(t.bg_bottom, t.accent, 110);
             draw_plus_minus(f, panel.x + panel.w - 16, 58, true, hint, 6);
@@ -377,40 +470,162 @@ void draw_double(LGFX_Sprite &f, const Theme &t, const UiState &s)
             draw_number(f, buf, panel.cx() - 6, 92, 124, 80, vc, shadow);
         }
     }
+
+    if (!has_kinds(g)) {
+        draw_footer(f, t, g);
+    }
+}
+
+// One player's half of the facing layout, drawn upright into a kWidth x kStripH sprite.
+void draw_strip(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p)
+{
+    const bb_game_t &g = *s.game;
+    char buf[16];
+    uint32_t shadow = mix(t.bg_bottom, 0x000000, 128);
+
+    draw_gradient(f, t, kStripH);
+
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    f.setTextColor(player_color(t, p));
+    f.setTextDatum(textdatum_t::middle_left);
+    f.drawString(ui_player_label(p), 8, 12);
+
+    char status[16];
+    uint32_t sc = status_text(g, p, status, sizeof(status));
+
+    snprintf(buf, sizeof(buf), "%d", g.value[p]);
+    uint32_t vc = value_color(t, bb_game_status(&g, p));
+
+    if (has_kinds(g)) {
+        draw_number(f, buf, 60, 50, 90, 58, vc, shadow);
+        draw_track(f, t, g, p, 108, 20, 21, 18, 3, 4);
+        draw_kind_button(f, t, s, p, 0);
+        draw_kind_button(f, t, s, p, 1);
+        if (status[0]) {
+            f.setFont(&fonts::FreeSansBold9pt7b);
+            f.setTextColor(sc);
+            f.setTextDatum(textdatum_t::middle_center);
+            f.drawString(status, 154, 72);
+        }
+    } else {
+        uint32_t hint = mix(t.bg_bottom, t.accent, 110);
+        draw_plus_minus(f, 28, 48, false, hint, 9);
+        draw_plus_minus(f, kWidth - 28, 48, true, hint, 9);
+        draw_number(f, buf, kWidth / 2, 46, 180, 70, vc, shadow);
+        if (status[0]) {
+            f.setFont(&fonts::FreeSansBold9pt7b);
+            f.setTextColor(sc);
+            f.setTextDatum(textdatum_t::middle_right);
+            f.drawString(status, kWidth - 8, 12);
+        }
+    }
+}
+
+LGFX_Sprite *strip_sprite(LGFX_Sprite &frame)
+{
+    static LGFX_Sprite strip;
+    if (!strip.getBuffer()) {
+        strip.setColorDepth(16);
+#ifdef ESP_PLATFORM
+        strip.setPsram(true);
+#endif
+        strip.createSprite(kWidth, kStripH);
+    }
+    (void)frame;
+    return &strip;
+}
+
+void draw_facing(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    LGFX_Sprite *strip = strip_sprite(f);
+
+    // YOU along the bottom, upright.
+    draw_strip(*strip, t, s, 0);
+    strip->pushSprite(&f, 0, kHeight - kStripH);
+
+    // OPP along the top, rotated 180 degrees: reversing the pixel order does exactly that.
+    draw_strip(*strip, t, s, 1);
+    uint16_t *px = (uint16_t *)strip->getBuffer();
+    for (int i = 0, j = kWidth * kStripH - 1; i < j; i++, j--) {
+        uint16_t tmp = px[i];
+        px[i] = px[j];
+        px[j] = tmp;
+    }
+    strip->pushSprite(&f, 0, 0);
+
+    for (int x = 0; x < kWidth; x++) {
+        int d = x < kWidth / 2 ? x : kWidth - 1 - x;
+        f.drawPixel(x, kStripH, mix(t.bg_bottom, t.accent, d * 256 / (kWidth / 2)));
+    }
 }
 
 void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
     const bb_game_t &g = *s.game;
-    char players[8];
-    snprintf(players, sizeof(players), "%d", g.players);
+    static const char *const kLayoutNames[] = {"YOU left", "YOU right", "Facing"};
+    char players[16];
+    snprintf(players, sizeof(players), g.players == 1 ? "Just you" : "Both");
 
-    const char *labels[kMenuRows] = {"Game", "Players", "Restart game", "Sleep"};
-    const char *values[kMenuRows] = {g.profile->name, players, "", "KEY wakes"};
+    const char *labels[kMenuTiles] = {"Game", "Players", "Layout", "Flip", "Restart", "Sleep"};
+    const char *values[kMenuTiles] = {
+        g.profile->name,
+        players,
+        g.players == 2 ? kLayoutNames[(int)s.layout] : "-",
+        s.flipped ? "On" : "Off",
+        "New game",
+        "KEY wakes",
+    };
 
     // Close mark in the header.
-    uint32_t xc = t.muted;
     for (int i = -1; i <= 1; i++) {
-        f.drawLine(kWidth - 52 + i, 7, kWidth - 42 + i, 17, xc);
-        f.drawLine(kWidth - 42 + i, 7, kWidth - 52 + i, 17, xc);
+        f.drawLine(kWidth - 52 + i, 7, kWidth - 42 + i, 17, t.muted);
+        f.drawLine(kWidth - 42 + i, 7, kWidth - 52 + i, 17, t.muted);
     }
 
-    for (int i = 0; i < kMenuRows; i++) {
-        Rect r = menu_row(i);
-        f.fillRoundRect(r.x, r.y, r.w, r.h, 7, t.surface);
-        f.drawRoundRect(r.x, r.y, r.w, r.h, 7, mix(t.surface, t.accent, 90));
-
-        f.setFont(&fonts::FreeSansBold9pt7b);
-        f.setTextSize(1);
-        f.setTextColor(t.text);
-        f.setTextDatum(textdatum_t::middle_left);
-        f.drawString(labels[i], r.x + 12, r.cy());
+    for (int i = 0; i < kMenuTiles; i++) {
+        Rect r = menu_tile(i);
+        bool enabled = !(i == 2 && g.players != 2);
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, enabled ? 140 : 40));
 
         f.setFont(&fonts::FreeSans9pt7b);
-        f.setTextColor(t.accent);
-        f.setTextDatum(textdatum_t::middle_right);
-        f.drawString(values[i], r.x + r.w - 12, r.cy());
+        f.setTextSize(1);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::middle_left);
+        f.drawString(labels[i], r.x + 9, r.y + 15);
+
+        fit_font(f, values[i], r.w - 12);
+        f.setTextColor(enabled ? t.accent : t.muted);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(values[i], r.cx(), r.y + 44);
     }
+}
+
+UiAction kind_hit(const UiState &s, uint8_t p, int x, int y)
+{
+    UiAction a;
+    for (uint8_t k = 0; k < 2; k++) {
+        Rect r = kind_button(s, p, k);
+        // Generous targets: each button owns its half of the button column.
+        bool hit;
+        if (facing(s)) {
+            hit = x >= r.x - 6 && (k == 0 ? y < kStripH / 2 : y >= kStripH / 2);
+        } else if (s.game->players == 1) {
+            hit = x >= r.x - 8 && (k == 0 ? y < 89 : y >= 89);
+        } else {
+            Rect panel = player_panel(s, p);
+            hit = y >= r.y - 10 && y < kFooterTop && (k == 0 ? x < panel.cx() : x >= panel.cx());
+        }
+        if (hit) {
+            a.type = UiAction::Adjust;
+            a.player = p;
+            a.kind = k;
+            a.delta = 1;
+            return a;
+        }
+    }
+    return a;
 }
 
 } // namespace
@@ -424,6 +639,14 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
 {
     const Theme &t = theme_for(state.game->profile);
 
+    if (!state.menu && facing(state)) {
+        draw_facing(frame, t, state);
+        if (state.toast) {
+            draw_toast(frame, t, state.toast, kStripH);
+        }
+        return;
+    }
+
     draw_background(frame, t, !state.menu);
     draw_header(frame, t, state.menu ? "MENU" : state.game->profile->name, state.battery_percent);
 
@@ -435,13 +658,11 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
     if (state.game->players == 1) {
         draw_single(frame, t, state);
     } else {
-        draw_double(frame, t, state);
+        draw_side_by_side(frame, t, state);
     }
 
     if (state.toast) {
-        draw_toast(frame, t, state.toast);
-    } else {
-        draw_footer(frame, t, *state.game);
+        draw_toast(frame, t, state.toast, (kFooterTop + kHeight) / 2);
     }
 }
 
@@ -455,15 +676,41 @@ UiAction ui_hit(const UiState &state, int x, int y)
             a.type = UiAction::MenuClose;
             return a;
         }
-        static const UiAction::Type kRowActions[kMenuRows] = {
-            UiAction::MenuGame, UiAction::MenuPlayers, UiAction::MenuRestart, UiAction::MenuSleep};
-        for (int i = 0; i < kMenuRows; i++) {
-            Rect r = menu_row(i);
-            // Rows are hit-tested with the gaps included so near-misses still count.
-            if (y >= r.y - kMenuRowGap / 2 && y < r.y + r.h + kMenuRowGap / 2) {
-                a.type = kRowActions[i];
+        static const UiAction::Type kTileActions[kMenuTiles] = {
+            UiAction::MenuGame, UiAction::MenuPlayers, UiAction::MenuLayout,
+            UiAction::MenuFlip, UiAction::MenuRestart, UiAction::MenuSleep};
+        for (int i = 0; i < kMenuTiles; i++) {
+            Rect r = menu_tile(i);
+            // Tiles are hit-tested with the gaps included so near-misses still count.
+            Rect padded{r.x - 2, r.y - 3, r.w + 4, r.h + 6};
+            if (padded.contains(x, y)) {
+                if (kTileActions[i] == UiAction::MenuLayout && g.players != 2) {
+                    return a;
+                }
+                a.type = kTileActions[i];
                 return a;
             }
+        }
+        return a;
+    }
+
+    if (facing(state)) {
+        // Map to the touched strip's own (upright) coordinates.
+        uint8_t p = y < kStripH ? 1 : 0;
+        int lx = p == 1 ? kWidth - 1 - x : x;
+        int ly = p == 1 ? kStripH - 1 - y : y - (kHeight - kStripH);
+        if (has_kinds(g)) {
+            return kind_hit(state, p, lx, ly);
+        }
+        a.player = p;
+        if (lx < kWidth / 3) {
+            a.type = UiAction::Adjust;
+            a.delta = -1;
+            a.repeat = true;
+        } else if (lx >= kWidth * 2 / 3) {
+            a.type = UiAction::Adjust;
+            a.delta = 1;
+            a.repeat = true;
         }
         return a;
     }
@@ -472,25 +719,16 @@ UiAction ui_hit(const UiState &state, int x, int y)
         return a;
     }
 
-    uint8_t p = (g.players == 2 && x >= kWidth / 2) ? 1 : 0;
-    Rect panel = player_panel(g, p);
+    uint8_t p = 0;
+    if (g.players == 2) {
+        p = (x < kWidth / 2) ? left_player(state) : (uint8_t)(1 - left_player(state));
+    }
+    Rect panel = player_panel(state, p);
     a.player = p;
 
     if (has_kinds(g)) {
         // Kind buttons only; mistakes are fixed with undo.
-        for (uint8_t k = 0; k < 2; k++) {
-            Rect r = kind_button(g, p, k);
-            // Generous targets: the button plus its half of the column.
-            bool hit = g.players == 1 ? (x >= r.x - 8 && (k == 0 ? y < 89 : y >= 89))
-                                      : (y >= r.y - 10 && (k == 0 ? x < panel.cx() : x >= panel.cx()));
-            if (hit) {
-                a.type = UiAction::Adjust;
-                a.kind = k;
-                a.delta = 1;
-                return a;
-            }
-        }
-        return a;
+        return kind_hit(state, p, x, y);
     }
 
     if (g.players == 1) {

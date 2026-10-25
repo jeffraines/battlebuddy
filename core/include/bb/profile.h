@@ -26,6 +26,7 @@ typedef struct {
     int16_t lose_at; /* reaching this value (from above) loses, or BB_NONE */
     uint8_t kind_count;              /* 0 = changes have no kind */
     const char *kinds[BB_MAX_KINDS]; /* names of the kinds, e.g. "Conquer" */
+    uint8_t group;                   /* 1 = merge rapid changes into one history entry */
 } bb_profile_t;
 
 size_t bb_profile_count(void);

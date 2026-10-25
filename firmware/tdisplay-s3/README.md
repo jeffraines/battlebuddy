@@ -17,22 +17,31 @@ Hold the board landscape, USB port on the right.
 | **KEY** button | Undo (shows what was undone); closes the menu if open; wakes from sleep |
 | Circle below the screen | Open / close the menu |
 
-**Menu:** tap a row. *Game* cycles Riftbound → Magic → Commander → Lorcana →
-Flesh and Blood. *Players* switches between just you and both players (one
-screen, YOU on the left, OPP on the right). Both restart the game. *Restart
-game* and *Sleep* do what they say. Tap the header to close.
+**Menu:** tap a tile; tap the header to close.
+
+| Tile | Does |
+|---|---|
+| Game | Cycles Riftbound → Magic → Commander → Lorcana → Flesh and Blood (restarts) |
+| Players | *Just you* or *Both* on one screen (restarts) |
+| Layout | Two players only: *YOU left*, *YOU right*, or *Facing* (YOU along the bottom, OPP along the top upside down, for a device lying between you) |
+| Flip | Rotates the whole screen 180° (USB port on the left) |
+| Restart | New game |
+| Sleep | Sleep now; KEY wakes |
 
 **Counting:**
 
-- Riftbound: tap **CONQUER** or **HOLD** to score a point of that kind. The
-  buttons show how many points came from each. Mistakes are fixed with undo.
+- Riftbound: tap **CONQUER** or **HOLD** to score a point of that kind. Every
+  point is recorded on its own, right away. A row of 8 slots per player fills
+  with **C** / **H** in the order the points were scored, so you can see
+  exactly how each point was earned. Mistakes are fixed with undo.
 - Other games, one player: left third −, right third +, middle switches the
   step between 1 and 5. Hold to repeat.
-- Other games, two players: top half of a player's side +1, bottom half −1.
+- Other games, two players: side by side, top half of a player's side +1,
+  bottom half −1; facing, left third −1, right third +1 of your own strip.
 
-Quick taps are grouped: changes within 1.5 s of each other show as a pending
-`+3` / `-2`, then become one history entry along the bottom (C = Conquer,
-H = Hold; colored by player in two-player mode).
+For games other than Riftbound, quick taps are grouped: changes within 1.5 s
+of each other show as a pending `+3` / `-2`, then become one history entry
+along the bottom (colored by player in two-player mode).
 
 Each game has its own color theme. The screen dims after 30 s idle and the
 board sleeps after 10 minutes; the first touch or press after dimming only

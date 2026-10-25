@@ -14,9 +14,10 @@ extern "C" {
 #define BB_MAX_PLAYERS 2
 #define BB_HISTORY_LEN 64
 
-/* Rapid taps are grouped: changes to the same player and kind made within
- * this window of each other become one history entry (five taps of -1 are
- * recorded as -5). */
+/* For profiles with group set, rapid taps are grouped: changes to the same
+ * player and kind made within this window of each other become one history
+ * entry (five taps of -1 are recorded as -5). Other profiles record every
+ * change as its own entry immediately. */
 #define BB_COMMIT_MS 1500
 
 typedef struct {

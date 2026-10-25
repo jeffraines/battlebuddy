@@ -1,7 +1,7 @@
 // BattleBuddy prototype for the LilyGO T-Display-S3 Touch.
 //
 // Buttons (board held landscape):
-//   BOOT (GPIO0), short press: open/close the menu (game, players, restart, sleep)
+//   BOOT (GPIO0), short press: open/close the menu (game, players, layout, flip, restart, sleep)
 //   BOOT, hold 1 s:            sleep
 //   KEY (GPIO14):              undo (closes the menu when it is open); wakes from sleep
 //   Circle below the screen:   open/close the menu
@@ -32,12 +32,14 @@ constexpr uint8_t kDimBrightness = 20;
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0001;
+constexpr uint32_t kSavedMagic = 0xBB0B0002;
 
 struct Saved {
     uint32_t magic;
     uint8_t profile_index;
     int16_t step;
+    Layout layout;
+    bool flipped;
     bb_game_t game;
 };
 
@@ -80,6 +82,8 @@ UiState ui_state()
     s.game = &game;
     s.step = saved.step;
     s.battery_percent = battery_percent;
+    s.layout = saved.layout;
+    s.flipped = saved.flipped;
     s.menu = menu_open;
     s.toast = toast_until ? toast_text : nullptr;
     return s;
@@ -171,6 +175,15 @@ void perform(const UiAction &a, uint32_t now)
         break;
     case UiAction::MenuPlayers:
         start_game(saved.profile_index, game.players == 1 ? 2 : 1);
+        break;
+    case UiAction::MenuLayout:
+        saved.layout = (Layout)(((int)saved.layout + 1) % (int)Layout::Count);
+        dirty = true;
+        break;
+    case UiAction::MenuFlip:
+        saved.flipped = !saved.flipped;
+        lcd.setRotation(saved.flipped ? 3 : 1);
+        dirty = true;
         break;
     case UiAction::MenuRestart:
         bb_game_reset(&game);
@@ -300,12 +313,14 @@ void setup()
         }
     } else {
         saved.step = 1;
+        saved.layout = Layout::SideYouLeft;
+        saved.flipped = false;
         start_game(0, 1);
     }
     saved.magic = 0; // only trusted again after the next sleep
 
     lcd.init();
-    lcd.setRotation(1); // landscape, USB port on the right
+    lcd.setRotation(saved.flipped ? 3 : 1); // landscape; unflipped = USB port on the right
     lcd.setBrightness(kBrightness);
 
     frame.setColorDepth(16);

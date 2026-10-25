@@ -38,6 +38,8 @@ static UiState state_for(const bb_game_t &g)
     s.game = &g;
     s.step = 1;
     s.battery_percent = 76;
+    s.layout = Layout::SideYouLeft;
+    s.flipped = false;
     s.menu = false;
     s.toast = nullptr;
     return s;
@@ -55,50 +57,58 @@ int main(int argc, char **argv)
     bb_game_t g;
     enum { CONQUER = 0, HOLD = 1 };
 
-    // Riftbound, just yourself: two Conquers and a Hold, one Hold pending.
+    // Riftbound, just yourself: Conquer, Conquer, Hold, Conquer, Hold.
     bb_game_init(&g, bb_profile_find("riftbound"), 1);
-    bb_game_adjust(&g, 0, CONQUER, 1, 0);
-    bb_game_commit(&g);
-    bb_game_adjust(&g, 0, HOLD, 1, 0);
-    bb_game_commit(&g);
-    bb_game_adjust(&g, 0, CONQUER, 1, 0);
-    bb_game_commit(&g);
-    bb_game_adjust(&g, 0, HOLD, 1, 0);
+    const uint8_t mine[] = {CONQUER, CONQUER, HOLD, CONQUER, HOLD};
+    for (uint8_t k : mine) {
+        bb_game_adjust(&g, 0, k, 1, 0);
+    }
     save(frame, state_for(g), "riftbound-1p");
 
-    // Riftbound, both players, you have won.
+    // Riftbound, both players side by side.
     bb_game_init(&g, bb_profile_find("riftbound"), 2);
-    bb_game_adjust(&g, 1, HOLD, 2, 0);
-    bb_game_commit(&g);
-    bb_game_adjust(&g, 0, CONQUER, 5, 0);
-    bb_game_commit(&g);
-    bb_game_adjust(&g, 1, CONQUER, 3, 0);
-    bb_game_commit(&g);
-    bb_game_adjust(&g, 0, HOLD, 3, 0);
-    bb_game_commit(&g);
+    const uint8_t seq[][2] = {{0, HOLD}, {1, CONQUER}, {0, CONQUER}, {0, CONQUER}, {1, HOLD},
+                              {1, HOLD}, {0, HOLD}, {1, CONQUER}, {0, CONQUER}, {0, CONQUER}};
+    for (auto &e : seq) {
+        bb_game_adjust(&g, e[0], e[1], 1, 0);
+    }
     save(frame, state_for(g), "riftbound-2p");
 
-    // Magic, both players, opponent's change pending.
+    // Same game, facing each other across the table.
+    {
+        UiState s = state_for(g);
+        s.layout = Layout::Facing;
+        save(frame, s, "riftbound-facing");
+    }
+
+    // Riftbound, you win (8 points).
+    bb_game_init(&g, bb_profile_find("riftbound"), 2);
+    for (int i = 0; i < 8; i++) {
+        bb_game_adjust(&g, 0, i % 3 == 0 ? HOLD : CONQUER, 1, 0);
+    }
+    for (int i = 0; i < 6; i++) {
+        bb_game_adjust(&g, 1, i % 2 ? HOLD : CONQUER, 1, 0);
+    }
+    {
+        UiState s = state_for(g);
+        s.layout = Layout::SideYouRight;
+        save(frame, s, "riftbound-win-you-right");
+    }
+
+    // Magic facing, opponent's change pending, undo toast.
     bb_game_init(&g, bb_profile_find("mtg"), 2);
     bb_game_adjust(&g, 0, 0, -6, 0);
     bb_game_commit(&g);
     bb_game_adjust(&g, 1, 0, -13, 0);
     bb_game_commit(&g);
-    bb_game_adjust(&g, 0, 0, 3, 0);
-    bb_game_commit(&g);
     bb_game_adjust(&g, 1, 0, -2, 0);
-    save(frame, state_for(g), "mtg-2p");
-
-    // Lorcana solo, step 5, showing an undo toast.
-    bb_game_init(&g, bb_profile_find("lorcana"), 1);
-    bb_game_adjust(&g, 0, 0, 7, 0);
-    bb_game_commit(&g);
     {
         UiState s = state_for(g);
-        s.step = 5;
-        s.toast = "Undo +2";
-        s.battery_percent = 15;
-        save(frame, s, "lorcana-toast");
+        s.layout = Layout::Facing;
+        save(frame, s, "mtg-facing");
+        s.layout = Layout::SideYouLeft;
+        s.toast = "Undo OPP -2";
+        save(frame, s, "mtg-2p-toast");
     }
 
     // Commander solo on USB power.
@@ -111,11 +121,12 @@ int main(int argc, char **argv)
         save(frame, s, "commander");
     }
 
-    // Menu, Riftbound theme.
+    // Menu, Riftbound theme, two players facing.
     bb_game_init(&g, bb_profile_find("riftbound"), 2);
     {
         UiState s = state_for(g);
         s.menu = true;
+        s.layout = Layout::Facing;
         save(frame, s, "menu");
     }
 

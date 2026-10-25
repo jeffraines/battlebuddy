@@ -61,6 +61,9 @@ int16_t bb_game_adjust(bb_game_t *game, uint8_t player, uint8_t kind, int16_t de
     game->pending.delta = (int16_t)(game->pending.delta + applied);
     game->pending.value = game->value[player];
     game->last_change_ms = now_ms;
+    if (!game->profile->group) {
+        bb_game_commit(game);
+    }
     return applied;
 }
 

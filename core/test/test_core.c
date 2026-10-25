@@ -52,7 +52,9 @@ static void test_adjust_and_clamp(void)
     CHECK(bb_game_adjust(&g, 0, CONQUER, 5, 0) == 5);
     CHECK(bb_game_adjust(&g, 0, CONQUER, 5, 0) == 3); /* clamped at max 8 */
     CHECK(g.value[0] == 8);
-    CHECK(g.pending.delta == 8);
+    /* Riftbound doesn't group: each change is committed immediately. */
+    CHECK(g.pending.delta == 0);
+    CHECK(g.history_count == 2);
 }
 
 static void test_grouping_and_tick(void)
@@ -167,27 +169,28 @@ static void test_kinds_and_tally(void)
     bb_game_init(&g, bb_profile_find("riftbound"), 2);
 
     bb_game_adjust(&g, 0, CONQUER, 1, 0);
-    bb_game_adjust(&g, 0, HOLD, 1, 10); /* different kind: separate entry */
-    bb_game_adjust(&g, 0, HOLD, 1, 20);
+    bb_game_adjust(&g, 0, HOLD, 1, 10);
+    bb_game_adjust(&g, 0, HOLD, 1, 20); /* same kind again: still its own entry */
     bb_game_adjust(&g, 1, CONQUER, 1, 30);
-    bb_game_commit(&g);
 
     CHECK(g.value[0] == 3 && g.value[1] == 1);
     CHECK(g.tally[0][CONQUER] == 1 && g.tally[0][HOLD] == 2);
     CHECK(g.tally[1][CONQUER] == 1 && g.tally[1][HOLD] == 0);
-    CHECK(g.history_count == 3);
+    CHECK(g.history_count == 4);
+    CHECK(g.pending.delta == 0);
 
-    bb_entry_t h[3];
-    CHECK(bb_game_history(&g, h, 3) == 3);
+    bb_entry_t h[4];
+    CHECK(bb_game_history(&g, h, 4) == 4);
     CHECK(h[0].player == 1 && h[0].kind == CONQUER && h[0].delta == 1);
-    CHECK(h[1].player == 0 && h[1].kind == HOLD && h[1].delta == 2);
-    CHECK(h[2].player == 0 && h[2].kind == CONQUER && h[2].delta == 1);
+    CHECK(h[1].player == 0 && h[1].kind == HOLD && h[1].delta == 1 && h[1].value == 3);
+    CHECK(h[2].player == 0 && h[2].kind == HOLD && h[2].delta == 1 && h[2].value == 2);
+    CHECK(h[3].player == 0 && h[3].kind == CONQUER && h[3].delta == 1);
 
     /* Undo reverts the tally too. */
     bb_game_undo(&g, NULL);
     bb_game_undo(&g, NULL);
-    CHECK(g.tally[0][HOLD] == 0 && g.tally[1][CONQUER] == 0);
-    CHECK(g.value[0] == 1 && g.value[1] == 0);
+    CHECK(g.tally[0][HOLD] == 1 && g.tally[1][CONQUER] == 0);
+    CHECK(g.value[0] == 2 && g.value[1] == 0);
 
     /* Kind is ignored for profiles without kinds. */
     bb_game_init(&g, bb_profile_find("mtg"), 1);

@@ -3,11 +3,11 @@
 #include <string.h>
 
 static const bb_profile_t profiles[] = {
-    {"riftbound", "Riftbound", 0, 0, 8, 8, BB_NONE, 2, {"Conquer", "Hold"}},
-    {"mtg", "Magic", 20, -99, 999, BB_NONE, 0, 0, {NULL}},
-    {"mtg-commander", "Commander", 40, -99, 999, BB_NONE, 0, 0, {NULL}},
-    {"lorcana", "Lorcana", 0, 0, 99, 20, BB_NONE, 0, {NULL}},
-    {"fab", "Flesh and Blood", 40, 0, 99, BB_NONE, 0, 0, {NULL}},
+    {"riftbound", "Riftbound", 0, 0, 8, 8, BB_NONE, 2, {"Conquer", "Hold"}, 0},
+    {"mtg", "Magic", 20, -99, 999, BB_NONE, 0, 0, {NULL}, 1},
+    {"mtg-commander", "Commander", 40, -99, 999, BB_NONE, 0, 0, {NULL}, 1},
+    {"lorcana", "Lorcana", 0, 0, 99, 20, BB_NONE, 0, {NULL}, 1},
+    {"fab", "Flesh and Blood", 40, 0, 99, BB_NONE, 0, 0, {NULL}, 1},
 };
 
 size_t bb_profile_count(void)

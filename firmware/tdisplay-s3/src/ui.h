@@ -9,12 +9,22 @@
 constexpr int kWidth = 320;
 constexpr int kHeight = 170;
 
+// How two players share the screen.
+enum class Layout : uint8_t {
+    SideYouLeft,  // side by side, YOU on the left
+    SideYouRight, // side by side, YOU on the right
+    Facing,       // YOU along the bottom, OPP along the top upside down (across a table)
+    Count,
+};
+
 struct UiState {
     const bb_game_t *game;
     int step;            // single-player +/- step (1 or 5)
     int battery_percent; // < 0 means on USB power
+    Layout layout;       // used when the game has two players
+    bool flipped;        // whole screen rotated 180 degrees (menu label only)
     bool menu;           // menu screen instead of the counter
-    const char *toast;   // short message over the footer, or nullptr
+    const char *toast;   // short message, or nullptr
 };
 
 struct UiAction {
@@ -24,6 +34,8 @@ struct UiAction {
         ToggleStep,
         MenuGame,
         MenuPlayers,
+        MenuLayout,
+        MenuFlip,
         MenuRestart,
         MenuSleep,
         MenuClose,
