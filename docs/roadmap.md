@@ -10,17 +10,60 @@ Two products from one device:
 The personal device comes first. The kit shapes a few early hardware choices
 (radio, battery, charging, device ID) so PCB v1 doesn't paint us into a corner.
 
+## Design principles
+
+These apply to everything built here, not just BattleBuddy.
+
+1. **The battery is user-replaceable, without tools beyond a coin or a common
+   screwdriver.** A dead battery must never make the device e-waste. Prefer a
+   standard, widely sold cell or pack over a custom pouch cell.
+2. **Repairable.** Screws, not glue. The display, battery and buttons connect
+   with connectors, not solder. Spare parts and firmware stay available.
+3. **Spill-tolerant, not waterproof.** It should survive a knocked-over drink
+   on the table. No official IP rating needed (and don't claim one without testing).
+
+### Replaceable battery options
+
+| Option | Pros | Cons |
+|---|---|---|
+| Phone-style flat pack (e.g. Nokia BL-5C type, 3.7 V ~1000 mAh, ~53×34×6 mm) | Flat, protected, keyed, spring contacts, sold almost everywhere | Long-term availability of a specific pack type; check it fits each design |
+| Small cylindrical Li-ion in a holder (10440 / 16340 / 18650) | Standard sizes, easy to buy, holder is cheap | Thicker; 10440/14500 look like AAA/AA, so mixing them up is a risk |
+| 2× AA / AAA (NiMH or alkaline) | Most universal; nothing to charge if you don't want to | Needs a boost converter; bulkier; best for low-power displays (e-paper, reflective) |
+| Flat LiPo with a JST plug behind a battery door | Thinnest; what the LilyGO prototype uses | Exact replacement is harder to find; must label size and polarity |
+
+Leaning: a phone-style flat pack for the personal device, an 18650 for a larger
+"Max" model.
+
+### Spill tolerance
+
+- A gasket between the display and the enclosure lip; buttons under a
+  membrane or with sealed caps.
+- USB-C mounted so liquid doesn't run into it (side-facing, recessed), and a
+  battery door with a simple seal.
+- Conformal coating on the PCB: cheap, and it handles the "wiped it off and it
+  still works" case.
+- Firmware: ignore touches that look like water (many points at once, large
+  contact areas) and offer a touch lock.
+
+### Regulation note
+
+The EU Battery Regulation (2023/1542) requires portable batteries in most
+appliances to be removable and replaceable by the end user from February 2027.
+That matters if this is ever sold in Europe, and principle 1 already covers it.
+
 ## Phases
 
 1. **Prototype firmware** on the LilyGO T-Display-S3 Touch, and play-test it at
    real games. *(In progress: `firmware/tdisplay-s3`.)*
 2. **Pick the display and MCU** using the display test kit and battery
    measurements (see `hardware.md`).
-3. **PCB v1:** MCU, display + touch, buttons, USB-C, LiPo charger, battery
-   sense, a charging footprint for the tray (coil or pogo pads), test points.
+3. **PCB v1:** MCU, display + touch on connectors, buttons, USB-C, charger,
+   battery sense, contacts or holder for a user-replaceable battery, a charging
+   footprint for the tray (coil or pogo pads), test points.
    Designed for low standby current (regulator and charger quiescent current
    matter as much as the MCU's sleep current).
-4. **Enclosure:** 3D printed first; injection molding only once the design settles.
+4. **Enclosure:** 3D printed first; injection molding only once the design
+   settles. Screwed together, with a tool-light battery door and a display gasket.
 5. **Configuration:** phone/web configurator, custom game profiles, sharing.
 6. **Tournament kit:** hub, server and dashboard, pairings import, charging tray.
 
