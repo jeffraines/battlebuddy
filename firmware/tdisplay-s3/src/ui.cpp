@@ -889,12 +889,12 @@ void draw_footer(LGFX_Sprite &f, const Theme &t, const bb_game_t &g)
     }
 }
 
-void draw_toast(LGFX_Sprite &f, const Theme &t, const char *msg, int cy)
+void draw_toast(LGFX_Sprite &f, const Theme &t, const char *msg, int cy, int cx = kWidth / 2)
 {
     f.setFont(&fonts::FreeSansBold9pt7b);
     f.setTextSize(1);
     int w = f.textWidth(msg) + 24;
-    Rect r{(kWidth - w) / 2, cy - 10, w, 20};
+    Rect r{cx - w / 2, cy - 10, w, 20};
     f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
     f.drawRoundRect(r.x, r.y, r.w, r.h, 8, t.accent);
     f.setTextColor(t.text);
@@ -2163,7 +2163,11 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
     }
 
     draw_background(frame, t, !state.menu && !gauge_style(*state.game));
-    draw_header(frame, t, state, state.menu ? (state.menu_page ? "MORE" : "MENU") : state.game->profile->name,
+    // Riftbound-style two-player screens show undo messages in the header,
+    // in place of the game name.
+    bool toast_in_header = state.toast && !state.menu && has_kinds(*state.game) && state.game->players == 2;
+    draw_header(frame, t, state,
+                state.menu ? (state.menu_page ? "MORE" : "MENU") : toast_in_header ? "" : state.game->profile->name,
                 !state.menu);
 
     if (state.menu) {
@@ -2184,7 +2188,16 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
         draw_banner(frame, t, state, winner);
     }
     if (state.toast) {
-        draw_toast(frame, t, state.toast, (kFooterTop + kHeight) / 2);
+        const bb_game_t &g = *state.game;
+        if (has_kinds(g) && g.players == 1) {
+            // Under the number, so the point track it refers to stays visible.
+            draw_toast(frame, t, state.toast, 138, 86);
+        } else if (has_kinds(g) && g.players == 2) {
+            // In the header, clear of both players' buttons and tracks.
+            draw_toast(frame, t, state.toast, kHeaderH / 2, 140);
+        } else {
+            draw_toast(frame, t, state.toast, (kFooterTop + kHeight) / 2);
+        }
     }
 }
 

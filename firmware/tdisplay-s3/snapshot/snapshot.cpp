@@ -81,6 +81,12 @@ int main(int argc, char **argv)
     }
     save(frame, state_for(g), "riftbound-1p");
 
+    {
+        UiState s = state_for(g);
+        s.toast = "Undo +1 Hold";
+        save(frame, s, "riftbound-1p-undo");
+    }
+
     // Riftbound, both players side by side.
     bb_game_init(&g, bb_profile_find("riftbound"), 2);
     const uint8_t seq[][2] = {{0, HOLD}, {1, CONQUER}, {0, CONQUER}, {0, CONQUER}, {1, HOLD},
@@ -89,6 +95,12 @@ int main(int argc, char **argv)
         bb_game_adjust(&g, e[0], e[1], 1, 0);
     }
     save(frame, state_for(g), "riftbound-2p");
+
+    {
+        UiState s = state_for(g);
+        s.toast = "Undo YOU +1 Conquer";
+        save(frame, s, "riftbound-2p-undo");
+    }
 
     // Same game, facing each other across the table.
     {
