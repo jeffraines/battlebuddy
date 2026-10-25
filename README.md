@@ -26,7 +26,8 @@ see [firmware/tdisplay-s3](firmware/tdisplay-s3).
 - `core/`: portable C counter logic (game profiles, grouped changes, undo
   history) with host tests (`make -C core test`).
 - `firmware/tdisplay-s3/`: PlatformIO firmware for the T-Display-S3 Touch.
-- `docs/`: hardware notes and game profile format.
+- `docs/`: hardware notes, game profile format, and the roadmap (personal
+  device first, store/tournament kit in mind).
 - `tools/`: printable display size cutouts.
 
 See [docs/hardware.md](docs/hardware.md) for the
