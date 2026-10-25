@@ -9,7 +9,8 @@
 constexpr int kWidth = 320;
 constexpr int kHeight = 170;
 
-// How two players share the screen.
+// How players share the screen. With 3-4 players only Facing vs. the others matters
+// (upright quadrants vs. the top row upside down).
 enum class Layout : uint8_t {
     SideYouLeft,  // side by side, YOU on the left
     SideYouRight, // side by side, YOU on the right
@@ -21,7 +22,7 @@ struct UiState {
     const bb_game_t *game;
     int step;            // single-player +/- step (1 or 5)
     int battery_percent; // < 0 means on USB power
-    Layout layout;       // used when the game has two players
+    Layout layout;       // used when the game has more than one player
     bool flipped;        // whole screen rotated 180 degrees (menu label only)
     bool menu;           // menu screen instead of the counter
     const char *toast;   // short message, or nullptr
@@ -55,5 +56,10 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state);
 // as ui_draw, so what is drawn is what is tapped.
 UiAction ui_hit(const UiState &state, int x, int y);
 
-// Short label for player p in two-player mode ("YOU" / "OPP").
-const char *ui_player_label(uint8_t player);
+// Short label for counter p: "YOU" / "OPP" with two players, "P1".."P4" with
+// more, "TEAM A" / "TEAM B" for team games.
+const char *ui_player_label(const bb_game_t &game, uint8_t player);
+
+// Name of the current layout as shown in the menu, and the layout after it.
+const char *ui_layout_name(const bb_game_t &game, Layout layout);
+Layout ui_next_layout(const bb_game_t &game, Layout layout);

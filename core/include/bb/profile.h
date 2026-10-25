@@ -27,6 +27,8 @@ typedef struct {
     uint8_t kind_count;              /* 0 = changes have no kind */
     const char *kinds[BB_MAX_KINDS]; /* names of the kinds, e.g. "Conquer" */
     uint8_t group;                   /* 1 = merge rapid changes into one history entry */
+    uint8_t max_players;             /* most counters shown at once (1..BB_MAX_PLAYERS) */
+    uint8_t teams;                   /* 1 = each counter is a team, not a player */
 } bb_profile_t;
 
 size_t bb_profile_count(void);

@@ -4,10 +4,14 @@
 
 void bb_game_init(bb_game_t *game, const bb_profile_t *profile, uint8_t players)
 {
+    uint8_t max = profile->max_players;
+    if (max < 1 || max > BB_MAX_PLAYERS) {
+        max = BB_MAX_PLAYERS;
+    }
     if (players < 1) {
         players = 1;
-    } else if (players > BB_MAX_PLAYERS) {
-        players = BB_MAX_PLAYERS;
+    } else if (players > max) {
+        players = max;
     }
 
     memset(game, 0, sizeof(*game));

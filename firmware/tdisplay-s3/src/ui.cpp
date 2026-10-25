@@ -39,10 +39,17 @@ const Theme kThemes[] = {
      {0xD4A24C, 0x6FB5E0}},
 };
 
+// Exact id match first, then a family prefix ("riftbound-2v2" uses "riftbound").
 const Theme &theme_for(const bb_profile_t *profile)
 {
     for (const Theme &t : kThemes) {
         if (strcmp(t.profile_id, profile->id) == 0) {
+            return t;
+        }
+    }
+    for (const Theme &t : kThemes) {
+        size_t n = strlen(t.profile_id);
+        if (strncmp(t.profile_id, profile->id, n) == 0 && profile->id[n] == '-') {
             return t;
         }
     }
@@ -56,7 +63,8 @@ constexpr uint32_t kInk = 0x10141C; // dark text on filled slots
 
 constexpr int kHeaderH = 24;
 constexpr int kFooterTop = 150;
-constexpr int kStripH = kHeight / 2; // facing layout: one strip per player
+constexpr int kStripH = kHeight / 2; // facing / 4-player layouts: one strip per row
+constexpr int kQuadW = kWidth / 2;
 
 uint32_t mix(uint32_t a, uint32_t b, int t256)
 {
@@ -79,6 +87,8 @@ bool has_kinds(const bb_game_t &g) { return g.profile->kind_count >= 2; }
 
 bool facing(const UiState &s) { return s.game->players == 2 && s.layout == Layout::Facing; }
 
+bool quads(const UiState &s) { return s.game->players > 2; }
+
 // Which player is drawn on the left in the side-by-side layout.
 uint8_t left_player(const UiState &s) { return s.layout == Layout::SideYouRight ? 1 : 0; }
 
@@ -91,9 +101,13 @@ Rect player_panel(const UiState &s, uint8_t p)
     return {side * kWidth / 2, kHeaderH, kWidth / 2, kFooterTop - kHeaderH};
 }
 
-// Kind buttons (e.g. Conquer / Hold). Facing-layout rects are in strip coordinates.
+// Kind buttons (e.g. Conquer / Hold). Facing-layout rects are in strip coordinates,
+// quadrant rects in quadrant coordinates.
 Rect kind_button(const UiState &s, uint8_t p, uint8_t kind)
 {
+    if (quads(s)) {
+        return {86, kind == 0 ? 4 : 36, 70, 29};
+    }
     if (facing(s)) {
         return {206, kind == 0 ? 5 : 45, 108, 35};
     }
@@ -147,9 +161,9 @@ void draw_background(LGFX_Sprite &f, const Theme &t, bool brackets)
     f.drawFastVLine(x1, y1 - l + 1, l, c);
 }
 
-void draw_battery(LGFX_Sprite &f, const Theme &t, int percent)
+void draw_battery(LGFX_Sprite &f, const Theme &t, int percent, int x = kWidth - 30, int y = 6)
 {
-    const int x = kWidth - 30, y = 6, w = 22, h = 12;
+    const int w = 22, h = 12;
     f.drawRoundRect(x, y, w, h, 2, t.muted);
     f.fillRect(x + w, y + 4, 2, h - 8, t.muted);
 
@@ -225,7 +239,11 @@ uint32_t value_color(const Theme &t, bb_status_t s)
     }
 }
 
-uint32_t player_color(const Theme &t, uint8_t p) { return p == 0 ? t.p1 : t.p2; }
+uint32_t player_color(const Theme &t, uint8_t p)
+{
+    static const uint32_t kExtra[] = {0x7FD36E, 0xE58AD8}; // P3, P4
+    return p == 0 ? t.p1 : p == 1 ? t.p2 : kExtra[(p - 2) & 1];
+}
 
 void upper(char *dst, size_t n, const char *src, size_t max_chars)
 {
@@ -287,7 +305,7 @@ void draw_kind_button(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t 
         f.setTextColor(t.text);
         f.drawString(buf, r.cx(), r.y + 39);
     } else {
-        upper(name, sizeof(name), g.profile->kinds[kind], facing(s) ? 10 : 4);
+        upper(name, sizeof(name), g.profile->kinds[kind], quads(s) ? 4 : facing(s) ? 10 : 4);
         snprintf(buf, sizeof(buf), "%s %d", name, g.tally[p][kind]);
         f.setFont(&fonts::FreeSansBold9pt7b);
         f.setTextSize(1);
@@ -325,30 +343,39 @@ size_t point_track(const bb_game_t &g, uint8_t p, uint8_t *kinds, size_t max)
 }
 
 // Slots for each point toward the win, filled with the kind's initial in order.
+// The slots fill a box w wide, in the given number of rows.
 void draw_track(LGFX_Sprite &f, const Theme &t, const bb_game_t &g, uint8_t p, int x, int y,
-                int slot_w, int slot_h, int gap, int per_row)
+                int w, int slot_h, int gap, int rows)
 {
+    constexpr int kMaxSlots = 12;
     int slots = g.profile->win_at != BB_NONE ? g.profile->win_at : 8;
-    if (slots > 10) {
-        slots = 10;
+    if (slots > kMaxSlots) {
+        slots = kMaxSlots;
     }
-    uint8_t kinds[10];
+    int per_row = (slots + rows - 1) / rows;
+    int slot_w = (w - (per_row - 1) * gap) / per_row;
+    uint8_t kinds[kMaxSlots];
     size_t n = point_track(g, p, kinds, slots);
 
-    f.setFont(&fonts::FreeSansBold9pt7b);
+    if (slot_w >= 15 && slot_h >= 15) {
+        f.setFont(&fonts::FreeSansBold9pt7b);
+    } else {
+        f.setFont(&fonts::Font0);
+    }
     f.setTextSize(1);
     f.setTextDatum(textdatum_t::middle_center);
     for (int i = 0; i < slots; i++) {
         int sx = x + (i % per_row) * (slot_w + gap);
         int sy = y + (i / per_row) * (slot_h + gap);
+        int r = slot_h >= 12 ? 4 : 2;
         if ((size_t)i < n) {
             uint32_t kc = t.kind[kinds[i]];
             char letter[2] = {g.profile->kinds[kinds[i]][0], '\0'};
-            f.fillRoundRect(sx, sy, slot_w, slot_h, 4, kc);
+            f.fillRoundRect(sx, sy, slot_w, slot_h, r, kc);
             f.setTextColor(kInk);
             f.drawString(letter, sx + slot_w / 2, sy + slot_h / 2 + 1);
         } else {
-            f.drawRoundRect(sx, sy, slot_w, slot_h, 4, mix(t.bg_bottom, t.accent, 70));
+            f.drawRoundRect(sx, sy, slot_w, slot_h, r, mix(t.bg_bottom, t.accent, 70));
         }
     }
 }
@@ -401,7 +428,7 @@ void draw_single(LGFX_Sprite &f, const Theme &t, const UiState &s)
         draw_number(f, buf, 86, 82, 150, 90, vc, shadow);
         draw_kind_button(f, t, s, 0, 0);
         draw_kind_button(f, t, s, 0, 1);
-        draw_track(f, t, g, 0, 10, kFooterTop + 2, 34, 17, 4, 8);
+        draw_track(f, t, g, 0, 10, kFooterTop + 2, 300, 17, 4, 1);
     } else {
         uint32_t hint = mix(t.bg_bottom, t.accent, 110);
         draw_plus_minus(f, 28, 87, false, hint, 10);
@@ -447,7 +474,7 @@ void draw_side_by_side(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextSize(1);
         f.setTextColor(player_color(t, p));
         f.setTextDatum(textdatum_t::middle_left);
-        f.drawString(ui_player_label(p), panel.x + 10, panel.y + 14);
+        f.drawString(ui_player_label(g, p), panel.x + 10, panel.y + 14);
 
         uint32_t sc = status_text(g, p, buf, sizeof(buf));
         if (buf[0]) {
@@ -459,10 +486,10 @@ void draw_side_by_side(LGFX_Sprite &f, const Theme &t, const UiState &s)
         snprintf(buf, sizeof(buf), "%d", g.value[p]);
         uint32_t vc = value_color(t, bb_game_status(&g, p));
         if (has_kinds(g)) {
-            draw_number(f, buf, panel.cx(), 72, 140, 64, vc, shadow);
+            draw_number(f, buf, panel.cx(), 76, 140, 58, vc, shadow);
             draw_kind_button(f, t, s, p, 0);
             draw_kind_button(f, t, s, p, 1);
-            draw_track(f, t, g, p, panel.x + 9, kFooterTop + 2, 16, 17, 2, 8);
+            draw_track(f, t, g, p, panel.x + 9, kFooterTop + 2, 142, 17, 2, 1);
         } else {
             uint32_t hint = mix(t.bg_bottom, t.accent, 110);
             draw_plus_minus(f, panel.x + panel.w - 16, 58, true, hint, 6);
@@ -489,7 +516,7 @@ void draw_strip(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p)
     f.setTextSize(1);
     f.setTextColor(player_color(t, p));
     f.setTextDatum(textdatum_t::middle_left);
-    f.drawString(ui_player_label(p), 8, 12);
+    f.drawString(ui_player_label(g, p), 8, 12);
 
     char status[16];
     uint32_t sc = status_text(g, p, status, sizeof(status));
@@ -499,7 +526,7 @@ void draw_strip(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p)
 
     if (has_kinds(g)) {
         draw_number(f, buf, 60, 50, 90, 58, vc, shadow);
-        draw_track(f, t, g, p, 108, 20, 21, 18, 3, 4);
+        draw_track(f, t, g, p, 106, 20, 96, 18, 3, 2);
         draw_kind_button(f, t, s, p, 0);
         draw_kind_button(f, t, s, p, 1);
         if (status[0]) {
@@ -519,6 +546,26 @@ void draw_strip(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p)
             f.setTextDatum(textdatum_t::middle_right);
             f.drawString(status, kWidth - 8, 12);
         }
+    }
+}
+
+// Rotates a sprite's contents 180 degrees: reversing the pixel order does exactly that.
+void rotate_180(LGFX_Sprite &sprite)
+{
+    uint16_t *px = (uint16_t *)sprite.getBuffer();
+    for (int i = 0, j = sprite.width() * sprite.height() - 1; i < j; i++, j--) {
+        uint16_t tmp = px[i];
+        px[i] = px[j];
+        px[j] = tmp;
+    }
+}
+
+// Horizontal rule between the top and bottom rows, brightest in the middle.
+void draw_row_divider(LGFX_Sprite &f, const Theme &t)
+{
+    for (int x = 0; x < kWidth; x++) {
+        int d = x < kWidth / 2 ? x : kWidth - 1 - x;
+        f.drawPixel(x, kStripH, mix(t.bg_bottom, t.accent, d * 256 / (kWidth / 2)));
     }
 }
 
@@ -544,34 +591,110 @@ void draw_facing(LGFX_Sprite &f, const Theme &t, const UiState &s)
     draw_strip(*strip, t, s, 0);
     strip->pushSprite(&f, 0, kHeight - kStripH);
 
-    // OPP along the top, rotated 180 degrees: reversing the pixel order does exactly that.
+    // OPP along the top, upside down.
     draw_strip(*strip, t, s, 1);
-    uint16_t *px = (uint16_t *)strip->getBuffer();
-    for (int i = 0, j = kWidth * kStripH - 1; i < j; i++, j--) {
-        uint16_t tmp = px[i];
-        px[i] = px[j];
-        px[j] = tmp;
-    }
+    rotate_180(*strip);
     strip->pushSprite(&f, 0, 0);
 
-    for (int x = 0; x < kWidth; x++) {
-        int d = x < kWidth / 2 ? x : kWidth - 1 - x;
-        f.drawPixel(x, kStripH, mix(t.bg_bottom, t.accent, d * 256 / (kWidth / 2)));
+    draw_row_divider(f, t);
+}
+
+// One counter's quarter of the 3-4 player layout, at x0 in a strip sprite.
+void draw_quadrant(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, int x0)
+{
+    const bb_game_t &g = *s.game;
+    char buf[16];
+    uint32_t shadow = mix(t.bg_bottom, 0x000000, 128);
+
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    f.setTextColor(player_color(t, p));
+    f.setTextDatum(textdatum_t::middle_left);
+    f.drawString(ui_player_label(g, p), x0 + 8, 11);
+
+    snprintf(buf, sizeof(buf), "%d", g.value[p]);
+    uint32_t vc = value_color(t, bb_game_status(&g, p));
+
+    if (has_kinds(g)) {
+        draw_number(f, buf, x0 + 42, 44, 74, 40, vc, shadow);
+        for (uint8_t k = 0; k < 2; k++) {
+            Rect r = kind_button(s, p, k);
+            r.x += x0;
+            char name[8];
+            upper(name, sizeof(name), g.profile->kinds[k], 1);
+            snprintf(buf, sizeof(buf), "%s %d", name, g.tally[p][k]);
+            f.fillRoundRect(r.x, r.y, r.w, r.h, 7, t.surface);
+            f.drawRoundRect(r.x, r.y, r.w, r.h, 7, mix(t.surface, t.kind[k], 200));
+            f.setFont(&fonts::FreeSansBold9pt7b);
+            f.setTextColor(t.kind[k]);
+            f.setTextDatum(textdatum_t::middle_center);
+            f.drawString(buf, r.cx(), r.cy());
+        }
+        draw_track(f, t, g, p, x0 + 6, 70, 148, 11, 2, 1);
+    } else {
+        char status[16];
+        uint32_t sc = status_text(g, p, status, sizeof(status));
+        if (status[0]) {
+            f.setTextColor(sc);
+            f.setTextDatum(textdatum_t::middle_right);
+            f.drawString(status, x0 + kQuadW - 8, 11);
+        }
+        uint32_t hint = mix(t.bg_bottom, t.accent, 110);
+        draw_plus_minus(f, x0 + 14, 50, false, hint, 6);
+        draw_plus_minus(f, x0 + kQuadW - 14, 50, true, hint, 6);
+        draw_number(f, buf, x0 + kQuadW / 2, 50, 96, 56, vc, shadow);
     }
+}
+
+// The spare quarter when only three counters are in play.
+void draw_info_quadrant(LGFX_Sprite &f, const Theme &t, const UiState &s, int x0)
+{
+    fit_font(f, s.game->profile->name, kQuadW - 16);
+    f.setTextColor(t.accent);
+    f.setTextDatum(textdatum_t::middle_center);
+    f.drawString(s.game->profile->name, x0 + kQuadW / 2, 34);
+    draw_battery(f, t, s.battery_percent, x0 + kQuadW / 2 - 11, 54);
+}
+
+void draw_quads(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    LGFX_Sprite *strip = strip_sprite(f);
+
+    for (int row = 0; row < 2; row++) {
+        // Row 0 (bottom): P1, P2. Row 1 (top): P3, P4 (or the info quarter).
+        draw_gradient(*strip, t, kStripH);
+        for (int col = 0; col < 2; col++) {
+            uint8_t p = (uint8_t)(row * 2 + col);
+            if (p < s.game->players) {
+                draw_quadrant(*strip, t, s, p, col * kQuadW);
+            } else {
+                draw_info_quadrant(*strip, t, s, col * kQuadW);
+            }
+        }
+        for (int y = 6; y < kStripH - 6; y++) {
+            strip->drawPixel(kQuadW, y, mix(t.bg_bottom, t.accent, 120));
+        }
+        if (row == 1 && s.layout == Layout::Facing) {
+            rotate_180(*strip);
+        }
+        strip->pushSprite(&f, 0, row == 0 ? kHeight - kStripH : 0);
+    }
+
+    draw_row_divider(f, t);
 }
 
 void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
     const bb_game_t &g = *s.game;
-    static const char *const kLayoutNames[] = {"YOU left", "YOU right", "Facing"};
-    char players[16];
-    snprintf(players, sizeof(players), g.players == 1 ? "Just you" : "Both");
+    static const char *const kPlayerNames[] = {"Just you", "Two", "Three", "Four"};
+    static const char *const kTeamNames[] = {"One team", "Two teams"};
+    const char *players = g.profile->teams ? kTeamNames[(g.players - 1) & 1] : kPlayerNames[g.players - 1];
 
     const char *labels[kMenuTiles] = {"Game", "Players", "Layout", "Flip", "Restart", "Sleep"};
     const char *values[kMenuTiles] = {
         g.profile->name,
         players,
-        g.players == 2 ? kLayoutNames[(int)s.layout] : "-",
+        g.players > 1 ? ui_layout_name(g, s.layout) : "-",
         s.flipped ? "On" : "Off",
         "New game",
         "KEY wakes",
@@ -585,7 +708,7 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
 
     for (int i = 0; i < kMenuTiles; i++) {
         Rect r = menu_tile(i);
-        bool enabled = !(i == 2 && g.players != 2);
+        bool enabled = !(i == 2 && g.players < 2);
         f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
         f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, enabled ? 140 : 40));
 
@@ -630,17 +753,49 @@ UiAction kind_hit(const UiState &s, uint8_t p, int x, int y)
 
 } // namespace
 
-const char *ui_player_label(uint8_t player)
+const char *ui_player_label(const bb_game_t &game, uint8_t player)
 {
+    static const char *const kNumbered[] = {"P1", "P2", "P3", "P4"};
+    if (game.profile->teams) {
+        return player == 0 ? "TEAM A" : "TEAM B";
+    }
+    if (game.players > 2) {
+        return kNumbered[player & 3];
+    }
     return player == 0 ? "YOU" : "OPP";
+}
+
+const char *ui_layout_name(const bb_game_t &game, Layout layout)
+{
+    if (game.players > 2) {
+        return layout == Layout::Facing ? "Facing" : "Upright";
+    }
+    static const char *const kNames[] = {"YOU left", "YOU right", "Facing"};
+    if (game.profile->teams) {
+        static const char *const kTeamNames[] = {"A left", "A right", "Facing"};
+        return kTeamNames[(int)layout];
+    }
+    return kNames[(int)layout];
+}
+
+Layout ui_next_layout(const bb_game_t &game, Layout layout)
+{
+    if (game.players > 2) {
+        return layout == Layout::Facing ? Layout::SideYouLeft : Layout::Facing;
+    }
+    return (Layout)(((int)layout + 1) % (int)Layout::Count);
 }
 
 void ui_draw(LGFX_Sprite &frame, const UiState &state)
 {
     const Theme &t = theme_for(state.game->profile);
 
-    if (!state.menu && facing(state)) {
-        draw_facing(frame, t, state);
+    if (!state.menu && (facing(state) || quads(state))) {
+        if (quads(state)) {
+            draw_quads(frame, t, state);
+        } else {
+            draw_facing(frame, t, state);
+        }
         if (state.toast) {
             draw_toast(frame, t, state.toast, kStripH);
         }
@@ -684,12 +839,42 @@ UiAction ui_hit(const UiState &state, int x, int y)
             // Tiles are hit-tested with the gaps included so near-misses still count.
             Rect padded{r.x - 2, r.y - 3, r.w + 4, r.h + 6};
             if (padded.contains(x, y)) {
-                if (kTileActions[i] == UiAction::MenuLayout && g.players != 2) {
+                if (kTileActions[i] == UiAction::MenuLayout && g.players < 2) {
                     return a;
                 }
                 a.type = kTileActions[i];
                 return a;
             }
+        }
+        return a;
+    }
+
+    if (quads(state)) {
+        // Map to the touched quarter's own (upright) coordinates.
+        bool top = y < kStripH;
+        bool turned = top && state.layout == Layout::Facing;
+        int lx = turned ? kWidth - 1 - x : x;
+        int ly = turned ? kStripH - 1 - y : (top ? y : y - (kHeight - kStripH));
+        uint8_t p = (uint8_t)((top ? 2 : 0) + (lx >= kQuadW ? 1 : 0));
+        if (p >= g.players) {
+            return a;
+        }
+        int qx = lx % kQuadW;
+        a.player = p;
+        if (has_kinds(g)) {
+            if (qx >= 80 && ly < 68) {
+                a.type = UiAction::Adjust;
+                a.kind = ly < 35 ? 0 : 1;
+                a.delta = 1;
+            }
+        } else if (qx < 64) {
+            a.type = UiAction::Adjust;
+            a.delta = -1;
+            a.repeat = true;
+        } else if (qx >= kQuadW - 64) {
+            a.type = UiAction::Adjust;
+            a.delta = 1;
+            a.repeat = true;
         }
         return a;
     }

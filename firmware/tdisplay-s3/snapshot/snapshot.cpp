@@ -121,6 +121,53 @@ int main(int argc, char **argv)
         save(frame, s, "commander");
     }
 
+    // Riftbound, four separate scores.
+    bb_game_init(&g, bb_profile_find("riftbound"), 4);
+    const uint8_t four[][2] = {{0, HOLD}, {1, CONQUER}, {2, CONQUER}, {3, HOLD}, {0, CONQUER},
+                               {1, HOLD}, {2, CONQUER}, {0, CONQUER}, {3, CONQUER}, {1, CONQUER},
+                               {0, HOLD}, {2, HOLD}};
+    for (auto &e : four) {
+        bb_game_adjust(&g, e[0], e[1], 1, 0);
+    }
+    save(frame, state_for(g), "riftbound-4p");
+    {
+        UiState s = state_for(g);
+        s.layout = Layout::Facing;
+        save(frame, s, "riftbound-4p-facing");
+    }
+
+    // Riftbound 2v2, one score per team.
+    bb_game_init(&g, bb_profile_find("riftbound-2v2"), 2);
+    const uint8_t team[][2] = {{0, HOLD}, {1, CONQUER}, {0, CONQUER}, {0, CONQUER}, {1, HOLD},
+                               {0, HOLD}, {1, CONQUER}, {0, CONQUER}, {1, HOLD}, {0, CONQUER},
+                               {1, CONQUER}, {0, HOLD}};
+    for (auto &e : team) {
+        bb_game_adjust(&g, e[0], e[1], 1, 0);
+    }
+    save(frame, state_for(g), "riftbound-2v2");
+    {
+        UiState s = state_for(g);
+        s.layout = Layout::Facing;
+        save(frame, s, "riftbound-2v2-facing");
+    }
+
+    // Commander, three players: the spare quarter shows the game and battery.
+    bb_game_init(&g, bb_profile_find("mtg-commander"), 3);
+    bb_game_adjust(&g, 0, 0, -12, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 1, 0, -40, 0);
+    bb_game_commit(&g);
+    bb_game_adjust(&g, 2, 0, -3, 0);
+    save(frame, state_for(g), "commander-3p");
+
+    // Menu with four players.
+    bb_game_init(&g, bb_profile_find("riftbound"), 4);
+    {
+        UiState s = state_for(g);
+        s.menu = true;
+        save(frame, s, "menu-4p");
+    }
+
     // Menu, Riftbound theme, two players facing.
     bb_game_init(&g, bb_profile_find("riftbound"), 2);
     {

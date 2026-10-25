@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define BB_MAX_PLAYERS 2
+#define BB_MAX_PLAYERS 4
 #define BB_HISTORY_LEN 64
 
 /* For profiles with group set, rapid taps are grouped: changes to the same
@@ -45,7 +45,7 @@ typedef struct {
     uint16_t history_head; /* index of the next write */
 } bb_game_t;
 
-/* players is clamped to 1..BB_MAX_PLAYERS. */
+/* players is clamped to 1..profile->max_players. */
 void bb_game_init(bb_game_t *game, const bb_profile_t *profile, uint8_t players);
 void bb_game_reset(bb_game_t *game);
 

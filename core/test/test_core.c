@@ -36,10 +36,16 @@ static void test_init_players(void)
 
     bb_game_init(&g, bb_profile_find("mtg"), 0);
     CHECK(g.players == 1);
-    bb_game_init(&g, bb_profile_find("mtg"), 5);
+    bb_game_init(&g, bb_profile_find("mtg"), 9);
     CHECK(g.players == BB_MAX_PLAYERS);
-    CHECK(g.value[0] == 20 && g.value[1] == 20);
+    CHECK(g.value[0] == 20 && g.value[3] == 20);
     CHECK(bb_game_adjust(&g, BB_MAX_PLAYERS, 0, -1, 0) == 0); /* no such player */
+
+    /* Team profile: at most two sides, each a team. */
+    const bb_profile_t *teams = bb_profile_find("riftbound-2v2");
+    CHECK(teams != NULL && teams->teams == 1 && teams->win_at == 11);
+    bb_game_init(&g, teams, 4);
+    CHECK(g.players == 2);
 }
 
 static void test_adjust_and_clamp(void)
@@ -198,6 +204,23 @@ static void test_kinds_and_tally(void)
     CHECK(g.pending.kind == 0);
 }
 
+static void test_four_players(void)
+{
+    bb_game_t g;
+    bb_game_init(&g, bb_profile_find("riftbound"), 4);
+    CHECK(g.players == 4);
+
+    bb_game_adjust(&g, 3, HOLD, 1, 0);
+    bb_game_adjust(&g, 2, CONQUER, 1, 0);
+    bb_game_adjust(&g, 3, CONQUER, 1, 0);
+    CHECK(g.value[2] == 1 && g.value[3] == 2);
+    CHECK(g.tally[3][HOLD] == 1 && g.tally[3][CONQUER] == 1);
+
+    bb_entry_t r;
+    CHECK(bb_game_undo(&g, &r) && r.player == 3 && r.kind == CONQUER);
+    CHECK(g.value[3] == 1);
+}
+
 static void test_status(void)
 {
     bb_game_t g;
@@ -228,6 +251,7 @@ int main(void)
     test_history_ring();
     test_two_players();
     test_kinds_and_tally();
+    test_four_players();
     test_status();
 
     if (failures) {

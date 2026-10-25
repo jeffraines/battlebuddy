@@ -2,6 +2,7 @@
 //
 // Buttons (board held landscape):
 //   BOOT (GPIO0), short press: open/close the menu (game, players, layout, flip, restart, sleep)
+// Players: 1-4 (two teams for team games), side by side, facing, or in quadrants.
 //   BOOT, hold 1 s:            sleep
 //   KEY (GPIO14):              undo (closes the menu when it is open); wakes from sleep
 //   Circle below the screen:   open/close the menu
@@ -32,7 +33,7 @@ constexpr uint8_t kDimBrightness = 20;
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0002;
+constexpr uint32_t kSavedMagic = 0xBB0B0003;
 
 struct Saved {
     uint32_t magic;
@@ -149,7 +150,7 @@ void undo(uint32_t now)
     char msg[40];
     int len = snprintf(msg, sizeof(msg), "Undo");
     if (game.players > 1) {
-        len += snprintf(msg + len, sizeof(msg) - len, " %s", ui_player_label(e.player));
+        len += snprintf(msg + len, sizeof(msg) - len, " %s", ui_player_label(game, e.player));
     }
     len += snprintf(msg + len, sizeof(msg) - len, " %+d", e.delta);
     if (game.profile->kind_count > 0) {
@@ -171,13 +172,13 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuGame:
-        start_game(saved.profile_index + 1, game.players);
+        start_game(saved.profile_index + 1, game.players); // clamped to the new game's limit
         break;
     case UiAction::MenuPlayers:
-        start_game(saved.profile_index, game.players == 1 ? 2 : 1);
+        start_game(saved.profile_index, game.players < game.profile->max_players ? game.players + 1 : 1);
         break;
     case UiAction::MenuLayout:
-        saved.layout = (Layout)(((int)saved.layout + 1) % (int)Layout::Count);
+        saved.layout = ui_next_layout(game, saved.layout);
         dirty = true;
         break;
     case UiAction::MenuFlip:

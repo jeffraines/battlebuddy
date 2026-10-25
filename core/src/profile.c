@@ -3,11 +3,14 @@
 #include <string.h>
 
 static const bb_profile_t profiles[] = {
-    {"riftbound", "Riftbound", 0, 0, 8, 8, BB_NONE, 2, {"Conquer", "Hold"}, 0},
-    {"mtg", "Magic", 20, -99, 999, BB_NONE, 0, 0, {NULL}, 1},
-    {"mtg-commander", "Commander", 40, -99, 999, BB_NONE, 0, 0, {NULL}, 1},
-    {"lorcana", "Lorcana", 0, 0, 99, 20, BB_NONE, 0, {NULL}, 1},
-    {"fab", "Flesh and Blood", 40, 0, 99, BB_NONE, 0, 0, {NULL}, 1},
+    /* id, name, start, min, max, win_at, lose_at, kinds, group, max_players, teams */
+    {"riftbound", "Riftbound", 0, 0, 8, 8, BB_NONE, 2, {"Conquer", "Hold"}, 0, 4, 0},
+    /* Team play: one shared score per team. Target of 11 is unconfirmed. */
+    {"riftbound-2v2", "Riftbound 2v2", 0, 0, 11, 11, BB_NONE, 2, {"Conquer", "Hold"}, 0, 2, 1},
+    {"mtg", "Magic", 20, -99, 999, BB_NONE, 0, 0, {NULL}, 1, 4, 0},
+    {"mtg-commander", "Commander", 40, -99, 999, BB_NONE, 0, 0, {NULL}, 1, 4, 0},
+    {"lorcana", "Lorcana", 0, 0, 99, 20, BB_NONE, 0, {NULL}, 1, 4, 0},
+    {"fab", "Flesh and Blood", 40, 0, 99, BB_NONE, 0, 0, {NULL}, 1, 4, 0},
 };
 
 size_t bb_profile_count(void)
