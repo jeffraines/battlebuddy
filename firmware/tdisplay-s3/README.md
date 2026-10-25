@@ -12,10 +12,10 @@ Hold the board landscape, USB port on the right.
 
 | Input | Action |
 |---|---|
-| **BOOT** button, short press | Open / close the menu |
+| **BOOT** button, short press | Open / close the menu (or leave the dice) |
 | **BOOT**, hold 1 s | Sleep |
-| **KEY** button | Undo (shows what was undone); closes the menu if open; wakes from sleep |
-| Circle below the screen | Open / close the menu |
+| **KEY** button | Undo (shows what was undone); rolls on the dice screen; closes the menu; wakes from sleep |
+| Circle below the screen | Open / close the dice |
 
 **Menu:** tap a tile; tap the header to close.
 
@@ -28,7 +28,7 @@ Hold the board landscape, USB port on the right.
 | Match | *Off*, *Bo1*, *Bo3*, *Bo5*. One or two sides only |
 | Timer | *Off*, *30*, *50*, *60 min* countdown; starts with the first point |
 | Restart | New match |
-| Sleep | Sleep now; KEY wakes |
+| Dice | Opens the dice |
 
 **Matches and the timer:** when a game is decided (someone reaches the win
 target, or a life total hits 0), a banner shows who won the game and the match
@@ -37,6 +37,11 @@ Undo before tapping if the result was a mistake. The match score and the
 countdown sit in the header (or a small pill on the middle line in facing and
 four-player layouts). The clock turns gold under 5 minutes and red with a `+`
 once time is up. It keeps running while the board sleeps.
+
+**Dice:** pick Coin, d4, d6, d8, d10, d12 or d20 along the top, then tap
+anywhere (or press KEY) to roll. The last few rolls are listed along the
+bottom. Rolls use the ESP32's hardware random number generator with no bias
+between faces. Good for casual play; at a sanctioned event, use physical dice.
 
 **Counting:**
 
@@ -86,7 +91,7 @@ These were set from LilyGO's pin map but haven't been tested on hardware yet:
   otherwise a rough charge level. Plug in a LiPo and compare.
 - **Circle key:** the serial monitor prints `touch raw x=.. y=..` for every
   touch. The circle should report y ≥ 320; if it reports something else, change
-  `kRawHomeKeyY` in `src/main.cpp`.
+  `kRawHomeKeyY` in `src/main.cpp`. Tapping it should open the dice.
 
 ## Previewing the UI without hardware
 

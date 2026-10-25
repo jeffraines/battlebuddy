@@ -208,7 +208,7 @@ void draw_header(LGFX_Sprite &f, const Theme &t, const UiState &s, const char *t
     f.drawString(title, 8, kHeaderH / 2);
     draw_battery(f, t, s.battery_percent);
 
-    if (s.menu) {
+    if (s.menu || s.dice) {
         return;
     }
     char score[8], clock[12];
@@ -801,7 +801,7 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
     snprintf(timer, sizeof(timer), s.timer_minutes ? "%d min" : "Off", s.timer_minutes);
 
     const char *labels[kMenuTiles] = {"Game", "Players", "Layout", "Flip",
-                                      "Match", "Timer", "Restart", "Sleep"};
+                                      "Match", "Timer", "Restart", "Dice"};
     const char *values[kMenuTiles] = {
         g.profile->name,
         players,
@@ -810,7 +810,7 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
         g.players <= 2 ? match : "-",
         timer,
         "New",
-        "KEY wakes",
+        "Roll",
     };
 
     // Close mark in the header.
@@ -835,6 +835,124 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextColor(enabled ? t.accent : t.muted);
         f.setTextDatum(textdatum_t::middle_center);
         f.drawString(values[i], r.cx(), r.y + 44);
+    }
+}
+
+constexpr int kDiceChipY = 30;
+constexpr int kDiceChipH = 26;
+
+Rect dice_chip(int i)
+{
+    int n = (int)bb_dice_count();
+    int w = (kWidth - 8 - (n - 1) * 4) / n;
+    return {4 + i * (w + 4), kDiceChipY, w, kDiceChipH};
+}
+
+// A rough outline of the die behind the result, for flavour.
+void draw_die_shape(LGFX_Sprite &f, uint8_t sides, int cx, int cy, int r, uint32_t fill, uint32_t edge)
+{
+    switch (sides) {
+    case 2:
+        f.fillCircle(cx, cy, r, fill);
+        f.drawCircle(cx, cy, r, edge);
+        f.drawCircle(cx, cy, r - 4, mix(fill, edge, 120));
+        break;
+    case 4:
+        f.fillTriangle(cx, cy - r, cx - r, cy + r * 3 / 4, cx + r, cy + r * 3 / 4, fill);
+        f.drawTriangle(cx, cy - r, cx - r, cy + r * 3 / 4, cx + r, cy + r * 3 / 4, edge);
+        break;
+    case 6:
+        f.fillRoundRect(cx - r * 4 / 5, cy - r * 4 / 5, r * 8 / 5, r * 8 / 5, 10, fill);
+        f.drawRoundRect(cx - r * 4 / 5, cy - r * 4 / 5, r * 8 / 5, r * 8 / 5, 10, edge);
+        break;
+    default: {
+        // Hexagon for the rest.
+        int hx = r * 87 / 100, hy = r / 2;
+        int px[6] = {cx, cx + hx, cx + hx, cx, cx - hx, cx - hx};
+        int py[6] = {cy - r, cy - hy, cy + hy, cy + r, cy + hy, cy - hy};
+        for (int i = 0; i < 6; i++) {
+            f.fillTriangle(cx, cy, px[i], py[i], px[(i + 1) % 6], py[(i + 1) % 6], fill);
+        }
+        for (int i = 0; i < 6; i++) {
+            f.drawLine(px[i], py[i], px[(i + 1) % 6], py[(i + 1) % 6], edge);
+        }
+        break;
+    }
+    }
+}
+
+void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    const DiceState &d = *s.dice;
+    const bb_die_t *die = bb_die_at(d.die);
+    char buf[16];
+
+    // Close mark in the header.
+    for (int i = -1; i <= 1; i++) {
+        f.drawLine(kWidth - 52 + i, 7, kWidth - 42 + i, 17, t.muted);
+        f.drawLine(kWidth - 42 + i, 7, kWidth - 52 + i, 17, t.muted);
+    }
+
+    // Die picker.
+    for (int i = 0; i < (int)bb_dice_count(); i++) {
+        Rect r = dice_chip(i);
+        bool sel = i == d.die;
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 6, sel ? t.accent : t.surface);
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 6, mix(t.surface, t.accent, sel ? 256 : 110));
+        f.setFont(&fonts::FreeSansBold9pt7b);
+        f.setTextSize(1);
+        f.setTextColor(sel ? kInk : t.text);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(bb_die_at(i)->name, r.cx(), r.cy() + 1);
+    }
+
+    // Result.
+    const int cx = kWidth / 2, cy = 98;
+    uint32_t edge = d.rolling ? t.muted : t.accent;
+    draw_die_shape(f, die->sides, cx, cy, 40, t.surface, edge);
+    uint32_t shadow = mix(t.surface, 0x000000, 160);
+    if (die->sides == 2) {
+        f.setFont(&fonts::FreeSansBold12pt7b);
+        f.setTextDatum(textdatum_t::middle_center);
+        const char *face = d.value == 0 ? "FLIP" : d.value == 1 ? "HEADS" : "TAILS";
+        f.setTextColor(d.rolling ? t.muted : t.text);
+        f.drawString(face, cx, cy);
+    } else if (d.value == 0) {
+        f.setFont(&fonts::FreeSansBold12pt7b);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString("ROLL", cx, cy);
+    } else {
+        snprintf(buf, sizeof(buf), "%d", d.value);
+        uint32_t c = d.rolling ? t.muted
+                     : d.value == die->sides && die->sides >= 6 ? kWinColor
+                     : d.value == 1 && die->sides >= 6           ? kLoss
+                                                                 : t.text;
+        draw_number(f, buf, cx, cy + 2, die->sides == 4 ? 46 : 64, die->sides == 4 ? 36 : 52, c, shadow);
+    }
+
+    f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextColor(t.muted);
+    f.setTextDatum(textdatum_t::middle_left);
+    f.drawString("Tap to roll", 10, cy);
+    f.setTextDatum(textdatum_t::middle_right);
+    f.drawString("KEY rolls", kWidth - 10, cy);
+
+    // Previous rolls, newest first.
+    f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextDatum(textdatum_t::bottom_left);
+    int x = 8;
+    for (int i = 0; i < d.history_count && x < kWidth - 40; i++) {
+        const bb_die_t *hd = bb_die_at(d.history_die[i]);
+        if (hd->sides == 2) {
+            snprintf(buf, sizeof(buf), "%s", d.history[i] == 1 ? "H" : "T");
+        } else {
+            snprintf(buf, sizeof(buf), "%d", d.history[i]);
+        }
+        f.setTextColor(i == 0 ? t.text : t.muted);
+        x += f.drawString(buf, x, kHeight - 3) + 4;
+        f.setTextColor(t.muted);
+        x += f.drawString(hd->sides == 2 ? "" : hd->name, x, kHeight - 3) + 10;
     }
 }
 
@@ -903,6 +1021,13 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
 {
     const Theme &t = theme_for(state.game->profile);
 
+    if (state.dice && !state.menu) {
+        draw_background(frame, t, false);
+        draw_header(frame, t, state, "DICE");
+        draw_dice(frame, t, state);
+        return;
+    }
+
     if (!state.menu && (facing(state) || quads(state))) {
         if (quads(state)) {
             draw_quads(frame, t, state);
@@ -945,7 +1070,7 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
 
 int ui_banner_winner(const UiState &state)
 {
-    if (state.menu || !state.match) {
+    if (state.menu || state.dice || !state.match) {
         return -1;
     }
     return bb_game_winner(state.game);
@@ -963,7 +1088,7 @@ UiAction ui_hit(const UiState &state, int x, int y)
         }
         static const UiAction::Type kTileActions[kMenuTiles] = {
             UiAction::MenuGame,  UiAction::MenuPlayers, UiAction::MenuLayout,  UiAction::MenuFlip,
-            UiAction::MenuMatch, UiAction::MenuTimer,   UiAction::MenuRestart, UiAction::MenuSleep};
+            UiAction::MenuMatch, UiAction::MenuTimer,   UiAction::MenuRestart, UiAction::MenuDice};
         for (int i = 0; i < kMenuTiles; i++) {
             Rect r = menu_tile(i);
             // Tiles are hit-tested with the gaps included so near-misses still count.
@@ -977,6 +1102,24 @@ UiAction ui_hit(const UiState &state, int x, int y)
                 return a;
             }
         }
+        return a;
+    }
+
+    if (state.dice) {
+        if (y < kHeaderH) {
+            a.type = UiAction::DiceClose;
+            return a;
+        }
+        for (int i = 0; i < (int)bb_dice_count(); i++) {
+            Rect r = dice_chip(i);
+            Rect padded{r.x - 2, r.y - 4, r.w + 4, r.h + 8};
+            if (padded.contains(x, y)) {
+                a.type = UiAction::DiceSelect;
+                a.kind = (uint8_t)i;
+                return a;
+            }
+        }
+        a.type = UiAction::DiceRoll;
         return a;
     }
 

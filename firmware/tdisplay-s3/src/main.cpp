@@ -1,12 +1,12 @@
 // BattleBuddy prototype for the LilyGO T-Display-S3 Touch.
 //
 // Buttons (board held landscape):
-//   BOOT (GPIO0), short press: open/close the menu
+//   BOOT (GPIO0), short press: open/close the menu (closes the dice)
 //   BOOT, hold 1 s:            sleep
-//   KEY (GPIO14):              undo (closes the menu when it is open); wakes from sleep
-//   Circle below the screen:   open/close the menu
+//   KEY (GPIO14):              undo; rolls on the dice screen; closes the menu; wakes from sleep
+//   Circle below the screen:   open/close the dice
 // Menu: game, players (1-4, or two teams), layout, flip, best-of match, timer,
-// restart, sleep. The game, match and timer survive sleep (RTC memory and the
+// restart, dice. The game, match and timer survive sleep (RTC memory and the
 // RTC clock) but not a power cut or reset.
 
 #include <Arduino.h>
@@ -14,6 +14,7 @@
 #include <esp_sleep.h>
 #include <time.h>
 
+#include "bb/dice.h"
 #include "bb/game.h"
 #include "bb/match.h"
 #include "bb/profile.h"
@@ -32,6 +33,8 @@ constexpr uint32_t kBatteryPollMs = 5000;
 constexpr uint32_t kToastMs = 1500;
 constexpr uint8_t kBrightness = 200;
 constexpr uint8_t kDimBrightness = 20;
+constexpr uint32_t kRollMs = 450;      // shuffle before showing a roll
+constexpr uint32_t kRollFrameMs = 60;
 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
@@ -62,6 +65,11 @@ LGFX_Sprite frame(&lcd);
 
 bool menu_open = false;
 bool dirty = true;
+
+bool dice_open = false;
+DiceState dice;
+uint32_t roll_end_ms = 0;
+uint32_t roll_frame_ms = 0;
 
 uint32_t last_input_ms = 0;
 bool dimmed = false;
@@ -123,6 +131,7 @@ UiState ui_state()
     s.timer_minutes = saved.timer_minutes;
     s.timer_running = saved.timer_minutes > 0;
     s.timer_left_s = timer_left_s();
+    s.dice = dice_open ? &dice : nullptr;
     return s;
 }
 
@@ -174,6 +183,46 @@ void go_to_sleep()
     rtc_gpio_pulldown_dis((gpio_num_t)PIN_BUTTON_KEY);
     esp_sleep_enable_ext0_wakeup((gpio_num_t)PIN_BUTTON_KEY, 0);
     esp_deep_sleep_start();
+}
+
+uint32_t hardware_random(void *)
+{
+    return esp_random();
+}
+
+void start_roll(uint32_t now)
+{
+    if (dice.rolling) {
+        return;
+    }
+    dice.rolling = true;
+    roll_end_ms = now + kRollMs;
+    roll_frame_ms = 0;
+}
+
+// Shows random faces while rolling, then settles on the real result.
+void update_roll(uint32_t now)
+{
+    if (!dice.rolling) {
+        return;
+    }
+    uint8_t sides = bb_die_at(dice.die)->sides;
+    if ((int32_t)(now - roll_end_ms) >= 0) {
+        dice.value = bb_dice_roll(sides, hardware_random, nullptr);
+        dice.rolling = false;
+        memmove(dice.history + 1, dice.history, DiceState::kHistory - 1);
+        memmove(dice.history_die + 1, dice.history_die, DiceState::kHistory - 1);
+        dice.history[0] = dice.value;
+        dice.history_die[0] = dice.die;
+        if (dice.history_count < DiceState::kHistory) {
+            dice.history_count++;
+        }
+        dirty = true;
+    } else if (now - roll_frame_ms >= kRollFrameMs) {
+        roll_frame_ms = now;
+        dice.value = bb_dice_roll(sides, hardware_random, nullptr);
+        dirty = true;
+    }
 }
 
 void undo(uint32_t now)
@@ -265,8 +314,24 @@ void perform(const UiAction &a, uint32_t now)
         menu_open = false;
         show_toast("New match", now);
         break;
-    case UiAction::MenuSleep:
-        go_to_sleep();
+    case UiAction::MenuDice:
+        menu_open = false;
+        dice_open = true;
+        dirty = true;
+        break;
+    case UiAction::DiceSelect:
+        if (!dice.rolling && a.kind != dice.die) {
+            dice.die = a.kind;
+            dice.value = 0;
+            dirty = true;
+        }
+        break;
+    case UiAction::DiceRoll:
+        start_roll(now);
+        break;
+    case UiAction::DiceClose:
+        dice_open = false;
+        dirty = true;
         break;
     case UiAction::MenuClose:
         menu_open = false;
@@ -279,7 +344,18 @@ void perform(const UiAction &a, uint32_t now)
 
 void toggle_menu()
 {
-    menu_open = !menu_open;
+    if (dice_open) {
+        dice_open = false; // BOOT backs out of the dice to the counter
+    } else {
+        menu_open = !menu_open;
+    }
+    dirty = true;
+}
+
+void toggle_dice()
+{
+    menu_open = false;
+    dice_open = !dice_open;
     dirty = true;
 }
 
@@ -313,7 +389,7 @@ void handle_touch(uint32_t now)
         return; // this press only woke the screen
     }
     if (tp.y >= kRawHomeKeyY) {
-        toggle_menu();
+        toggle_dice();
         return;
     }
 
@@ -417,6 +493,8 @@ void loop()
         [now] {
             if (menu_open) {
                 toggle_menu();
+            } else if (dice_open) {
+                start_roll(now);
             } else {
                 undo(now);
             }
@@ -428,6 +506,7 @@ void loop()
     if (bb_game_tick(&game, now)) {
         dirty = true;
     }
+    update_roll(now);
     if (toast_until && (int32_t)(now - toast_until) >= 0) {
         toast_until = 0;
         dirty = true;

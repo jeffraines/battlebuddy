@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "bb/dice.h"
 #include "bb/game.h"
 #include "bb/match.h"
 #include "bb/profile.h"
@@ -273,6 +274,44 @@ static void test_game_winner(void)
     CHECK(bb_game_winner(&g) == -1); /* no head-to-head result with 3+ players */
 }
 
+static uint32_t lcg(void *ctx)
+{
+    uint32_t *state = ctx;
+    *state = *state * 1664525u + 1013904223u;
+    return *state;
+}
+
+/* Returns UINT32_MAX first (always rejected), then counts up. */
+static uint32_t high_then_count(void *ctx)
+{
+    uint32_t *calls = ctx;
+    return (*calls)++ == 0 ? UINT32_MAX : *calls;
+}
+
+static void test_dice(void)
+{
+    CHECK(bb_dice_count() == 7);
+    CHECK(bb_die_at(0)->sides == 2 && bb_die_at(6)->sides == 20);
+    CHECK(bb_die_at(7) == NULL);
+
+    uint32_t seed = 12345;
+    int counts[21] = {0};
+    for (int i = 0; i < 20000; i++) {
+        uint8_t v = bb_dice_roll(20, lcg, &seed);
+        CHECK(v >= 1 && v <= 20);
+        counts[v]++;
+    }
+    for (int f = 1; f <= 20; f++) {
+        CHECK(counts[f] > 800 && counts[f] < 1200); /* expected 1000 each */
+    }
+
+    uint32_t calls = 0;
+    CHECK(bb_dice_roll(6, high_then_count, &calls) == 2 % 6 + 1);
+    CHECK(calls == 2); /* the first value was rejected */
+
+    CHECK(bb_dice_roll(1, lcg, &seed) == 1);
+}
+
 static void test_status(void)
 {
     bb_game_t g;
@@ -306,6 +345,7 @@ int main(void)
     test_four_players();
     test_match();
     test_game_winner();
+    test_dice();
     test_status();
 
     if (failures) {

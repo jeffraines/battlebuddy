@@ -48,6 +48,7 @@ static UiState state_for(const bb_game_t &g)
     s.timer_minutes = 0;
     s.timer_running = false;
     s.timer_left_s = 0;
+    s.dice = nullptr;
     return s;
 }
 
@@ -202,6 +203,40 @@ int main(int argc, char **argv)
         s.timer_running = true;
         s.timer_left_s = 4 * 60 + 2;
         save(frame, s, "match-banner");
+    }
+
+    // Dice: a d20 that came up 20, with earlier rolls.
+    {
+        DiceState d;
+        d.die = 6;
+        d.value = 20;
+        const uint8_t hist[][2] = {{20, 6}, {7, 6}, {2, 0}, {4, 2}, {11, 6}, {1, 0}, {3, 1}};
+        for (auto &h : hist) {
+            d.history[d.history_count] = h[0];
+            d.history_die[d.history_count] = h[1];
+            d.history_count++;
+        }
+        bb_game_init(&g, bb_profile_find("riftbound"), 2);
+        UiState s = state_for(g);
+        s.dice = &d;
+        save(frame, s, "dice-d20");
+
+        d.die = 0;
+        d.value = 2;
+        save(frame, s, "dice-coin");
+
+        bb_game_init(&g, bb_profile_find("mtg"), 1);
+        UiState m = state_for(g);
+        m.dice = &d;
+        d.die = 2;
+        d.value = 3;
+        d.rolling = true;
+        save(frame, m, "dice-d6-rolling");
+
+        d.die = 1;
+        d.value = 4;
+        d.rolling = false;
+        save(frame, m, "dice-d4");
     }
 
     // Menu with four players.

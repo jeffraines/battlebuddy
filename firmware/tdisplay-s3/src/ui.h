@@ -3,6 +3,7 @@
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
 
+#include "bb/dice.h"
 #include "bb/game.h"
 #include "bb/match.h"
 
@@ -19,6 +20,18 @@ enum class Layout : uint8_t {
     Count,
 };
 
+// The dice screen.
+struct DiceState {
+    static constexpr int kHistory = 8;
+
+    uint8_t die = 2;     // index into bb_die_at(); d6 by default
+    uint8_t value = 0;   // last roll, 0 = not rolled yet
+    bool rolling = false; // showing the shuffle before the result
+    uint8_t history[kHistory] = {}; // previous results, newest first
+    uint8_t history_die[kHistory] = {};
+    uint8_t history_count = 0;
+};
+
 struct UiState {
     const bb_game_t *game;
     int step;            // single-player +/- step (1 or 5)
@@ -33,6 +46,8 @@ struct UiState {
     int timer_minutes;       // menu value: 0 = off
     bool timer_running;      // show the countdown
     int32_t timer_left_s;    // seconds left; negative = over time
+
+    const DiceState *dice; // dice screen instead of the counter, or nullptr
 };
 
 struct UiAction {
@@ -47,9 +62,12 @@ struct UiAction {
         MenuMatch,
         MenuTimer,
         MenuRestart,
-        MenuSleep,
+        MenuDice,
         MenuClose,
         NextGame, // dismiss the game-over banner and record the result
+        DiceSelect, // choose die `kind`
+        DiceRoll,
+        DiceClose,
     };
 
     Type type = None;
