@@ -37,7 +37,8 @@ constexpr uint32_t kToastMs = 1500;
 constexpr uint8_t kBrightness = 200;
 constexpr uint8_t kDimBrightness = 20;
 constexpr uint32_t kRollMs = 900;      // tumble before showing a roll
-constexpr uint32_t kPopMs = 300;       // landing effect after a roll
+constexpr uint32_t kPopMs = 350;       // landing effect after a roll
+constexpr uint32_t kCelebrateMs = 1100; // longer effect for the top or bottom face
 constexpr uint32_t kAnimFrameMs = 25;  // redraw rate while animating
 constexpr uint32_t kBurstMs = 260;     // game picker: formats bursting out of a game tile
 constexpr int32_t kMaxEntry = 32000;   // number pad limit (fits the counter's range)
@@ -45,7 +46,7 @@ constexpr int32_t kMaxEntry = 32000;   // number pad limit (fits the counter's r
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0005;
+constexpr uint32_t kSavedMagic = 0xBB0B0006;
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
 constexpr uint8_t kTimerChoices[] = {0, 30, 50, 60}; // minutes, 0 = off
@@ -56,6 +57,7 @@ struct Saved {
     int16_t step;
     Layout layout;
     bool flipped;
+    bool vivid;
     uint8_t best_of;       // 0 = match tracking off
     uint8_t timer_minutes; // 0 = no timer
     uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
@@ -142,6 +144,7 @@ UiState ui_state()
     s.battery_percent = battery_percent;
     s.layout = saved.layout;
     s.flipped = saved.flipped;
+    s.vivid = saved.vivid;
     s.menu = menu_open;
     s.toast = toast_until ? toast_text : nullptr;
     s.match = saved.best_of && game.players <= 2 ? &saved.match : nullptr;
@@ -234,7 +237,10 @@ void update_roll(uint32_t now)
     if (!dice.rolling) {
         if (dice.pop < 1000) {
             uint32_t e = now - land_ms;
-            dice.pop = e >= kPopMs ? 1000 : (uint16_t)(e * 1000 / kPopMs);
+            uint8_t sides = bb_die_at(dice.die)->sides;
+            bool extreme = sides >= 4 && (dice.value == sides || dice.value == 1);
+            uint32_t len = extreme ? kCelebrateMs : kPopMs;
+            dice.pop = e >= len ? 1000 : (uint16_t)(e * 1000 / len);
             if (now - anim_frame_ms >= kAnimFrameMs || dice.pop == 1000) {
                 anim_frame_ms = now;
                 dirty = true;
@@ -434,6 +440,10 @@ void perform(const UiAction &a, uint32_t now)
         saved.layout = ui_next_layout(game, saved.layout);
         dirty = true;
         break;
+    case UiAction::MenuLook:
+        saved.vivid = !saved.vivid;
+        dirty = true;
+        break;
     case UiAction::MenuFlip:
         saved.flipped = !saved.flipped;
         lcd.setRotation(saved.flipped ? 3 : 1);
@@ -623,6 +633,7 @@ void setup()
         saved.step = 1;
         saved.layout = Layout::SideYouLeft;
         saved.flipped = false;
+        saved.vivid = false;
         saved.best_of = 1;
         saved.timer_minutes = 0;
         start_game(0, 1);

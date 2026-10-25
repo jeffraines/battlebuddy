@@ -41,6 +41,7 @@ static UiState state_for(const bb_game_t &g)
     s.battery_percent = 76;
     s.layout = Layout::SideYouLeft;
     s.flipped = false;
+    s.vivid = false;
     s.menu = false;
     s.toast = nullptr;
     s.match = nullptr;
@@ -297,6 +298,67 @@ int main(int argc, char **argv)
         e.amount = 2400;
         s.entry = &e;
         save(frame, s, "yugioh-entry");
+    }
+
+    // Look: the same screens subdued and vivid.
+    {
+        bb_game_init(&g, bb_profile_find("riftbound"), 2);
+        const uint8_t seq[][2] = {{0, HOLD}, {1, CONQUER}, {0, CONQUER}, {0, CONQUER}, {1, HOLD}};
+        for (auto &e : seq) {
+            bb_game_adjust(&g, e[0], e[1], 1, 0);
+        }
+        UiState s = state_for(g);
+        s.vivid = true;
+        save(frame, s, "vivid-riftbound");
+        PickerState pk;
+        s.picker = &pk;
+        save(frame, s, "vivid-picker");
+        s.picker = nullptr;
+        s.menu = true;
+        save(frame, s, "vivid-menu");
+
+        bb_game_init(&g, bb_profile_find("digimon"), 2);
+        bb_game_adjust(&g, 0, 0, -4, 0);
+        UiState d = state_for(g);
+        d.vivid = true;
+        save(frame, d, "vivid-digimon");
+        bb_game_init(&g, bb_profile_find("yugioh"), 2);
+        UiState y = state_for(g);
+        y.vivid = true;
+        save(frame, y, "vivid-yugioh");
+    }
+
+    // Dice landings: a celebration (NAT 8 on a d8), a fumble (1 on a d20) and a middle roll.
+    {
+        bb_game_init(&g, bb_profile_find("riftbound"), 2);
+        UiState s = state_for(g);
+        DiceState d;
+        s.dice = &d;
+        struct Landing { uint8_t die, value; const char *name; int pop_ms; };
+        const Landing landings[] = {{3, 8, "land-d8-max", 1100}, {6, 1, "land-d20-min", 1100},
+                                    {6, 13, "land-d20-mid", 350}};
+        for (const Landing &l : landings) {
+            d.die = l.die;
+            char name[40];
+            int n = 0;
+            for (int a = 0; a <= 1000; a += 45) {
+                d.rolling = true;
+                d.anim = (uint16_t)a;
+                d.value = (uint8_t)(1 + (a / 90 * 7) % bb_die_at(l.die)->sides);
+                snprintf(name, sizeof(name), "%s-%03d", l.name, n++);
+                save(frame, s, name);
+            }
+            d.rolling = false;
+            d.value = l.value;
+            for (int ms = 0; ms <= l.pop_ms; ms += 40) {
+                d.pop = (uint16_t)(ms * 1000 / l.pop_ms);
+                snprintf(name, sizeof(name), "%s-%03d", l.name, n++);
+                save(frame, s, name);
+            }
+            d.pop = 1000;
+            snprintf(name, sizeof(name), "%s-%03d", l.name, n++);
+            save(frame, s, name);
+        }
     }
 
     // Menu with four players.

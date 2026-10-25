@@ -23,6 +23,7 @@ Hold the board landscape, USB port on the right.
 |---|---|
 | Game | Opens the game picker: one tile per game, in that game's colors. Games with several formats (Riftbound 1v1 / 2v2, Magic Standard / Commander) burst open into format tiles; tap one to start. BOOT or the header steps back |
 | Players | *Just you*, *Two*, *Three*, *Four* (team games: one or two teams) (restarts) |
+| Look | *Subdued* (the game's palette as is) or *Vivid* (more saturated colors and glowing text) |
 | Layout | Two players: *YOU left*, *YOU right*, or *Facing* (opponent upside down along the top, for a device lying between you). Three or four: *Upright* or *Facing* (top row upside down) |
 | Flip | Rotates the whole screen 180° (USB port on the left) |
 | Match | *Off*, *Bo1*, *Bo3*, *Bo5*. One or two sides only |
@@ -39,7 +40,9 @@ four-player layouts). The clock turns gold under 5 minutes and red with a `+`
 once time is up. It keeps running while the board sleeps.
 
 **Dice:** pick Coin, d4, d6, d8, d10, d12 or d20 along the top, then tap
-anywhere (or press KEY) to roll. The last few rolls are listed along the
+anywhere (or press KEY) to roll. Every landing pops with a ring and sparks,
+colored cool for low rolls and warm for high ones. The top face is a
+celebration (confetti, "NAT 8!") and a 1 throws embers ("NAT 1"). The last few rolls are listed along the
 bottom. Rolls use the ESP32's hardware random number generator with no bias
 between faces. Good for casual play; at a sanctioned event, use physical dice.
 
@@ -75,7 +78,7 @@ For games other than Riftbound, quick taps are grouped: changes within 1.5 s
 of each other show as a pending `+3` / `-2`, then become one history entry
 along the bottom (colored by player in two-player mode).
 
-Each game has its own color theme. The screen dims after 30 s idle and the
+Each game has its own colors and its own title lettering. The screen dims after 30 s idle and the
 board sleeps after 10 minutes; the first touch or press after dimming only
 wakes the screen. The game survives sleep, but not a reset or power cut.
 

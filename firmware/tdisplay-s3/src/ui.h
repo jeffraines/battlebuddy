@@ -54,6 +54,7 @@ struct UiState {
     int battery_percent; // < 0 means on USB power
     Layout layout;       // used when the game has more than one player
     bool flipped;        // whole screen rotated 180 degrees (menu label only)
+    bool vivid;          // Look setting: vivid colors and glows instead of subdued
     bool menu;           // menu screen instead of the counter
     const char *toast;   // short message, or nullptr
 
@@ -77,6 +78,7 @@ struct UiAction {
         MenuPlayers,
         MenuLayout,
         MenuFlip,
+        MenuLook,
         MenuMatch,
         MenuTimer,
         MenuRestart,
