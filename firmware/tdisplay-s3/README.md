@@ -58,6 +58,11 @@ between faces. Good for casual play; at a sanctioned event, use physical dice.
 - Riftbound 2v2 keeps one score per team, to 11. (The 11 is my assumption;
   it's one number in `core/src/profile.c`.)
 
+Taps act when your finger lifts. A touch is ignored if a side button is
+pressed during it or just before it, so grazing the screen while reaching for
+a button doesn't score anything. CONQUER/HOLD only respond to taps on the
+button itself; tapping between them does nothing.
+
 For games other than Riftbound, quick taps are grouped: changes within 1.5 s
 of each other show as a pending `+3` / `-2`, then become one history entry
 along the bottom (colored by player in two-player mode).

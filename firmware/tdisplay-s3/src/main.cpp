@@ -25,6 +25,8 @@
 namespace {
 
 constexpr uint32_t kRepeatDelayMs = 500;
+constexpr uint32_t kTapMaxMs = 700;       // longer presses without repeat don't count as taps
+constexpr uint32_t kButtonGuardMs = 250;  // ignore touches this soon after a physical button
 constexpr uint32_t kRepeatIntervalMs = 150;
 constexpr uint32_t kLongPressMs = 1000;
 constexpr uint32_t kDimAfterMs = 30000;
@@ -94,6 +96,9 @@ Button boot_button(PIN_BUTTON_BOOT);
 Button key_button(PIN_BUTTON_KEY);
 
 bool touch_down = false;
+bool touch_fired = false;     // the action already ran (auto-repeat, wake, circle key)
+bool touch_cancelled = false; // a physical button was involved; ignore this touch
+uint32_t last_button_ms = 0;
 UiAction touch_action;
 uint32_t touch_start_ms = 0;
 uint32_t last_repeat_ms = 0;
@@ -387,10 +392,17 @@ void toggle_dice()
     dirty = true;
 }
 
+// Taps act when the finger lifts, so a touch can be cancelled: if a physical
+// button is pressed during it (a thumb grazing the screen while reaching for
+// the button), or it starts right after one, nothing happens. +/- still
+// repeat while held.
 void handle_touch(uint32_t now)
 {
     lgfx::touch_point_t tp;
     if (lcd.getTouchRaw(&tp, 1) == 0) {
+        if (touch_down && !touch_fired && !touch_cancelled && now - touch_start_ms <= kTapMaxMs) {
+            perform(touch_action, now);
+        }
         touch_down = false;
         return;
     }
@@ -398,9 +410,13 @@ void handle_touch(uint32_t now)
     if (touch_down) {
         // Held press: auto-repeat where the action allows it.
         last_input_ms = now;
-        if (touch_action.repeat && now - touch_start_ms >= kRepeatDelayMs &&
+        if (boot_button.down || key_button.down) {
+            touch_cancelled = true;
+        }
+        if (touch_action.repeat && !touch_cancelled && now - touch_start_ms >= kRepeatDelayMs &&
             now - last_repeat_ms >= kRepeatIntervalMs) {
             last_repeat_ms = now;
+            touch_fired = true;
             perform(touch_action, now);
         }
         return;
@@ -408,22 +424,28 @@ void handle_touch(uint32_t now)
 
     // New press.
     touch_down = true;
+    touch_fired = false;
+    touch_cancelled = boot_button.down || key_button.down || now - last_button_ms < kButtonGuardMs;
     touch_action = UiAction();
     touch_start_ms = now;
     last_repeat_ms = now;
-    Serial.printf("touch raw x=%d y=%d\n", tp.x, tp.y);
+    Serial.printf("touch raw x=%d y=%d%s\n", tp.x, tp.y, touch_cancelled ? " (ignored)" : "");
 
+    if (touch_cancelled) {
+        return;
+    }
     if (register_input(now)) {
-        return; // this press only woke the screen
+        touch_fired = true; // this press only woke the screen
+        return;
     }
     if (tp.y >= kRawHomeKeyY) {
+        touch_fired = true;
         toggle_dice();
         return;
     }
 
     lcd.convertRawXY(&tp, 1);
     touch_action = ui_hit(ui_state(), tp.x, tp.y);
-    perform(touch_action, now);
 }
 
 // Calls on_short when released before kLongPressMs, on_long once when held that long.
@@ -431,6 +453,13 @@ template <typename Short, typename Long>
 void poll_button(Button &b, uint32_t now, Short on_short, Long on_long)
 {
     bool down = digitalRead(b.pin) == LOW;
+
+    if (down != b.down) {
+        last_button_ms = now;
+        if (touch_down) {
+            touch_cancelled = true;
+        }
+    }
 
     if (down && !b.down) {
         b.down = true;

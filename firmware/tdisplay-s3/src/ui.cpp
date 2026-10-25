@@ -106,17 +106,19 @@ Rect player_panel(const UiState &s, uint8_t p)
 // quadrant rects in quadrant coordinates.
 Rect kind_button(const UiState &s, uint8_t p, uint8_t kind)
 {
+    // Paired buttons leave a gap wider than twice the tap margin, so there is a
+    // dead strip between them rather than one button's area touching the other's.
     if (quads(s)) {
-        return {86, kind == 0 ? 4 : 36, 70, 29};
+        return {86, kind == 0 ? 3 : 38, 70, 28};
     }
     if (facing(s)) {
-        return {206, kind == 0 ? 5 : 45, 108, 35};
+        return {206, kind == 0 ? 4 : 46, 108, 34};
     }
     if (s.game->players == 1) {
-        return {176, kind == 0 ? 30 : 92, 138, 56};
+        return {176, kind == 0 ? 30 : 94, 138, 54};
     }
     Rect panel = player_panel(s, p);
-    return {panel.x + (kind == 0 ? 6 : 82), 110, 72, 36};
+    return {panel.x + (kind == 0 ? 5 : 87), 110, 68, 36};
 }
 
 constexpr int kMenuTiles = 8;
@@ -1077,22 +1079,17 @@ void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
     }
 }
 
+// Kind buttons only respond to taps on the button itself (plus a small margin),
+// so a tap next to a button does nothing rather than hitting the wrong one.
+constexpr int kTapMargin = 2;
+
 UiAction kind_hit(const UiState &s, uint8_t p, int x, int y)
 {
     UiAction a;
     for (uint8_t k = 0; k < 2; k++) {
         Rect r = kind_button(s, p, k);
-        // Generous targets: each button owns its half of the button column.
-        bool hit;
-        if (facing(s)) {
-            hit = x >= r.x - 6 && (k == 0 ? y < kStripH / 2 : y >= kStripH / 2);
-        } else if (s.game->players == 1) {
-            hit = x >= r.x - 8 && (k == 0 ? y < 89 : y >= 89);
-        } else {
-            Rect panel = player_panel(s, p);
-            hit = y >= r.y - 10 && y < kFooterTop && (k == 0 ? x < panel.cx() : x >= panel.cx());
-        }
-        if (hit) {
+        Rect padded{r.x - kTapMargin, r.y - kTapMargin, r.w + 2 * kTapMargin, r.h + 2 * kTapMargin};
+        if (padded.contains(x, y)) {
             a.type = UiAction::Adjust;
             a.player = p;
             a.kind = k;
@@ -1263,11 +1260,7 @@ UiAction ui_hit(const UiState &state, int x, int y)
         int qx = lx % kQuadW;
         a.player = p;
         if (has_kinds(g)) {
-            if (qx >= 80 && ly < 68) {
-                a.type = UiAction::Adjust;
-                a.kind = ly < 35 ? 0 : 1;
-                a.delta = 1;
-            }
+            return kind_hit(state, p, qx, ly); // quadrant coordinates
         } else if (qx < 64) {
             a.type = UiAction::Adjust;
             a.delta = -1;
