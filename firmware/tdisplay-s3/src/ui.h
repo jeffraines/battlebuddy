@@ -56,6 +56,11 @@ struct UiState {
     bool flipped;        // whole screen rotated 180 degrees (menu label only)
     bool vivid;          // Look setting: vivid colors and glows instead of subdued
     bool menu;           // menu screen instead of the counter
+    int menu_page;       // 0 = main settings, 1 = more
+    bool spindown;       // Counter setting: life shown on a spinning d20 instead of plain digits
+    const uint16_t *spin;  // per-player spin animation progress (0..1000, 1000 = still), or nullptr
+    const int8_t *spin_dir; // per-player direction of the last change (+1 / -1)
+    bool end_prompt;     // "who won?" screen
     const char *toast;   // short message, or nullptr
 
     const bb_match_t *match; // best-of match in progress, or nullptr when off
@@ -84,6 +89,15 @@ struct UiAction {
         MenuRestart,
         MenuDice,
         MenuClose,
+        MenuMore,
+        MenuBack,
+        MenuCounter,
+        MenuSleep,
+        MenuUndo,
+        MenuEnd,       // open the "who won?" screen
+        DeclareWinner, // `player` won this game
+        EndRestart,    // restart without recording a result
+        EndCancel,
         NextGame, // dismiss the game-over banner and record the result
         DiceSelect, // choose die `kind`
         DiceRoll,

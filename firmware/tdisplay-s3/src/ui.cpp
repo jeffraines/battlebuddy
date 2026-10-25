@@ -20,7 +20,8 @@ struct Theme {
     uint32_t text;
     uint32_t muted;
     uint32_t kind[BB_MAX_KINDS]; // e.g. Conquer / Hold slots on the score track
-    const lgfx::IFont *title_font; // game name on picker tiles and in the header
+    const lgfx::IFont *title_font;  // game name on picker tiles
+    const lgfx::IFont *header_font; // game name in the header bar
     bool vivid;                    // set by styled(): richer colors and glows
 };
 
@@ -28,25 +29,25 @@ struct Theme {
 const Theme kThemes[] = {
     // Navy and teal with gold trim; gold = Conquer, violet = Hold.
     {"riftbound", 0x0A1428, 0x0B3A44, 0x10283A, 0xC8AA6E, 0x0AC8B9, 0xE8604C, 0xF0E6D2, 0x7E8A96,
-     {0xE0B85A, 0xA78BFA}, &fonts::FreeSerifBold12pt7b, false},
+     {0xE0B85A, 0xA78BFA}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
     // Charcoal and warm brown with amber.
     {"mtg", 0x15110E, 0x33221A, 0x2A1E17, 0xE0A040, 0x6FB5E0, 0xE8604C, 0xF2E8DC, 0x8C8072,
-     {0xE0A040, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, false},
+     {0xE0A040, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
     // Charcoal and plum with lilac.
     {"mtg-commander", 0x120F1A, 0x2E1F40, 0x251A36, 0xC9A0FF, 0x6FB5E0, 0xE8604C, 0xF0EAFA, 0x8A7FA0,
-     {0xC9A0FF, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, false},
+     {0xC9A0FF, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
     // Ink blue and violet with gold.
     {"lorcana", 0x0B0F2E, 0x2D1B4E, 0x1C1840, 0xE8C25A, 0x7FB2FF, 0xF07FB0, 0xF4F0FF, 0x8A88AA,
-     {0xE8C25A, 0x7FB2FF}, &fonts::Satisfy_24, false},
+     {0xE8C25A, 0x7FB2FF}, &fonts::Satisfy_24, &fonts::Satisfy_24, false},
     // Deep navy with digital orange and cyan.
     {"digimon", 0x07131F, 0x0E2A3A, 0x0F2333, 0xF28C28, 0x2EC4F1, 0xF2545B, 0xEAF6FF, 0x7F95A8,
-     {0xF28C28, 0x2EC4F1}, &fonts::Orbitron_Light_24, false},
+     {0xF28C28, 0x2EC4F1}, &fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b, false},
     // Dark umber with gold.
     {"yugioh", 0x140F05, 0x3A2A0A, 0x2E2410, 0xE6B422, 0x7FB2FF, 0xE8604C, 0xFFF4DA, 0x9C8C6A,
-     {0xE6B422, 0x7FB2FF}, &fonts::FreeSerifBoldItalic12pt7b, false},
+     {0xE6B422, 0x7FB2FF}, &fonts::FreeSerifBoldItalic12pt7b, &fonts::FreeSerifBoldItalic9pt7b, false},
     // Black and blood red with bronze.
     {"fab", 0x140808, 0x3C1210, 0x2E1210, 0xD4A24C, 0x6FB5E0, 0xE04B3A, 0xF4E6DC, 0x907670,
-     {0xD4A24C, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, false},
+     {0xD4A24C, 0x6FB5E0}, &fonts::FreeSerifBold12pt7b, &fonts::FreeSerifBold9pt7b, false},
 };
 
 // Exact id match first, then a family prefix ("riftbound-2v2" uses "riftbound").
@@ -71,6 +72,7 @@ constexpr uint32_t kLoss = 0xF0564A;
 constexpr uint32_t kWinColor = 0xFFD45A;
 constexpr uint32_t kInk = 0x10141C; // dark text on filled slots
 
+constexpr float kPi = 3.14159265f;
 constexpr int kHeaderH = 24;
 constexpr int kFooterTop = 150;
 constexpr int kStripH = kHeight / 2; // facing / 4-player layouts: one strip per row
@@ -253,7 +255,9 @@ bool match_info(const UiState &s, char *score, size_t score_n, char *clock, size
 void draw_header(LGFX_Sprite &f, const Theme &t, const UiState &s, const char *title, bool game_title = false)
 {
     if (game_title) {
-        draw_title(f, t, title, 8, kHeaderH / 2 + 1, 150, 18, t.accent, false, true);
+        Theme ht = t;
+        ht.title_font = t.header_font; // a font made for this size, not a scaled-down one
+        draw_title(f, ht, title, 8, kHeaderH / 2 + 1, 150, 18, t.accent, false, true);
     } else {
         f.setFont(&fonts::FreeSansBold9pt7b);
         f.setTextSize(1);
@@ -270,7 +274,7 @@ void draw_header(LGFX_Sprite &f, const Theme &t, const UiState &s, const char *t
     }
     draw_battery(f, t, s.battery_percent);
 
-    if (s.menu || s.dice || s.picker || s.entry) {
+    if (s.menu || s.dice || s.picker || s.entry || s.end_prompt) {
         return;
     }
     char score[8], clock[12];
@@ -474,6 +478,34 @@ void draw_title(LGFX_Sprite &f, const Theme &t, const char *text, int x, int cy,
     f.setTextSize(1);
 }
 
+bool counter_style_plain(const bb_game_t &g);
+void draw_close_mark(LGFX_Sprite &f, const Theme &t);
+void draw_die_body(LGFX_Sprite &f, uint8_t sides, int cx, int cy, float r, float angle,
+                   uint32_t fill, uint32_t edge, uint32_t facet, float sx, float sy);
+float ease_out_back(float t);
+
+// A counter value: plain digits, or (with the d20 Counter setting) on a d20
+// that spins a face's worth toward the change, like turning a spin-down die.
+void draw_value(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, const char *text, int cx,
+                int cy, int max_w, int max_h, uint32_t color, uint32_t shadow)
+{
+    if (!s.spindown || !counter_style_plain(*s.game)) {
+        draw_number(f, text, cx, cy, max_w, max_h, color, shadow);
+        return;
+    }
+    float r = max_h / 2.0f;
+    if (r > max_w / 1.8f) {
+        r = max_w / 1.8f;
+    }
+    float angle = 0;
+    if (s.spin && s.spin[p] < 1000) {
+        float e = ease_out_back(s.spin[p] / 1000.0f);
+        angle = (1 - e) * (kPi / 3) * (s.spin_dir ? -s.spin_dir[p] : -1);
+    }
+    draw_die_body(f, 20, cx, cy, r, angle, t.surface, t.accent, mix(t.surface, t.accent, 45), 1, 1);
+    draw_number(f, text, cx, cy + 2, (int)(r * 1.25f), (int)(r * 0.95f), color, shadow);
+}
+
 uint32_t value_color(const Theme &t, bb_status_t s)
 {
     switch (s) {
@@ -551,13 +583,30 @@ void draw_kind_button(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t 
         f.setFont(&fonts::FreeSansBold12pt7b);
         f.setTextColor(t.text);
         f.drawString(buf, r.cx(), r.y + 39);
-    } else {
-        upper(name, sizeof(name), g.profile->kinds[kind], quads(s) ? 4 : facing(s) ? 10 : 4);
-        snprintf(buf, sizeof(buf), "%s %d", name, g.tally[p][kind]);
-        f.setFont(&fonts::FreeSansBold9pt7b);
+    } else if (facing(s)) {
+        // Name on the left, count on the right.
+        upper(name, sizeof(name), g.profile->kinds[kind], 10);
+        f.setFont(&fonts::Font2);
         f.setTextSize(1);
         f.setTextColor(kc);
-        f.drawString(buf, r.cx(), r.cy());
+        f.setTextDatum(textdatum_t::middle_left);
+        f.drawString(name, r.x + 10, r.cy());
+        snprintf(buf, sizeof(buf), "%d", g.tally[p][kind]);
+        f.setFont(&fonts::FreeSansBold12pt7b);
+        f.setTextColor(t.text);
+        f.setTextDatum(textdatum_t::middle_right);
+        f.drawString(buf, r.x + r.w - 10, r.cy() + 1);
+    } else {
+        // Small name over the count.
+        upper(name, sizeof(name), g.profile->kinds[kind], 7);
+        f.setFont(&fonts::Font2);
+        f.setTextSize(1);
+        f.setTextColor(kc);
+        f.drawString(name, r.cx(), r.y + 10);
+        snprintf(buf, sizeof(buf), "%d", g.tally[p][kind]);
+        f.setFont(&fonts::FreeSansBold9pt7b);
+        f.setTextColor(t.text);
+        f.drawString(buf, r.cx(), r.y + r.h - 11);
     }
 }
 
@@ -692,7 +741,7 @@ void draw_single(LGFX_Sprite &f, const Theme &t, const UiState &s)
             draw_plus_minus(f, 28, 87, false, hint, 10);
             draw_plus_minus(f, kWidth - 28, 87, true, hint, 10);
         }
-        draw_number(f, buf, kWidth / 2, 80, 200, 90, vc, shadow);
+        draw_value(f, t, s, 0, buf, kWidth / 2, 82, 200, 96, vc, shadow);
         if (s.step != 1) {
             snprintf(buf, sizeof(buf), "x%d", s.step);
             f.setFont(&fonts::FreeSansBold9pt7b);
@@ -755,7 +804,7 @@ void draw_side_by_side(LGFX_Sprite &f, const Theme &t, const UiState &s)
             uint32_t hint = mix(t.bg_bottom, t.accent, 110);
             draw_plus_minus(f, panel.x + panel.w - 16, 58, true, hint, 6);
             draw_plus_minus(f, panel.x + panel.w - 16, 128, false, hint, 6);
-            draw_number(f, buf, panel.cx() - 6, 92, 124, 80, vc, shadow);
+            draw_value(f, t, s, p, buf, panel.cx() - 6, 92, 124, 82, vc, shadow);
         }
     }
 
@@ -802,7 +851,7 @@ void draw_strip(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p)
             draw_plus_minus(f, 28, 48, false, hint, 9);
             draw_plus_minus(f, kWidth - 28, 48, true, hint, 9);
         }
-        draw_number(f, buf, kWidth / 2, 46, 180, 70, vc, shadow);
+        draw_value(f, t, s, p, buf, kWidth / 2, 46, 180, 72, vc, shadow);
         if (status[0]) {
             f.setFont(&fonts::FreeSansBold9pt7b);
             f.setTextColor(sc);
@@ -907,7 +956,7 @@ void draw_quadrant(LGFX_Sprite &f, const Theme &t, const UiState &s, uint8_t p, 
             draw_plus_minus(f, x0 + 14, 50, false, hint, 6);
             draw_plus_minus(f, x0 + kQuadW - 14, 50, true, hint, 6);
         }
-        draw_number(f, buf, x0 + kQuadW / 2, 50, amount_style(g) ? 136 : 96, 56, vc, shadow);
+        draw_value(f, t, s, p, buf, x0 + kQuadW / 2, 48, amount_style(g) ? 136 : 96, 60, vc, shadow);
     }
 }
 
@@ -948,58 +997,152 @@ void draw_quads(LGFX_Sprite &f, const Theme &t, const UiState &s)
     draw_row_divider(f, t);
 }
 
-void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
+// Menu tiles for each page. Blank slots have a null label.
+struct MenuTile {
+    const char *label;
+    const char *value;
+    UiAction::Type action;
+    bool enabled;
+};
+
+bool counter_style_plain(const bb_game_t &g)
+{
+    return g.profile->style == BB_STYLE_COUNTER && g.profile->kind_count == 0;
+}
+
+void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
 {
     const bb_game_t &g = *s.game;
     static const char *const kPlayerNames[] = {"Just you", "Two", "Three", "Four"};
     static const char *const kTeamNames[] = {"One team", "Two teams"};
     const char *players = g.profile->teams ? kTeamNames[(g.players - 1) & 1] : kPlayerNames[g.players - 1];
+    const char *name = g.profile->short_name ? g.profile->short_name : g.profile->name;
+    sprintf(match, s.best_of ? "Bo%d" : "Off", s.best_of);
+    sprintf(timer, s.timer_minutes ? "%d min" : "Off", s.timer_minutes);
+    bool gauge = gauge_style(g);
 
-    char match[8], timer[8];
-    snprintf(match, sizeof(match), s.best_of ? "Bo%d" : "Off", s.best_of);
-    snprintf(timer, sizeof(timer), s.timer_minutes ? "%d min" : "Off", s.timer_minutes);
-
-    const char *labels[kMenuTiles] = {"Game", "Players", "Layout", "Match", "Timer",
-                                      "Look", "Flip", "Restart", "Dice"};
-    const char *values[kMenuTiles] = {
-        g.profile->name,
-        players,
-        g.players > 1 && !gauge_style(g) ? ui_layout_name(g, s.layout) : "-",
-        g.players <= 2 ? match : "-",
-        timer,
-        s.vivid ? "Vivid" : "Subdued",
-        s.flipped ? "On" : "Off",
-        "New",
-        "Roll",
-    };
-
-    // Close mark in the header.
-    for (int i = -1; i <= 1; i++) {
-        f.drawLine(kWidth - 52 + i, 7, kWidth - 42 + i, 17, t.muted);
-        f.drawLine(kWidth - 42 + i, 7, kWidth - 52 + i, 17, t.muted);
+    if (s.menu_page == 0) {
+        bool ending = s.match != nullptr;
+        MenuTile tiles[kMenuTiles] = {
+            {"Game", name, UiAction::MenuGame, true},
+            {"Players", players, UiAction::MenuPlayers, !gauge},
+            {"Layout", g.players > 1 && !gauge ? ui_layout_name(g, s.layout) : "-", UiAction::MenuLayout,
+             g.players > 1 && !gauge},
+            {"Match", g.players <= 2 ? match : "-", UiAction::MenuMatch, g.players <= 2},
+            {"Timer", timer, UiAction::MenuTimer, true},
+            {ending ? "End game" : "Restart", ending ? "Who won?" : "New",
+             ending ? UiAction::MenuEnd : UiAction::MenuRestart, true},
+            {"Dice", "Roll", UiAction::MenuDice, true},
+            {"Undo", "Last", UiAction::MenuUndo, true},
+            {"More", ">", UiAction::MenuMore, true},
+        };
+        memcpy(out, tiles, sizeof(tiles));
+    } else {
+        MenuTile tiles[kMenuTiles] = {
+            {"Look", s.vivid ? "Vivid" : "Subdued", UiAction::MenuLook, true},
+            {"Counter", counter_style_plain(g) ? (s.spindown ? "d20" : "Digits") : "-", UiAction::MenuCounter,
+             counter_style_plain(g)},
+            {"Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true},
+            {"Sleep", "KEY wakes", UiAction::MenuSleep, true},
+            {nullptr, nullptr, UiAction::None, false},
+            {nullptr, nullptr, UiAction::None, false},
+            {nullptr, nullptr, UiAction::None, false},
+            {nullptr, nullptr, UiAction::None, false},
+            {"Back", "<", UiAction::MenuBack, true},
+        };
+        memcpy(out, tiles, sizeof(tiles));
     }
+}
+
+void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    MenuTile tiles[kMenuTiles];
+    char match[8], timer[12];
+    menu_tiles(s, tiles, match, timer);
+    draw_close_mark(f, t);
 
     for (int i = 0; i < kMenuTiles; i++) {
+        const MenuTile &mt = tiles[i];
+        if (!mt.label) {
+            continue;
+        }
         Rect r = menu_tile(i);
-        bool enabled = !(i == 2 && (g.players < 2 || gauge_style(g))) && !(i == 3 && g.players > 2) &&
-                       !(i == 1 && gauge_style(g));
         f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
-        f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, enabled ? 140 : 40));
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, mt.enabled ? 140 : 40));
 
         f.setFont(&fonts::Font2);
         f.setTextSize(1);
         f.setTextColor(t.muted);
         f.setTextDatum(textdatum_t::middle_left);
-        f.drawString(labels[i], r.x + 8, r.y + 11);
+        f.drawString(mt.label, r.x + 8, r.y + 11);
 
-        fit_font(f, values[i], r.w - 12);
+        fit_font(f, mt.value, r.w - 12);
         if (f.getFont() == &fonts::FreeSansBold12pt7b) {
             f.setFont(&fonts::FreeSansBold9pt7b); // keep values to one size in the short tiles
         }
-        f.setTextColor(enabled ? t.accent : t.muted);
+        f.setTextColor(mt.enabled ? t.accent : t.muted);
         f.setTextDatum(textdatum_t::middle_center);
-        f.drawString(values[i], r.cx(), r.y + 29);
+        f.drawString(mt.value, r.cx(), r.y + 29);
     }
+}
+
+// ---- Who won? ------------------------------------------------------------------
+
+Rect winner_tile(int p)
+{
+    return {6 + p * 158, 32, 150, 94};
+}
+
+constexpr Rect kNoResult = {6, 134, 308, 30};
+
+void draw_end_prompt(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    const bb_game_t &g = *s.game;
+    char buf[24];
+    draw_close_mark(f, t);
+    int game_no = s.match ? s.match->games + 1 : 1;
+    for (uint8_t p = 0; p < 2; p++) {
+        Rect r = winner_tile(p);
+        uint32_t c = player_color(t, p);
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 10, t.surface);
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 10, c);
+        f.drawRoundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 9, mix(t.surface, c, 140));
+        fit_font(f, ui_player_label(g, p), r.w - 16);
+        f.setTextDatum(textdatum_t::middle_center);
+        draw_text_glow(f, t, ui_player_label(g, p), r.cx(), r.cy() - 10, c);
+        snprintf(buf, sizeof(buf), "won game %d", game_no);
+        f.setFont(&fonts::Font2);
+        f.setTextSize(1);
+        f.setTextColor(t.text);
+        f.drawString(buf, r.cx(), r.cy() + 18);
+    }
+    Rect r = kNoResult;
+    f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
+    f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, 90));
+    f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextColor(t.muted);
+    f.setTextDatum(textdatum_t::middle_center);
+    f.drawString("Restart without a result", r.cx(), r.cy());
+}
+
+UiAction end_prompt_hit(int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = UiAction::EndCancel;
+        return a;
+    }
+    for (uint8_t p = 0; p < 2; p++) {
+        if (winner_tile(p).contains(x, y)) {
+            a.type = UiAction::DeclareWinner;
+            a.player = p;
+            return a;
+        }
+    }
+    if (kNoResult.contains(x, y)) {
+        a.type = UiAction::EndRestart;
+    }
+    return a;
 }
 
 constexpr int kDiceChipY = 30;
@@ -1013,8 +1156,6 @@ Rect dice_chip(int i)
 }
 
 // ---- Dice -------------------------------------------------------------------
-
-constexpr float kPi = 3.14159265f;
 
 // Unit-circle outline of each die's silhouette (x right, y down), and how much
 // of the radius is free for the number inside it.
@@ -1076,16 +1217,17 @@ DieShape die_shape(uint8_t sides)
     return d;
 }
 
-// Draws a die silhouette rotated by angle and scaled to radius r.
+// Draws a die silhouette rotated by angle and scaled to radius r, then
+// stretched by sx / sy (for spins seen edge-on and landing squash).
 void draw_die_body(LGFX_Sprite &f, uint8_t sides, int cx, int cy, float r, float angle,
-                   uint32_t fill, uint32_t edge, uint32_t facet)
+                   uint32_t fill, uint32_t edge, uint32_t facet, float sx = 1, float sy = 1)
 {
     DieShape d = die_shape(sides);
     float c = cosf(angle), sn = sinf(angle);
     int x[6], y[6];
     for (int i = 0; i < d.n; i++) {
-        x[i] = cx + (int)lroundf((d.px[i] * c - d.py[i] * sn) * r);
-        y[i] = cy + (int)lroundf((d.px[i] * sn + d.py[i] * c) * r);
+        x[i] = cx + (int)lroundf((d.px[i] * c - d.py[i] * sn) * r * sx);
+        y[i] = cy + (int)lroundf((d.px[i] * sn + d.py[i] * c) * r * sy);
     }
     for (int i = 0; i < d.n; i++) {
         f.fillTriangle(cx, cy, x[i], y[i], x[(i + 1) % d.n], y[(i + 1) % d.n], fill);
@@ -1140,6 +1282,58 @@ float ease_out_cubic(float t)
 {
     float u = 1 - t;
     return 1 - u * u * u;
+}
+
+// Overshoots a little past 1, then settles: a springy stop.
+float ease_out_back(float t)
+{
+    const float c1 = 1.70158f, c3 = c1 + 1;
+    float u = t - 1;
+    return 1 + c3 * u * u * u + c1 * u * u;
+}
+
+// How each die moves while rolling, given roll progress t (0..1).
+struct DieMotion {
+    float angle = 0, dx = 0, dy = 0, sx = 1, sy = 1, zoom = 1;
+};
+
+DieMotion die_motion(uint8_t sides, float t)
+{
+    DieMotion m;
+    float u = 1 - ease_out_cubic(t); // motion left, 1 -> 0
+    switch (sides) {
+    case 4: // hops in shrinking bounces, wobbling, squashing as it lands
+        m.dy = -fabsf(sinf(t * 3.5f * kPi)) * 46 * u;
+        m.angle = sinf(t * 9 * kPi) * 0.45f * u;
+        if (m.dy > -3 && u > 0.05f) {
+            m.sx = 1.14f;
+            m.sy = 0.84f;
+        }
+        break;
+    case 6: // rolls in from the left
+        m.dx = -150 * u;
+        m.angle = -u * 5 * kPi;
+        break;
+    case 8: { // spins like a top, seen edge-on as it turns
+        float w = fabsf(cosf(u * 9 * kPi));
+        m.sx = w < 0.12f ? 0.12f : w;
+        break;
+    }
+    case 10: // swings like a pendulum while drifting side to side
+        m.angle = sinf(t * 14 * kPi) * 1.4f * u;
+        m.dx = sinf(t * 5 * kPi) * 30 * u;
+        break;
+    case 12: // tossed in an arc from the right
+        m.dx = 150 * u;
+        m.dy = -sinf(t * kPi) * 48 * u;
+        m.angle = u * 4 * kPi;
+        break;
+    default: // d20: thrown toward you, spinning as it grows
+        m.zoom = 0.35f + 0.65f * ease_out_cubic(t);
+        m.angle = u * 6.4f * kPi;
+        break;
+    }
+    return m;
 }
 
 void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
@@ -1248,26 +1442,29 @@ void draw_dice(LGFX_Sprite &f, const Theme &t, const UiState &s)
             f.drawString("FLIP", cx, cy + 1);
         }
     } else {
+        DieMotion m = d.rolling ? die_motion(die->sides, t_roll) : DieMotion();
+        float rr = r * m.zoom;
         // Triangles sit lower so they look centered.
-        int dy = die->sides == 4 ? (int)(r * 0.18f) : 0;
+        int dy = die->sides == 4 ? (int)(rr * 0.18f) : 0;
+        int bx = cx + (int)m.dx, by = cy + dy + (int)m.dy;
         uint32_t edge = d.rolling ? mix(t.surface, t.accent, 150)
                         : max_roll || min_roll ? tier
                                                : t.accent;
-        draw_die_body(f, die->sides, cx, cy + dy, r, spin, t.surface,
-                      edge, mix(t.surface, t.accent, 45));
+        draw_die_body(f, die->sides, bx, by, rr, d.rolling ? m.angle : 0, t.surface, edge,
+                      mix(t.surface, t.accent, 45), m.sx, m.sy);
         DieShape shape = die_shape(die->sides);
-        int box = (int)(r * shape.inner * 2);
+        float squeeze = (m.sx < m.sy ? m.sx : m.sy) * m.zoom;
+        int box = (int)(r * shape.inner * 2 * squeeze);
         if (d.value == 0) {
             f.setFont(&fonts::FreeSansBold12pt7b);
             f.setTextColor(t.text);
             f.setTextDatum(textdatum_t::middle_center);
             bool narrow = die->sides == 4 || die->sides == 8 || die->sides == 10;
-            f.drawString(narrow ? "TAP" : "ROLL", cx, cy + dy + 2);
-        } else {
+            f.drawString(narrow ? "TAP" : "ROLL", bx, by + 2);
+        } else if (box > 14) {
             snprintf(buf, sizeof(buf), "%d", d.value);
             uint32_t c = d.rolling ? t.muted : tier;
-            draw_number(f, buf, cx, cy + dy + 2, box, (int)(box * 0.8f), c,
-                        mix(t.surface, 0x000000, 160));
+            draw_number(f, buf, bx, by + 2, box, (int)(box * 0.8f), c, mix(t.surface, 0x000000, 160));
         }
     }
 
@@ -1721,6 +1918,13 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
 {
     const Theme t = styled(theme_for(state.game->profile), state.vivid);
 
+    if (state.end_prompt) {
+        draw_background(frame, t, false);
+        draw_header(frame, t, state, "WHO WON?");
+        draw_end_prompt(frame, t, state);
+        return;
+    }
+
     if (state.picker) {
         draw_background(frame, t, false);
         char title[32] = "GAME";
@@ -1766,7 +1970,8 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
     }
 
     draw_background(frame, t, !state.menu && !gauge_style(*state.game));
-    draw_header(frame, t, state, state.menu ? "MENU" : state.game->profile->name, !state.menu);
+    draw_header(frame, t, state, state.menu ? (state.menu_page ? "MORE" : "MENU") : state.game->profile->name,
+                !state.menu);
 
     if (state.menu) {
         draw_menu(frame, t, state);
@@ -1808,27 +2013,26 @@ UiAction ui_hit(const UiState &state, int x, int y)
             a.type = UiAction::MenuClose;
             return a;
         }
-        static const UiAction::Type kTileActions[kMenuTiles] = {
-            UiAction::MenuGame,  UiAction::MenuPlayers, UiAction::MenuLayout,
-            UiAction::MenuMatch, UiAction::MenuTimer,   UiAction::MenuLook,
-            UiAction::MenuFlip,  UiAction::MenuRestart, UiAction::MenuDice};
+        MenuTile tiles[kMenuTiles];
+        char match[8], timer[12];
+        menu_tiles(state, tiles, match, timer);
         for (int i = 0; i < kMenuTiles; i++) {
             Rect r = menu_tile(i);
             // Tiles are hit-tested with the gaps included so near-misses still count.
             Rect padded{r.x - 2, r.y - 1, r.w + 4, r.h + 3};
             if (padded.contains(x, y)) {
-                if ((kTileActions[i] == UiAction::MenuLayout && (g.players < 2 || gauge_style(g))) ||
-                    (kTileActions[i] == UiAction::MenuPlayers && gauge_style(g)) ||
-                    (kTileActions[i] == UiAction::MenuMatch && g.players > 2)) {
-                    return a;
+                if (tiles[i].label && tiles[i].enabled) {
+                    a.type = tiles[i].action;
                 }
-                a.type = kTileActions[i];
                 return a;
             }
         }
         return a;
     }
 
+    if (state.end_prompt) {
+        return end_prompt_hit(x, y);
+    }
     if (state.picker) {
         return picker_hit(state, x, y);
     }

@@ -43,6 +43,11 @@ static UiState state_for(const bb_game_t &g)
     s.flipped = false;
     s.vivid = false;
     s.menu = false;
+    s.menu_page = 0;
+    s.spindown = false;
+    s.spin = nullptr;
+    s.spin_dir = nullptr;
+    s.end_prompt = false;
     s.toast = nullptr;
     s.match = nullptr;
     s.best_of = 0;
@@ -358,6 +363,93 @@ int main(int argc, char **argv)
             d.pop = 1000;
             snprintf(name, sizeof(name), "%s-%03d", l.name, n++);
             save(frame, s, name);
+        }
+    }
+
+    // Menu pages and the who-won screen during a Bo3 of Digimon.
+    {
+        bb_match_t m;
+        bb_match_init(&m, 3);
+        bb_match_record(&m, 1);
+        bb_game_init(&g, bb_profile_find("digimon"), 2);
+        UiState s = state_for(g);
+        s.match = &m;
+        s.best_of = 3;
+        s.menu = true;
+        save(frame, s, "menu-page1");
+        s.menu_page = 1;
+        save(frame, s, "menu-page2");
+        s.menu = false;
+        s.end_prompt = true;
+        save(frame, s, "end-prompt");
+    }
+
+    // Spin-down d20 counters: Magic solo, mid-spin; Magic two players; Commander four.
+    {
+        uint16_t spin[4] = {1000, 1000, 1000, 1000};
+        int8_t dir[4] = {-1, -1, 1, -1};
+        bb_game_init(&g, bb_profile_find("mtg"), 1);
+        bb_game_adjust(&g, 0, 0, -3, 0);
+        bb_game_commit(&g);
+        UiState s = state_for(g);
+        s.spindown = true;
+        s.spin = spin;
+        s.spin_dir = dir;
+        save(frame, s, "spindown-1p");
+        char name[32];
+        for (int i = 0; i <= 10; i++) {
+            spin[0] = (uint16_t)(i * 100);
+            snprintf(name, sizeof(name), "spin-%03d", i);
+            save(frame, s, name);
+        }
+        spin[0] = 1000;
+        bb_game_init(&g, bb_profile_find("mtg"), 2);
+        bb_game_adjust(&g, 0, 0, -6, 0);
+        bb_game_commit(&g);
+        bb_game_adjust(&g, 1, 0, -13, 0);
+        bb_game_commit(&g);
+        UiState s2 = state_for(g);
+        s2.spindown = true;
+        s2.spin = spin;
+        s2.spin_dir = dir;
+        spin[1] = 300;
+        save(frame, s2, "spindown-2p");
+        spin[1] = 1000;
+        bb_game_init(&g, bb_profile_find("mtg-commander"), 4);
+        bb_game_adjust(&g, 2, 0, -11, 0);
+        bb_game_commit(&g);
+        UiState s4 = state_for(g);
+        s4.spindown = true;
+        s4.spin = spin;
+        s4.spin_dir = dir;
+        save(frame, s4, "spindown-4p");
+    }
+
+    // Each die's own roll: frames for d4, d6, d8, d10, d12, d20.
+    {
+        bb_game_init(&g, bb_profile_find("riftbound"), 2);
+        UiState s = state_for(g);
+        DiceState d;
+        s.dice = &d;
+        const uint8_t finals[] = {0, 3, 5, 6, 9, 11, 17};
+        for (int die = 1; die <= 6; die++) {
+            d.die = (uint8_t)die;
+            char name[32];
+            int n = 0;
+            for (int a = 0; a <= 1000; a += 40) {
+                d.rolling = true;
+                d.anim = (uint16_t)a;
+                d.value = (uint8_t)(1 + (a / 90 * 5) % bb_die_at(die)->sides);
+                snprintf(name, sizeof(name), "shape%d-%03d", die, n++);
+                save(frame, s, name);
+            }
+            d.rolling = false;
+            d.value = finals[die];
+            d.pop = 1000;
+            for (int k = 0; k < 6; k++) {
+                snprintf(name, sizeof(name), "shape%d-%03d", die, n++);
+                save(frame, s, name);
+            }
         }
     }
 

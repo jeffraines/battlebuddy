@@ -17,19 +17,22 @@ Hold the board landscape, USB port on the right.
 | **KEY** button | Undo (shows what was undone); rolls on the dice screen; closes the menu; wakes from sleep |
 | Circle below the screen | Open / close the dice |
 
-**Menu:** tap a tile; tap the header to close.
+**Menu:** tap a tile; tap the header to close. The menu has two pages.
 
 | Tile | Does |
 |---|---|
-| Game | Opens the game picker: one tile per game, in that game's colors. Games with several formats (Riftbound 1v1 / 2v2, Magic Standard / Commander) burst open into format tiles; tap one to start. BOOT or the header steps back |
+| Game | Opens the game picker: one tile per game, in that game's colors and lettering. Games with several formats (Riftbound 1v1 / 2v2, Magic Standard / Commander) burst open into format tiles; tap one to start. BOOT or the header steps back |
 | Players | *Just you*, *Two*, *Three*, *Four* (team games: one or two teams) (restarts) |
-| Look | *Subdued* (the game's palette as is) or *Vivid* (more saturated colors and glowing text) |
 | Layout | Two players: *YOU left*, *YOU right*, or *Facing* (opponent upside down along the top, for a device lying between you). Three or four: *Upright* or *Facing* (top row upside down) |
-| Flip | Rotates the whole screen 180° (USB port on the left) |
 | Match | *Off*, *Bo1*, *Bo3*, *Bo5*. One or two sides only |
 | Timer | *Off*, *30*, *50*, *60 min* countdown; starts with the first point |
-| Restart | New match |
+| Restart / End game | Without a match: start over. With a match: *Who won?* lets you pick the winner (for games the counter can't decide, like Digimon, or a concession), or restart without a result |
 | Dice | Opens the dice |
+| Undo | Undoes the last change (same as KEY) |
+| More → Look | *Subdued* (the game's palette as is) or *Vivid* (more saturated colors and glowing text) |
+| More → Counter | *Digits* or *d20*: life sits on a d20 that spins a face toward each change, like a spin-down die. For plain life counters (Magic, Commander, Lorcana, FaB) |
+| More → Flip | Rotates the whole screen 180° (USB port on the left) |
+| More → Sleep | Sleep now; KEY wakes |
 
 **Matches and the timer:** when a game is decided (someone reaches the win
 target, or a life total hits 0), a banner shows who won the game and the match
@@ -40,7 +43,10 @@ four-player layouts). The clock turns gold under 5 minutes and red with a `+`
 once time is up. It keeps running while the board sleeps.
 
 **Dice:** pick Coin, d4, d6, d8, d10, d12 or d20 along the top, then tap
-anywhere (or press KEY) to roll. Every landing pops with a ring and sparks,
+anywhere (or press KEY) to roll. Each die moves its own way: the d4 hops,
+the d6 rolls in from the left, the d8 spins like a top, the d10 swings, the
+d12 is tossed in an arc, the d20 is thrown toward you, and the coin flips.
+Every landing pops with a ring and sparks,
 colored cool for low rolls and warm for high ones. The top face is a
 celebration (confetti, "NAT 8!") and a 1 throws embers ("NAT 1"). The last few rolls are listed along the
 bottom. Rolls use the ESP32's hardware random number generator with no bias

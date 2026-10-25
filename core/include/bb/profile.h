@@ -39,6 +39,7 @@ typedef struct {
     uint8_t teams;                   /* 1 = each counter is a team, not a player */
     const char *family;              /* game the profile belongs to, e.g. "Magic" */
     const char *format;              /* format within the game, or NULL if it's the only one */
+    const char *short_name;          /* for tight spots (menu tiles), or NULL to use name */
     uint8_t style;                   /* bb_style_t */
 } bb_profile_t;
 

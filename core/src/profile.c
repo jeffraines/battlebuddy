@@ -8,6 +8,7 @@ static const bb_profile_t profiles[] = {
      .kind_count = 2, .kinds = {"Conquer", "Hold"}, .group = 0, .max_players = 4},
     /* Team play: one shared score per team. Target of 11 is unconfirmed. */
     {.id = "riftbound-2v2", .name = "Riftbound 2v2", .family = "Riftbound", .format = "2v2",
+     .short_name = "Rift 2v2",
      .start = 0, .min = 0, .max = 11, .win_at = 11, .lose_at = BB_NONE,
      .kind_count = 2, .kinds = {"Conquer", "Hold"}, .group = 0, .max_players = 2, .teams = 1},
     {.id = "mtg", .name = "Magic", .family = "Magic", .format = "Standard",
@@ -26,7 +27,7 @@ static const bb_profile_t profiles[] = {
     {.id = "lorcana", .name = "Lorcana", .family = "Lorcana",
      .start = 0, .min = 0, .max = 99, .win_at = 20, .lose_at = BB_NONE,
      .group = 1, .max_players = 4},
-    {.id = "fab", .name = "Flesh and Blood", .family = "Flesh and Blood",
+    {.id = "fab", .name = "Flesh and Blood", .family = "Flesh and Blood", .short_name = "FaB",
      .start = 40, .min = 0, .max = 99, .win_at = BB_NONE, .lose_at = 0,
      .group = 1, .max_players = 4},
 };

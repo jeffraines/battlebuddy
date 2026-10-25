@@ -42,11 +42,12 @@ constexpr uint32_t kCelebrateMs = 1100; // longer effect for the top or bottom f
 constexpr uint32_t kAnimFrameMs = 25;  // redraw rate while animating
 constexpr uint32_t kBurstMs = 260;     // game picker: formats bursting out of a game tile
 constexpr int32_t kMaxEntry = 32000;   // number pad limit (fits the counter's range)
+constexpr uint32_t kSpinMs = 380;      // d20 counter: spin to the new face
 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0006;
+constexpr uint32_t kSavedMagic = 0xBB0B0007;
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
 constexpr uint8_t kTimerChoices[] = {0, 30, 50, 60}; // minutes, 0 = off
@@ -58,6 +59,7 @@ struct Saved {
     Layout layout;
     bool flipped;
     bool vivid;
+    bool spindown;
     uint8_t best_of;       // 0 = match tracking off
     uint8_t timer_minutes; // 0 = no timer
     uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
@@ -72,7 +74,13 @@ Display lcd;
 LGFX_Sprite frame(&lcd);
 
 bool menu_open = false;
+int menu_page = 0;
+bool end_prompt = false;
 bool dirty = true;
+
+uint16_t spin[BB_MAX_PLAYERS] = {1000, 1000, 1000, 1000};
+int8_t spin_dir[BB_MAX_PLAYERS] = {1, 1, 1, 1};
+uint32_t spin_start_ms[BB_MAX_PLAYERS] = {};
 
 bool dice_open = false;
 DiceState dice;
@@ -145,6 +153,11 @@ UiState ui_state()
     s.layout = saved.layout;
     s.flipped = saved.flipped;
     s.vivid = saved.vivid;
+    s.menu_page = menu_page;
+    s.spindown = saved.spindown;
+    s.spin = spin;
+    s.spin_dir = spin_dir;
+    s.end_prompt = end_prompt;
     s.menu = menu_open;
     s.toast = toast_until ? toast_text : nullptr;
     s.match = saved.best_of && game.players <= 2 ? &saved.match : nullptr;
@@ -302,8 +315,14 @@ void undo(uint32_t now)
 
 void adjust(uint8_t player, uint8_t kind, int16_t delta, uint32_t now)
 {
-    if (bb_game_adjust(&game, player, kind, delta, now) != 0) {
+    int16_t applied = bb_game_adjust(&game, player, kind, delta, now);
+    if (applied != 0) {
         dirty = true;
+        if (player < BB_MAX_PLAYERS) {
+            spin[player] = 0;
+            spin_dir[player] = applied > 0 ? 1 : -1;
+            spin_start_ms[player] = now;
+        }
         if (saved.match_start == 0) {
             saved.match_start = now_s(); // the timer starts with the first change
         }
@@ -440,6 +459,61 @@ void perform(const UiAction &a, uint32_t now)
         saved.layout = ui_next_layout(game, saved.layout);
         dirty = true;
         break;
+    case UiAction::MenuMore:
+        menu_page = 1;
+        dirty = true;
+        break;
+    case UiAction::MenuBack:
+        menu_page = 0;
+        dirty = true;
+        break;
+    case UiAction::MenuCounter:
+        saved.spindown = !saved.spindown;
+        dirty = true;
+        break;
+    case UiAction::MenuSleep:
+        go_to_sleep();
+        break;
+    case UiAction::MenuUndo:
+        menu_open = false;
+        undo(now);
+        dirty = true;
+        break;
+    case UiAction::MenuEnd:
+        menu_open = false;
+        end_prompt = true;
+        dirty = true;
+        break;
+    case UiAction::DeclareWinner: {
+        char msg[40];
+        uint8_t game_no = saved.match.games + 1;
+        bb_match_record(&saved.match, a.player);
+        const char *who = ui_player_label(game, a.player);
+        const char *verb = strcmp(who, "YOU") == 0 ? "win" : "wins";
+        if (bb_match_winner(&saved.match) >= 0 && saved.match.best_of > 1) {
+            snprintf(msg, sizeof(msg), "%s %s the match %d-%d", who, verb, saved.match.wins[0],
+                     saved.match.wins[1]);
+            new_match();
+        } else {
+            snprintf(msg, sizeof(msg), "%s %s game %d", who, verb, game_no);
+            if (bb_match_winner(&saved.match) >= 0) {
+                new_match();
+            }
+        }
+        bb_game_reset(&game);
+        end_prompt = false;
+        show_toast(msg, now);
+        break;
+    }
+    case UiAction::EndRestart:
+        bb_game_reset(&game);
+        end_prompt = false;
+        show_toast("New game", now);
+        break;
+    case UiAction::EndCancel:
+        end_prompt = false;
+        dirty = true;
+        break;
     case UiAction::MenuLook:
         saved.vivid = !saved.vivid;
         dirty = true;
@@ -476,6 +550,7 @@ void perform(const UiAction &a, uint32_t now)
         break;
     case UiAction::MenuClose:
         menu_open = false;
+        menu_page = 0;
         dirty = true;
         break;
     case UiAction::None:
@@ -485,7 +560,10 @@ void perform(const UiAction &a, uint32_t now)
 
 void toggle_menu()
 {
-    if (picker_open && picker.family >= 0) {
+    menu_page = 0;
+    if (end_prompt) {
+        end_prompt = false;
+    } else if (picker_open && picker.family >= 0) {
         picker.family = -1; // BOOT steps back from a game's formats to the games
     } else if (picker_open || entry_open || dice_open) {
         picker_open = entry_open = dice_open = false; // BOOT backs out to the counter
@@ -634,6 +712,7 @@ void setup()
         saved.layout = Layout::SideYouLeft;
         saved.flipped = false;
         saved.vivid = false;
+        saved.spindown = false;
         saved.best_of = 1;
         saved.timer_minutes = 0;
         start_game(0, 1);
@@ -659,8 +738,9 @@ void loop()
     poll_button(
         key_button, now,
         [now] {
-            if (menu_open || picker_open || entry_open) {
-                menu_open = picker_open = entry_open = false;
+            if (menu_open || picker_open || entry_open || end_prompt) {
+                menu_open = picker_open = entry_open = end_prompt = false;
+                menu_page = 0;
                 dirty = true;
             } else if (dice_open) {
                 start_roll(now);
@@ -676,6 +756,20 @@ void loop()
         dirty = true;
     }
     update_roll(now);
+
+    // d20 counter: spin each changed player's die to its new face.
+    for (int p = 0; p < BB_MAX_PLAYERS; p++) {
+        if (spin[p] < 1000) {
+            uint32_t e = now - spin_start_ms[p];
+            spin[p] = e >= kSpinMs ? 1000 : (uint16_t)(e * 1000 / kSpinMs);
+            if (saved.spindown && now - anim_frame_ms >= kAnimFrameMs) {
+                dirty = true;
+            }
+        }
+    }
+    if (dirty && saved.spindown) {
+        anim_frame_ms = now;
+    }
 
     if (picker_open && picker.anim < 1000) {
         uint32_t e = now - burst_start_ms;
