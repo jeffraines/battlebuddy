@@ -6,15 +6,22 @@ Part numbers are candidates to evaluate, not final picks.
 
 ## Battery life target
 
-**6-8 hours of play on one charge**, screen in normal use (dimming between
-changes), including after the battery has aged.
+- **Minimum: 8 hours with the screen on the whole time** (a full event day).
+  The screen can't rely on dimming; it must stay readable throughout.
+- **Goal: a weekend (two ~8 h days, ~16 h) without charging.**
 
-- Estimated draw on the LilyGO prototype: ~70-110 mA screen bright, ~50 mA dimmed
-  (to be measured). 8 h at ~100 mA needs ~800 mAh usable.
-- A 1000 mAh cell (~850 mAh usable) meets it new. LiPo capacity drops to roughly
-  80% after a few hundred cycles, so either size up (~1200 mAh) or cut draw
-  (lower CPU clock, light sleep between touch polls, dimmer default backlight).
-- Measure on the prototype before choosing the PCB v1 battery.
+Rough budget (to be measured on the prototype):
+
+| Setup | Est. draw | 8 h needs | 16 h needs |
+|---|---|---|---|
+| Backlit LCD, full brightness, MCU as today | ~100 mA | ~1000 mAh | ~2000 mAh |
+| Backlit LCD, moderate brightness, MCU slowed + light sleep | ~40 mA | ~400 mAh | ~800 mAh |
+| Reflective / memory LCD (no backlight) | ~10 mA or less | tiny | ~200 mAh |
+
+Add ~25% for battery aging (capacity falls to ~80% after a few hundred cycles).
+So with a backlit screen, the weekend goal needs both firmware power work and a
+~1000-1500 mAh cell; a reflective screen meets it easily. This is a strong
+reason to evaluate the reflective panel from the test kit.
 
 ## Power
 
