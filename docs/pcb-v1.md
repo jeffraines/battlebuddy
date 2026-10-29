@@ -4,6 +4,18 @@ A running list of what the first custom board needs. **Must** = v1 won't ship
 without it, **Should** = planned, **Maybe** = leave a footprint or decide later.
 Part numbers are candidates to evaluate, not final picks.
 
+## Battery life target
+
+**6-8 hours of play on one charge**, screen in normal use (dimming between
+changes), including after the battery has aged.
+
+- Estimated draw on the LilyGO prototype: ~70-110 mA screen bright, ~50 mA dimmed
+  (to be measured). 8 h at ~100 mA needs ~800 mAh usable.
+- A 1000 mAh cell (~850 mAh usable) meets it new. LiPo capacity drops to roughly
+  80% after a few hundred cycles, so either size up (~1200 mAh) or cut draw
+  (lower CPU clock, light sleep between touch polls, dimmer default backlight).
+- Measure on the prototype before choosing the PCB v1 battery.
+
 ## Power
 
 | | Requirement | Notes / candidates |
