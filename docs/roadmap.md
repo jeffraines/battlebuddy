@@ -57,9 +57,8 @@ That matters if this is ever sold in Europe, and principle 1 already covers it.
    real games. *(In progress: `firmware/tdisplay-s3`.)*
 2. **Pick the display and MCU** using the display test kit and battery
    measurements (see `hardware.md`).
-3. **PCB v1:** MCU, display + touch on connectors, buttons, USB-C, charger,
-   battery sense, contacts or holder for a user-replaceable battery, a charging
-   footprint for the tray (coil or pogo pads), test points.
+3. **PCB v1:** see `pcb-v1.md` for the running requirements list (fuel gauge,
+   replaceable battery, wireless charging, display on connectors, and more).
    Designed for low standby current (regulator and charger quiescent current
    matter as much as the MCU's sleep current).
 4. **Enclosure:** 3D printed first; injection molding only once the design

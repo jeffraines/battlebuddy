@@ -27,7 +27,7 @@ see [firmware/tdisplay-s3](firmware/tdisplay-s3).
   history) with host tests (`make -C core test`).
 - `firmware/tdisplay-s3/`: PlatformIO firmware for the T-Display-S3 Touch.
 - `docs/`: hardware notes, game profile format, which games fit and what
-  they need (`games.md`), and the roadmap (personal device first,
+  they need (`games.md`), PCB v1 requirements (`pcb-v1.md`), and the roadmap (personal device first,
   store/tournament kit in mind).
 - `tools/`: printable display size cutouts.
 
