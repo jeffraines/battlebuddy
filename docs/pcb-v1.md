@@ -47,6 +47,17 @@ reason to evaluate the reflective panel from the test kit.
 | Should | Accelerometer | e.g. LIS3DH: face-down to sleep, wake on pick-up, auto-rotate |
 | Maybe | I2C expansion header (Qwiic style) | Handy for development and add-ons |
 
+## Enclosure shape
+
+- **Flat, not wedged.** In shared and facing modes the device lies between the
+  players and must read from both sides, so it can't tilt toward one person.
+- The battery sits evenly under the board. To keep the extra thickness
+  (~16-18 mm with a ~1400 mAh cell) from looking bulky: tapered or rounded
+  sides so the top face looks thinner (a "river stone" profile), and soft feet
+  so it doesn't slide.
+- Needs a wide-viewing-angle (IPS) display, since one player always reads it
+  off-axis.
+
 ## Build and repair
 
 | | Requirement | Notes |
