@@ -14,10 +14,26 @@ membrane needed). Outer size about **67 x 37 x 25 mm**.
 | File | What |
 |---|---|
 | `lilygo_case.scad` | Parametric OpenSCAD model; edit the values at the top |
-| `shell.stl` | Print face-down (front on the bed), no supports |
-| `lid.stl` | Print flat, countersinks on the bed |
-| `buttons.stl` | The press plungers, laid out flat; no supports |
-| `fitcheck.stl` | Front frame with short walls plus the USB end at full depth (~5 g); for checking fit fast |
+| `export.sh` | Exports all parts with a revision number and description |
+| `stl/shell_rNN_*.stl` | Print face-down (front on the bed), no supports |
+| `stl/lid_rNN_*.stl` | Print flat, countersinks on the bed |
+| `stl/buttons_rNN_*.stl` | The press caps, laid out flat; no supports |
+| `stl/fitcheck_rNN_*.stl` | Front frame with short walls plus the USB end at full depth (~5 g); for checking fit fast |
+
+Use the files with the highest revision number. Older revisions stay so every
+print can be traced back to its design.
+
+### Revisions
+
+| Rev | Change |
+|---|---|
+| r01 | First case: long side slots, separator floor, screw-on lid |
+| r02 | Printed side buttons and a reset pinhole |
+| r03 | Bigger USB opening, separator plate, buttons on any edge |
+| r04 | Face buttons beside USB, Touch board size 62 x 32 x 11 |
+| r05 | Screen-only window, circle key hole, crush ribs, lower USB, quick fit check |
+
+(r01-r04 weren't exported with revision names; they're in git history.)
 
 ## Measure first
 
@@ -41,12 +57,10 @@ aren't published. Before a full print, measure your board (or print
   and recessed pinholes (`"pin"`) are also supported.
 - If the caps don't click, lower `switch_h` a little so they reach further.
 
-Then re-export:
+Then export a new revision (it never overwrites an existing one):
 
 ```sh
-openscad -D 'part="shell"' -o shell.stl lilygo_case.scad
-openscad -D 'part="lid"'     -o lid.stl     lilygo_case.scad
-openscad -D 'part="buttons"' -o buttons.stl lilygo_case.scad
+./export.sh 6 short-description-of-the-change
 ```
 
 ## Assembly
