@@ -26,6 +26,7 @@ see [firmware/tdisplay-s3](firmware/tdisplay-s3).
 - `core/`: portable C counter logic (game profiles, grouped changes, undo
   history) with host tests (`make -C core test`).
 - `firmware/tdisplay-s3/`: PlatformIO firmware for the T-Display-S3 Touch.
+- `enclosure/`: 3D-printable prototype case for the LilyGO and an 803040 battery.
 - `docs/`: hardware notes, game profile format, which games fit and what
   they need (`games.md`), PCB v1 requirements (`pcb-v1.md`), and the roadmap (personal device first,
   store/tournament kit in mind).
