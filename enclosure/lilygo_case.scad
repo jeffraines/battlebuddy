@@ -295,12 +295,19 @@ module lid() {
     }
 }
 
-// A thin frame of just the front and board walls: prints in a few minutes and
-// shows whether the board, USB port and buttons line up before a full print.
+// Quick fit check: the front frame with short walls (enough to check the
+// outline, window, key hole and button holes), plus the USB end at full
+// depth so the port can be checked too. Prints in a fraction of the time.
+fit_walls = 4;     // wall height below the front frame
+fit_usb_len = 6;   // length of the full-depth piece at the USB end
+
 module fitcheck() {
     intersection() {
         shell();
-        translate([-1, -1, board_z + board_t * 0.35]) cube([out_l + 2, out_w + 2, out_h]);
+        union() {
+            translate([-1, -1, front_z - fit_walls]) cube([out_l + 2, out_w + 2, out_h]);
+            translate([-1, -1, board_z]) cube([fit_usb_len + 1, out_w + 2, out_h]);
+        }
     }
 }
 

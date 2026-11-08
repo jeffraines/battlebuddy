@@ -17,7 +17,7 @@ membrane needed). Outer size about **67 x 37 x 25 mm**.
 | `shell.stl` | Print face-down (front on the bed), no supports |
 | `lid.stl` | Print flat, countersinks on the bed |
 | `buttons.stl` | The press plungers, laid out flat; no supports |
-| `fitcheck.stl` | Just the front frame and board walls; prints in minutes |
+| `fitcheck.stl` | Front frame with short walls plus the USB end at full depth (~5 g); for checking fit fast |
 
 ## Measure first
 
@@ -62,6 +62,13 @@ openscad -D 'part="buttons"' -o buttons.stl lilygo_case.scad
 Thin crush ribs on the inside walls squash as the board goes in so it sits
 snug (`rib`; shave them with a knife if it's too tight). If it still rattles,
 a strip of foam tape behind it takes up the slack.
+
+## Quick fit-check print settings
+
+Draft quality is fine; it only has to show whether things line up.
+0.28 mm layers, 2 walls, 3 top/bottom layers, 15% infill, no supports, no brim,
+your printer's fast or draft speed. Print it face-down (the STL is already
+oriented that way).
 
 ## Notes
 
