@@ -29,7 +29,7 @@ board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
 switch_h = 2.2;  // face buttons: height above the board's top surface
-usb_from_front = 6.5;  // front glass to the USB-C centre (the first print showed it sits lower)
+usb_from_front = 6.2;  // front glass to the USB-C centre (the first print showed it sits lower)
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
 
 /* [Front window: measure] */
@@ -39,7 +39,7 @@ lip = 1.2;            // how far the front frame overlaps the glass edge (window
 window_style = "screen";
 active_w = 22.7;        // visible display area (1.9" 170x320 panel)
 active_l = 42.7;
-active_from_far = 4.7;  // far edge of the glass to the start of the display (measure)
+active_from_far = 6.3;  // far edge of the glass to the start of the display (measure)
 screen_margin = 0.4;    // window this much bigger than the display all round
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
 key_from_glass = 3.9;   // USB-side edge of the glass to the circle key's centre (measure)
