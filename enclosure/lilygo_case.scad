@@ -39,7 +39,7 @@ lip = 1.2;            // how far the front frame overlaps the glass edge (window
 window_style = "screen";
 active_w = 22.7;        // visible display area (1.9" 170x320 panel)
 active_l = 42.7;
-active_from_far = 3.5;  // far edge of the glass to the start of the display (measure)
+active_from_far = 4.7;  // far edge of the glass to the start of the display (measure)
 screen_margin = 0.4;    // window this much bigger than the display all round
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
 key_from_glass = 3.9;   // USB-side edge of the glass to the circle key's centre (measure)
@@ -91,8 +91,9 @@ wire_notch = [6, 4]; // notch size (along the case, across)
 lid_t = 1.8;
 clr = clr_default; // clearance around board and battery
 corner_r = 4;
-usb_w = 13.5;     // USB-C opening: room for the plug's moulded housing
-usb_h = 8;
+usb_w = 12.5;     // USB-C opening: a typical plug housing (~12 x 6.5) plus clearance
+usb_h = 7.2;      // (r07: closed rounded slot instead of a notch open to the front)
+usb_lip = 1.0;    // recess around the slot, this much bigger all round
 usb_relief = 1.2; // wall thinned this much around the opening so plugs seat fully
 screw_pilot = 1.7;  // M2 self-tapping
 screw_clear = 2.4;
@@ -111,6 +112,13 @@ front_z = board_z + board_t + clr;    // inner face of the front frame
 out_l = in_l + 2 * wall;
 out_w = in_w + 2 * wall;
 out_h = front_z + front;
+usb_z = front_z - usb_from_front;          // USB-C centre height
+
+// Rounded-rectangle USB slot outline (in the YZ plane after rotation), grown by g.
+module usb_slot(g) {
+    r = usb_h / 2 + g;
+    hull() for (y = [-usb_w / 2 + usb_h / 2, usb_w / 2 - usb_h / 2]) translate([0, y]) circle(r = r, $fn = 48);
+}
 
 board_x = wall + clr;                     // board sits against the USB end
 board_y = wall + (in_w - board_w) / 2;
@@ -219,11 +227,10 @@ module shell(with_slots = false) {
             cube([wire_notch[0], wire_notch[1], shelf + 2]);
 
         // USB-C at the board end.
-        usb_z = front_z - usb_from_front;
-        // Open up through the front frame: the port sits on top of the board.
-        translate([-1, out_w / 2 - usb_w / 2, usb_z - usb_h / 2]) cube([wall + 2, usb_w, out_h]);
-        // Thinner wall around it so the plug's housing gets close enough to seat.
-        translate([-1, out_w / 2 - usb_w / 2 - 2, usb_z - usb_h / 2 - 2]) cube([usb_relief + 1, usb_w + 4, out_h]);
+        // Rounded slot sized to a USB-C plug's moulded housing, chamfered on the outside.
+        translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall + 2) usb_slot(0);
+        // Shallow matching recess so the plug's housing gets close enough to seat.
+        translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(usb_relief + 1) usb_slot(usb_lip);
 
         if (with_slots) {
             // Fit check: long slots in both long walls.
@@ -248,7 +255,7 @@ module shell(with_slots = false) {
                 } else {
                     for (b = buttons) button_hole(b);
                 }
-                translate([wall - 1, out_w / 2 - usb_w / 2, 0]) cube([3, usb_w, out_h]);
+                translate([wall - 1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(3) usb_slot(0);
             }
 
     // With buttons on the far end, fill the extra room there so the board can't slide.
