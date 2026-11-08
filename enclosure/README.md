@@ -3,10 +3,11 @@
 ![Case preview](preview.png)
 
 A 3D-printed case: a **shell** that holds the board face-down behind a front
-window with the battery in its own bay underneath, a **lid** that screws on
+window with the battery in its own bay underneath (a printed separator plate
+keeps them apart, with a small notch for the wire), a **lid** that screws on
 with 4 x M2 x 6 self-tapping screws (remove it to swap the battery), and
-**button plungers** that sit in the side wall and press the board's BOOT and
-KEY buttons. Reset is a small recessed pinhole so it can't be hit by
+**button caps** that sit on the board's BOOT and KEY buttons and poke out of
+the wall, so no membrane is needed. Reset is a small recessed pinhole so it can't be hit by
 accident. Outer size about **67 x 35 x 24 mm**.
 
 | File | What |
@@ -26,10 +27,11 @@ and edit these in `lilygo_case.scad`:
 - `board_l`, `board_w`, `board_t`: thickness including the touch glass and the
   parts on the back.
 - `usb_from_front`: front glass to the centre of the USB-C port.
-- `buttons`: which side each button is on and its centre in mm from the USB
-  end, plus whether it gets a plunger (`"press"`) or a pinhole (`"pin"`).
-  **The defaults are guesses** (BOOT and KEY on the left at 12 and 24 mm, reset
-  on the right at 12 mm). The fit check has long slots on both sides instead,
+- `buttons`: where each button is and whether it gets a cap (`"press"`) or a
+  pinhole (`"pin"`). Sides are `"left"` / `"right"` (long edges, position in mm
+  from the USB end) or `"end"` (the short edge opposite USB, position in mm
+  from the centre line). **The defaults are guesses** (BOOT on the left and KEY
+  on the right at 12 mm, reset as a pinhole on the left at 24 mm). The fit check has long slots on both sides instead,
   so you can see where the buttons really are.
 - `button_from_front`: front glass to the centre of the buttons.
 - `button_stick_out`: how far the buttons stick out past the board edge. This
@@ -56,6 +58,10 @@ openscad -D 'part="buttons"' -o buttons.stl lilygo_case.scad
 If the board rattles, a strip of foam tape behind it takes up the slack.
 
 ## Notes
+
+- The USB-C opening is 13 x 8 mm with the wall thinned around it so the plug's
+  moulded housing can get close enough to seat. If a chunky cable still won't
+  click in, raise `usb_relief` or use a slimmer cable.
 
 - PLA or PETG, 0.2 mm layers. The floor between board and battery bridges
   about 32 mm, which most printers handle.

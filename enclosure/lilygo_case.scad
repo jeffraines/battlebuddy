@@ -27,16 +27,20 @@ usb_from_front = 5;   // front glass to the centre of the USB-C port
 lip = 1.2;            // how far the front frame overlaps the board edge
 
 /* [Side buttons: measure] */
-// One entry per button on the board's long edges:
-//   [side, centre in mm from the USB end of the board, kind]
-//   side: "left" / "right" (looking at the screen, USB end at the bottom)
-//   kind: "press" = a printed plunger you push; "pin" = a small recessed hole
-//         (for reset, so it can't be hit by accident)
+// One entry per button on the board's edges:
+//   [side, position, kind]
+//   side: "left" / "right" = the long edges (looking at the screen, USB end at
+//         the bottom); position = centre in mm from the USB end of the board.
+//         "end" = the short edge opposite the USB port; position = offset in mm
+//         from the board's centre line (+ = toward the right).
+//   kind: "press" = a printed cap that sits on the board's button and pokes out
+//         of the case; "pin" = a small recessed hole (for reset, so it can't be
+//         hit by accident)
 // THESE POSITIONS ARE GUESSES. Measure your board (or print the fit check,
 // which has long slots instead) and correct them.
 buttons = [["left", 12, "press"],   // BOOT (GPIO0): menu
-           ["left", 24, "press"],   // KEY (GPIO14): undo
-           ["right", 12, "pin"]];   // RST
+           ["right", 12, "press"],  // KEY (GPIO14): undo
+           ["left", 24, "pin"]];    // RST
 button_from_front = 5;   // front glass to the centre of the buttons (measure)
 button_stick_out = 0.5;  // how far the buttons stick out past the board edge (measure)
 cap_l = 7;               // plunger cap, along the case
@@ -58,12 +62,15 @@ batt_t = 8;
 /* [Case] */
 wall = 2.0;
 front = 1.6;      // front frame thickness
-shelf = 1.4;      // floor between board and battery
+shelf = 1.6;      // separator plate between board and battery
+wire_notch_x = 10;   // where the battery wire passes the separator, mm from the USB end
+wire_notch = [6, 4]; // notch size (along the case, across)
 lid_t = 1.8;
 clr = 0.5;        // clearance around board and battery
 corner_r = 4;
-usb_w = 11;       // USB-C opening (plug overmould needs room)
-usb_h = 7;
+usb_w = 13;       // USB-C opening: room for the plug's moulded housing
+usb_h = 8;
+usb_relief = 1.2; // wall thinned this much around the opening so plugs seat fully
 screw_pilot = 1.7;  // M2 self-tapping
 screw_clear = 2.4;
 boss_d = 5.5;
@@ -71,7 +78,9 @@ boss_d = 5.5;
 $fn = 48;
 
 // Interior
-in_l = max(board_l, batt_l) + 2 * clr;
+has_end_buttons = len([for (b = buttons) if (b[0] == "end") b]) > 0;
+end_room = has_end_buttons ? (max(board_w, batt_w) - board_w) / 2 + clr : 0;
+in_l = max(board_l + end_room, batt_l) + 2 * clr;
 in_w = max(board_w, batt_w) + 2 * clr;
 bay_h = batt_t + 0.6;
 board_z = bay_h + shelf;              // back of the board pocket
@@ -95,35 +104,44 @@ module rounded_box(l, w, h, r) {
 }
 
 btn_z = front_z - button_from_front;
-gap_side = (in_w - board_w) / 2;                 // wall to board edge
-block_t = gap_side - button_stick_out - 0.2;     // plunger's inner block (presses the button)
+gap_side = (in_w - board_w) / 2;                 // wall to board edge, long sides
 block_l = cap_l + 3;
 block_h = cap_h + 3;
 
-function side_y(side) = side == "left" ? 0 : out_w;
+// Gap between the inside of the wall and the board edge on a button's side.
+function button_gap(b) = b[0] == "end" ? out_l - wall - (board_x + board_l) : gap_side;
+// Thickness of a plunger's inner block (the part that sits on the button).
+function block_thick(b) = button_gap(b) - button_stick_out - 0.2;
 
-// Hole through the wall (and the pocket in the rail behind it) for one button.
+// Places children in a button's frame: origin on the outside of the wall at
+// the button's centre, +y pointing into the case, z up.
+module at_button(b) {
+    if (b[0] == "left")
+        translate([board_x + b[1], 0, btn_z]) children();
+    else if (b[0] == "right")
+        translate([board_x + b[1], out_w, btn_z]) mirror([0, 1, 0]) children();
+    else
+        translate([out_l, board_y + board_w / 2 + b[1], btn_z]) rotate([0, 0, 90]) children();
+}
+
+// Hole through the wall (and the pocket behind it) for one button.
 module button_hole(b) {
-    x = board_x + b[1];
-    if (b[2] == "pin") {
-        y0 = b[0] == "left" ? -1 : out_w - wall - gap_side - 1;
-        translate([x, b[0] == "left" ? -1 : out_w + 1, btn_z])
-            rotate([b[0] == "left" ? -90 : 90, 0, 0]) cylinder(d = pin_d, h = wall + gap_side + 2);
-    } else {
-        // Cap hole through the wall.
-        translate([x - cap_l / 2 - plunger_clr, b[0] == "left" ? -1 : out_w - wall - 1, btn_z - cap_h / 2 - plunger_clr])
-            cube([cap_l + 2 * plunger_clr, wall + 2, cap_h + 2 * plunger_clr]);
-        // Room for the plunger's inner block.
-        translate([x - block_l / 2 - 0.3, b[0] == "left" ? wall - 0.01 : out_w - wall - gap_side, btn_z - block_h / 2 - 0.3])
-            cube([block_l + 0.6, gap_side + 0.01, block_h + 0.6]);
+    at_button(b) {
+        if (b[2] == "pin") {
+            translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = pin_d, h = wall + button_gap(b) + 2);
+        } else {
+            translate([-cap_l / 2 - plunger_clr, -1, -cap_h / 2 - plunger_clr])
+                cube([cap_l + 2 * plunger_clr, wall + 2, cap_h + 2 * plunger_clr]);
+            translate([-block_l / 2 - 0.3, wall - 0.01, -block_h / 2 - 0.3])
+                cube([block_l + 0.6, button_gap(b) + 0.01, block_h + 0.6]);
+        }
     }
 }
 
-// One plunger, oriented as it sits in a left-side hole (pressing toward +y).
-module plunger() {
-    // Inner block, larger than the hole so the plunger can't fall out.
-    translate([-block_l / 2, wall, -block_h / 2]) cube([block_l, block_t, block_h]);
-    // Stem and cap through the wall, standing proud of the outside.
+// A press button: a cap that pokes out of the wall, on an inner block that is
+// bigger than the hole (so it can't fall out) and sits on the board's button.
+module plunger(t) {
+    translate([-block_l / 2, wall, -block_h / 2]) cube([block_l, t, block_h]);
     translate([-cap_l / 2, -cap_proud, -cap_h / 2]) cube([cap_l, wall + cap_proud + 0.01, cap_h]);
 }
 
@@ -141,12 +159,15 @@ module shell(with_slots = false) {
         translate([board_x + lip, board_y + lip, front_z - 1])
             cube([board_l - 2 * lip, board_w - 2 * lip, front + 2]);
 
-        // Wire pass-through from battery bay to the board's battery connector.
-        translate([wall + 6, out_w / 2 - 5, bay_h - 1]) cube([10, 10, shelf + 2]);
+        // Small notch in the separator for the battery wire.
+        translate([board_x + wire_notch_x - wire_notch[0] / 2, out_w / 2 - wire_notch[1] / 2, bay_h - 1])
+            cube([wire_notch[0], wire_notch[1], shelf + 2]);
 
         // USB-C at the board end.
         usb_z = front_z - usb_from_front;
         translate([-1, out_w / 2 - usb_w / 2, usb_z - usb_h / 2]) cube([wall + 2, usb_w, usb_h]);
+        // Thinner wall around it so the plug's housing gets close enough to seat.
+        translate([-1, out_w / 2 - usb_w / 2 - 2, usb_z - usb_h / 2 - 2]) cube([usb_relief + 1, usb_w + 4, usb_h + 4]);
 
         if (with_slots) {
             // Fit check: long slots in both long walls.
@@ -173,6 +194,13 @@ module shell(with_slots = false) {
                 }
                 translate([wall - 1, out_w / 2 - usb_w / 2, 0]) cube([3, usb_w, out_h]);
             }
+
+    // With buttons on the far end, fill the extra room there so the board can't slide.
+    if (has_end_buttons)
+        difference() {
+            translate([board_x + board_l + 0.2, wall, board_z]) cube([out_l - wall - board_x - board_l - 0.2, in_w, front_z - board_z]);
+            for (b = buttons) if (b[0] == "end") button_hole(b);
+        }
 
     // Screw bosses in the battery bay corners (the battery sits between them).
     for (p = boss_xy)
@@ -224,7 +252,7 @@ if (part == "shell") {
     presses = [for (b = buttons) if (b[2] == "press") b];
     for (i = [0 : len(presses) - 1])
         translate([i * (block_l + 4) + block_l / 2, block_h / 2, 0])
-            rotate([-90, 0, 0]) translate([0, -wall - block_t, 0]) plunger();
+            rotate([-90, 0, 0]) translate([0, -wall - block_thick(presses[i]), 0]) plunger(block_thick(presses[i]));
 } else if (part == "fitcheck") {
     translate([0, out_w, out_h]) rotate([180, 0, 0]) fitcheck();
 } else {
@@ -233,9 +261,7 @@ if (part == "shell") {
     battery_dummy();
     for (b = buttons)
         if (b[2] == "press")
-            color("Orange")
-                translate([board_x + b[1], side_y(b[0]), btn_z])
-                    mirror([0, b[0] == "left" ? 0 : 1, 0]) plunger();
+            color("Orange") at_button(b) plunger(block_thick(b));
     color("SlateGray") translate([0, 0, -lid_t - 6]) lid();
 }
 
