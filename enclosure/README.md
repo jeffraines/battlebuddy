@@ -6,9 +6,10 @@ A 3D-printed case: a **shell** that holds the board face-down behind a front
 window with the battery in its own bay underneath (a printed separator plate
 keeps them apart, with a small notch for the wire), a **lid** that screws on
 with 4 x M2 x 6 self-tapping screws (remove it to swap the battery), and
-**button caps** that sit on the board's BOOT and KEY buttons and poke out of
-the wall, so no membrane is needed. Reset is a small recessed pinhole so it can't be hit by
-accident. Outer size about **67 x 35 x 24 mm**.
+**button caps**: the T-Display-S3's BOOT and KEY buttons are on its face,
+either side of the USB port, so the front frame covers that bare end of the
+board and two round caps poke up through it and sit on the buttons (no
+membrane needed). Outer size about **67 x 37 x 25 mm**.
 
 | File | What |
 |---|---|
@@ -20,22 +21,20 @@ accident. Outer size about **67 x 35 x 24 mm**.
 
 ## Measure first
 
-LilyGO lists the board as 62 x 26 x 10 mm but doesn't publish button or USB
-positions. Before a full print, measure your board (or print `fitcheck.stl`)
-and edit these in `lilygo_case.scad`:
+The Touch version is listed as 62 x 32 x 11 mm, but button and USB positions
+aren't published. Before a full print, measure your board (or print
+`fitcheck.stl`) and edit these in `lilygo_case.scad`:
 
 - `board_l`, `board_w`, `board_t`: thickness including the touch glass and the
   parts on the back.
-- `usb_from_front`: front glass to the centre of the USB-C port.
-- `buttons`: where each button is and whether it gets a cap (`"press"`) or a
-  pinhole (`"pin"`). Sides are `"left"` / `"right"` (long edges, position in mm
-  from the USB end) or `"end"` (the short edge opposite USB, position in mm
-  from the centre line). **The defaults are guesses** (BOOT on the left and KEY
-  on the right at 12 mm, reset as a pinhole on the left at 24 mm). The fit check has long slots on both sides instead,
-  so you can see where the buttons really are.
-- `button_from_front`: front glass to the centre of the buttons.
-- `button_stick_out`: how far the buttons stick out past the board edge. This
-  sets how far the plungers reach; if they don't click, lower it a little.
+- `tail_l`: how far the bare board sticks out past the glass at the USB end.
+- `glass_drop`: from the front of the glass down to the board's top surface.
+- `switch_h`: how tall the face buttons stand above the board.
+- `buttons`: where each button is. The defaults put BOOT and KEY on the face,
+  3.5 mm from the USB end and 10 mm either side of centre. **These are
+  estimates from product photos.** Edge buttons (`"left"`, `"right"`, `"end"`)
+  and recessed pinholes (`"pin"`) are also supported.
+- If the caps don't click, lower `switch_h` a little so they reach further.
 
 Then re-export:
 
@@ -48,8 +47,8 @@ openscad -D 'part="buttons"' -o buttons.stl lilygo_case.scad
 ## Assembly
 
 1. Plug the battery into the board (check polarity: red to +).
-2. Push the plungers into their holes from the inside, caps out. Their inner
-   blocks are bigger than the holes, so the board holds them in place.
+2. Drop the two button caps into their holes from the inside, caps out.
+   Their inner blocks are bigger than the holes, so the board holds them in.
 3. Drop the board face-down into the shell, screen against the window.
 4. Route the battery wire through the slot in the floor and lay the battery
    in the bay.
