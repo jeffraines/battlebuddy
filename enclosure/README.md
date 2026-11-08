@@ -2,16 +2,19 @@
 
 ![Case preview](preview.png)
 
-A two-part 3D-printed case: a **shell** that holds the board face-down behind a
-front window with the battery in its own bay underneath, and a **lid** that
-screws on with 4 x M2 x 6 self-tapping screws. The battery swaps out by
-removing the lid. Outer size about **67 x 35 x 24 mm**.
+A 3D-printed case: a **shell** that holds the board face-down behind a front
+window with the battery in its own bay underneath, a **lid** that screws on
+with 4 x M2 x 6 self-tapping screws (remove it to swap the battery), and
+**button plungers** that sit in the side wall and press the board's BOOT and
+KEY buttons. Reset is a small recessed pinhole so it can't be hit by
+accident. Outer size about **67 x 35 x 24 mm**.
 
 | File | What |
 |---|---|
 | `lilygo_case.scad` | Parametric OpenSCAD model; edit the values at the top |
 | `shell.stl` | Print face-down (front on the bed), no supports |
 | `lid.stl` | Print flat, countersinks on the bed |
+| `buttons.stl` | The press plungers, laid out flat; no supports |
 | `fitcheck.stl` | Just the front frame and board walls; prints in minutes |
 
 ## Measure first
@@ -23,24 +26,32 @@ and edit these in `lilygo_case.scad`:
 - `board_l`, `board_w`, `board_t`: thickness including the touch glass and the
   parts on the back.
 - `usb_from_front`: front glass to the centre of the USB-C port.
-- `slots_left`, `slots_right`: where the BOOT / KEY / RST buttons are, in mm
-  from the USB end. The defaults are long slots (4-26 mm) on both sides; shorten
-  them once you know.
+- `buttons`: which side each button is on and its centre in mm from the USB
+  end, plus whether it gets a plunger (`"press"`) or a pinhole (`"pin"`).
+  **The defaults are guesses** (BOOT and KEY on the left at 12 and 24 mm, reset
+  on the right at 12 mm). The fit check has long slots on both sides instead,
+  so you can see where the buttons really are.
+- `button_from_front`: front glass to the centre of the buttons.
+- `button_stick_out`: how far the buttons stick out past the board edge. This
+  sets how far the plungers reach; if they don't click, lower it a little.
 
 Then re-export:
 
 ```sh
 openscad -D 'part="shell"' -o shell.stl lilygo_case.scad
-openscad -D 'part="lid"'   -o lid.stl   lilygo_case.scad
+openscad -D 'part="lid"'     -o lid.stl     lilygo_case.scad
+openscad -D 'part="buttons"' -o buttons.stl lilygo_case.scad
 ```
 
 ## Assembly
 
 1. Plug the battery into the board (check polarity: red to +).
-2. Drop the board face-down into the shell, screen against the window.
-3. Route the battery wire through the slot in the floor and lay the battery
+2. Push the plungers into their holes from the inside, caps out. Their inner
+   blocks are bigger than the holes, so the board holds them in place.
+3. Drop the board face-down into the shell, screen against the window.
+4. Route the battery wire through the slot in the floor and lay the battery
    in the bay.
-4. Screw the lid on. Stick four 8 mm rubber feet into the recesses.
+5. Screw the lid on. Stick four 8 mm rubber feet into the recesses.
 
 If the board rattles, a strip of foam tape behind it takes up the slack.
 
