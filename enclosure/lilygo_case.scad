@@ -46,7 +46,10 @@ key_from_glass = 3.9;   // USB-side edge of the glass to the circle key's centre
 key_room = 3.5;         // window reaches this far past the key's centre toward USB
 
 /* [Fit] */
-rib = 0.35;             // crush ribs on the inside walls (r06: 0.8 bent the screen)
+board_clr = 0.25;       // gap around the board in its pocket (sides and ends)
+rib_squeeze = 0.08;     // crush ribs reach this far past the board edge (r05 0.3 bent the screen, r06 -0.15 rattled)
+rib = board_clr + rib_squeeze;           // side ribs
+end_rib = 2 * board_clr + rib_squeeze;   // far-end ribs: also push the board against the USB end
 
 /* [Buttons: measure] */
 // One entry per button:
@@ -60,8 +63,8 @@ rib = 0.35;             // crush ribs on the inside walls (r06: 0.8 bent the scr
 //   kind: "press" = a printed cap that sits on the board's button and pokes out
 //         of the case; "pin" = a small recessed hole (so it can't be hit by accident)
 // THESE POSITIONS ARE ESTIMATES from product photos. Measure and correct them.
-buttons = [["front", 3.5, "press", -11.5],   // BOOT (GPIO0): menu  (r06: moved out 1.5 mm)
-           ["front", 3.5, "press", 11.5]];   // KEY (GPIO14): undo
+buttons = [["front", 3.5, "press", -10.75],   // BOOT (GPIO0): menu  (r05 +-10 too far in, r06 +-11.5 too far out)
+           ["front", 3.5, "press", 10.75]];   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 5;          // round cap on face buttons
@@ -83,18 +86,18 @@ batt_w = 30;
 batt_t = 8;
 
 /* [Case] */
-wall = 2.0;
-front = 1.6;      // front frame thickness
-shelf = 1.6;      // separator plate between board and battery
+wall = 1.6;
+front = 1.2;      // front frame thickness
+edge_ch = 1.0;    // chamfer round the front edge so the case looks thinner
+shelf = 1.2;      // separator plate between board and battery
 wire_notch_x = 10;   // where the battery wire passes the separator, mm from the USB end
 wire_notch = [6, 4]; // notch size (along the case, across)
-lid_t = 1.8;
+lid_t = 1.4;
 clr = clr_default; // clearance around board and battery
 corner_r = 4;
-usb_w = 12.5;     // USB-C opening: a typical plug housing (~12 x 6.5) plus clearance
-usb_h = 7.2;      // (r07: closed rounded slot instead of a notch open to the front)
-usb_lip = 1.0;    // recess around the slot, this much bigger all round
-usb_relief = 1.2; // wall thinned this much around the opening so plugs seat fully
+usb_w = 9.6;      // USB-C opening: just the plug's metal shell (8.4 x 2.6) plus room for error
+usb_h = 4.2;
+usb_web = 0.8;    // wall left round the port (thinned from inside) so the plug housing gets close
 screw_pilot = 1.7;  // M2 self-tapping
 screw_clear = 2.4;
 boss_d = 5.5;
@@ -104,8 +107,8 @@ $fn = 48;
 // Interior
 has_end_buttons = len([for (b = buttons) if (b[0] == "end") b]) > 0;
 end_room = has_end_buttons ? (max(board_w, batt_w) - board_w) / 2 + clr : 0;
-in_l = max(board_l + end_room, batt_l) + 2 * clr;
-in_w = max(board_w, batt_w) + 2 * clr;
+in_l = max(board_l + end_room + 2 * board_clr, batt_l + 2 * clr);
+in_w = max(board_w + 2 * board_clr, batt_w + 2 * clr);
 bay_h = batt_t + 0.6;
 board_z = bay_h + shelf;              // back of the board pocket
 front_z = board_z + board_t + clr;    // inner face of the front frame
@@ -120,7 +123,7 @@ module usb_slot(g) {
     hull() for (y = [-usb_w / 2 + usb_h / 2, usb_w / 2 - usb_h / 2]) translate([0, y]) circle(r = r, $fn = 48);
 }
 
-board_x = wall + clr;                     // board sits against the USB end
+board_x = wall + board_clr;                     // board sits against the USB end
 board_y = wall + (in_w - board_w) / 2;
 batt_x = wall + (in_l - batt_l) / 2;      // battery centred, clear of the screw bosses
 batt_y = wall + (in_w - batt_w) / 2;
@@ -196,7 +199,10 @@ module plunger(b) {
 
 module shell(with_slots = false) {
     difference() {
-        rounded_box(out_l, out_w, out_h, corner_r);
+        hull() {
+            rounded_box(out_l, out_w, out_h - edge_ch, corner_r);
+            translate([edge_ch, edge_ch, 0]) rounded_box(out_l - 2 * edge_ch, out_w - 2 * edge_ch, out_h, corner_r - edge_ch);
+        }
 
         // Battery bay (open at the back, closed by the lid).
         translate([wall, wall, -1]) cube([in_l, in_w, bay_h + 1]);
@@ -227,10 +233,10 @@ module shell(with_slots = false) {
             cube([wire_notch[0], wire_notch[1], shelf + 2]);
 
         // USB-C at the board end.
-        // Rounded slot sized to a USB-C plug's moulded housing, chamfered on the outside.
+        // Small rounded slot for the plug's metal shell only.
         translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall + 2) usb_slot(0);
-        // Shallow matching recess so the plug's housing gets close enough to seat.
-        translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(usb_relief + 1) usb_slot(usb_lip);
+        // Wall thinned from the inside round the port so the plug housing gets close enough to seat.
+        translate([usb_web, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall) usb_slot(2.5);
 
         if (with_slots) {
             // Fit check: long slots in both long walls.
@@ -273,7 +279,7 @@ module shell(with_slots = false) {
             translate([x - 0.5, out_w - wall - rib + 0.01, board_z]) cube([1, rib, front_z - board_z]);
         }
         for (y = [out_w / 2 - 9, out_w / 2 + 9])
-            translate([out_l - wall - rib + 0.01, y - 0.5, board_z]) cube([rib, 1, front_z - board_z]);
+            translate([out_l - wall - end_rib + 0.01, y - 0.5, board_z]) cube([end_rib, 1, front_z - board_z]);
     }
 
     // Screw bosses in the battery bay corners (the battery sits between them).
