@@ -29,8 +29,24 @@ board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
 switch_h = 2.2;  // face buttons: height above the board's top surface
-usb_from_front = clr_default + glass_drop - 1.6;  // front glass to the USB-C centre
-lip = 1.2;            // how far the front frame overlaps the glass edge
+usb_from_front = 6.5;  // front glass to the USB-C centre (the first print showed it sits lower)
+lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
+
+/* [Front window: measure] */
+// "screen": the frame covers the glass's black border and shows only the
+//           display, with a small round hole for the circle touch key.
+// "glass":  the whole glass shows.
+window_style = "screen";
+active_w = 22.7;        // visible display area (1.9" 170x320 panel)
+active_l = 42.7;
+active_from_far = 3.5;  // far edge of the glass to the start of the display (measure)
+screen_margin = 0.4;    // window this much bigger than the display all round
+bevel = 0.8;            // window edges slope outward by this much
+key_from_glass = 3.9;   // USB-side edge of the glass to the circle key's centre (measure)
+key_hole_d = 6;         // round hole for the circle key (0 = none)
+
+/* [Fit] */
+rib = 0.8;              // crush ribs on the inside walls: squash to hold the board snug
 
 /* [Buttons: measure] */
 // One entry per button:
@@ -180,9 +196,26 @@ module shell(with_slots = false) {
         // Board pocket.
         translate([wall, wall, board_z]) cube([in_l, in_w, front_z - board_z]);
 
-        // Front window over the glass (the frame covers the bare board at the USB end).
-        translate([board_x + tail_l + lip, board_y + lip, front_z - 1])
-            cube([board_l - tail_l - 2 * lip, board_w - 2 * lip, front + 2]);
+        // Front window.
+        if (window_style == "screen") {
+            // Just the display, with bevelled edges, plus the circle key.
+            wx = board_x + board_l - active_from_far - active_l - screen_margin;
+            wy = out_w / 2 - active_w / 2 - screen_margin;
+            wl = active_l + 2 * screen_margin;
+            ww = active_w + 2 * screen_margin;
+            hull() {
+                translate([wx, wy, front_z - 0.01]) cube([wl, ww, 0.01]);
+                translate([wx - bevel, wy - bevel, out_h]) cube([wl + 2 * bevel, ww + 2 * bevel, 0.01]);
+            }
+            translate([wx, wy, front_z - 1]) cube([wl, ww, 1.02]);
+            if (key_hole_d > 0)
+                translate([board_x + tail_l + key_from_glass, out_w / 2, front_z - 1])
+                    cylinder(d1 = key_hole_d, d2 = key_hole_d + bevel, h = front + 1.02 + 0.01);
+        } else {
+            // The whole glass (the frame covers the bare board at the USB end).
+            translate([board_x + tail_l + lip, board_y + lip, front_z - 1])
+                cube([board_l - tail_l - 2 * lip, board_w - 2 * lip, front + 2]);
+        }
 
         // Small notch in the separator for the battery wire.
         translate([board_x + wire_notch_x - wire_notch[0] / 2, out_w / 2 - wire_notch[1] / 2, bay_h - 1])
@@ -228,6 +261,17 @@ module shell(with_slots = false) {
             for (b = buttons) if (b[0] == "end") button_hole(b);
         }
 
+    // Crush ribs: thin ridges on the inside walls of the board pocket that
+    // squash as the board goes in, so it sits snug instead of rattling.
+    if (rib > 0) {
+        for (x = [board_x + 15, board_x + 31, board_x + 47]) {
+            translate([x - 0.5, wall - 0.01, board_z]) cube([1, rib, front_z - board_z]);
+            translate([x - 0.5, out_w - wall - rib + 0.01, board_z]) cube([1, rib, front_z - board_z]);
+        }
+        for (y = [out_w / 2 - 9, out_w / 2 + 9])
+            translate([out_l - wall - rib + 0.01, y - 0.5, board_z]) cube([rib, 1, front_z - board_z]);
+    }
+
     // Screw bosses in the battery bay corners (the battery sits between them).
     for (p = boss_xy)
         translate([p[0], p[1], 0])
@@ -255,7 +299,7 @@ module lid() {
 // shows whether the board, USB port and buttons line up before a full print.
 module fitcheck() {
     intersection() {
-        shell(with_slots = true);
+        shell();
         translate([-1, -1, board_z + board_t * 0.35]) cube([out_l + 2, out_w + 2, out_h]);
     }
 }

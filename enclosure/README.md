@@ -28,6 +28,11 @@ aren't published. Before a full print, measure your board (or print
 - `board_l`, `board_w`, `board_t`: thickness including the touch glass and the
   parts on the back.
 - `tail_l`: how far the bare board sticks out past the glass at the USB end.
+- `active_from_far`, `key_from_glass`: where the display and the circle touch
+  key sit on the glass. The front frame covers the glass's black border and
+  shows only the display, with a small round hole for the key
+  (`window_style = "glass"` shows the whole glass instead).
+- `usb_from_front`: front of the glass to the centre of the USB-C port.
 - `glass_drop`: from the front of the glass down to the board's top surface.
 - `switch_h`: how tall the face buttons stand above the board.
 - `buttons`: where each button is. The defaults put BOOT and KEY on the face,
@@ -54,7 +59,9 @@ openscad -D 'part="buttons"' -o buttons.stl lilygo_case.scad
    in the bay.
 5. Screw the lid on. Stick four 8 mm rubber feet into the recesses.
 
-If the board rattles, a strip of foam tape behind it takes up the slack.
+Thin crush ribs on the inside walls squash as the board goes in so it sits
+snug (`rib`; shave them with a knife if it's too tight). If it still rattles,
+a strip of foam tape behind it takes up the slack.
 
 ## Notes
 
