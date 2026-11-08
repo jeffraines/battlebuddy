@@ -36,6 +36,7 @@ print can be traced back to its design.
 | r07 | Rounded, recessed USB-C slot (closed, 12.5 × 7.2) instead of an open notch; window trimmed 1.2 mm at the far end to hide the bezel |
 | r08 | Window far edge in another 1.6 mm (r05 print showed ~3 mm of bezel there); USB slot 0.3 mm higher to centre on the port |
 | r09 | Slimmer: walls 2.0 → 1.6, front 1.6 → 1.2, lid 1.8 → 1.4, separator 1.6 → 1.2, 1 mm front-edge chamfer, board pocket 0.25 mm clearance; ribs squeeze 0.08 mm (end ribs push the board against the USB end); buttons ±10.75; USB slot just for the plug shell (9.6 × 4.2), wall thinned to 0.8 mm from inside |
+| r10 | Thin frame: new window_style "border" shows most of the glass's black border (3 mm past the display each side, 2.5 mm at the far end); meant for black filament |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

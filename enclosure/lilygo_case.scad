@@ -35,12 +35,17 @@ lip = 1.2;            // how far the front frame overlaps the glass edge (window
 /* [Front window: measure] */
 // "screen": the frame covers the glass's black border and shows the display
 //           plus the strip below it with the circle touch key, as one window.
+// "border": like "screen", but most of the glass's black border shows too, so
+//           the plastic frame is thin (best with black filament: glass and
+//           frame blend). The board itself is black, so a slight overshoot hides.
 // "glass":  the whole glass shows.
-window_style = "screen";
+window_style = "border";
 active_w = 22.7;        // visible display area (1.9" 170x320 panel)
 active_l = 42.7;
 active_from_far = 6.3;  // far edge of the glass to the start of the display (measure)
-screen_margin = 0.4;    // window this much bigger than the display all round
+screen_margin = 0.4;    // "screen": window this much bigger than the display all round
+border_side = 3.0;      // "border": window this much wider than the display on each long side
+border_far = 2.5;       //           and this much past it at the far end
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
 key_from_glass = 3.9;   // USB-side edge of the glass to the circle key's centre (measure)
 key_room = 3.5;         // window reaches this far past the key's centre toward USB
@@ -211,12 +216,14 @@ module shell(with_slots = false) {
         translate([wall, wall, board_z]) cube([in_l, in_w, front_z - board_z]);
 
         // Front window.
-        if (window_style == "screen") {
+        if (window_style == "screen" || window_style == "border") {
             // The display plus the circle key below it, as one bevelled window.
             wx = board_x + tail_l + key_from_glass - key_room;
-            wy = out_w / 2 - active_w / 2 - screen_margin;
-            wl = board_x + board_l - active_from_far + screen_margin - wx;
-            ww = active_w + 2 * screen_margin;
+            side = window_style == "border" ? border_side : screen_margin;
+            far = window_style == "border" ? border_far : screen_margin;
+            wy = out_w / 2 - active_w / 2 - side;
+            wl = board_x + board_l - active_from_far + far - wx;
+            ww = active_w + 2 * side;
             hull() {
                 translate([wx, wy, front_z - 0.01]) cube([wl, ww, 0.01]);
                 translate([wx - bevel, wy - bevel, out_h]) cube([wl + 2 * bevel, ww + 2 * bevel, 0.01]);
