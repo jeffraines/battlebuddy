@@ -32,6 +32,7 @@ print can be traced back to its design.
 | r03 | Bigger USB opening, separator plate, buttons on any edge |
 | r04 | Face buttons beside USB, Touch board size 62 x 32 x 11 |
 | r05 | Screen-only window, circle key hole, crush ribs, lower USB, quick fit check |
+| r06 | Face buttons 1.5 mm further out, circle key inside one larger bevelled window, ribs 0.8 → 0.35 mm |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

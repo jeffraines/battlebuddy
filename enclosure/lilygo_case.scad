@@ -33,20 +33,20 @@ usb_from_front = 6.5;  // front glass to the USB-C centre (the first print showe
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
 
 /* [Front window: measure] */
-// "screen": the frame covers the glass's black border and shows only the
-//           display, with a small round hole for the circle touch key.
+// "screen": the frame covers the glass's black border and shows the display
+//           plus the strip below it with the circle touch key, as one window.
 // "glass":  the whole glass shows.
 window_style = "screen";
 active_w = 22.7;        // visible display area (1.9" 170x320 panel)
 active_l = 42.7;
 active_from_far = 3.5;  // far edge of the glass to the start of the display (measure)
 screen_margin = 0.4;    // window this much bigger than the display all round
-bevel = 0.8;            // window edges slope outward by this much
+bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
 key_from_glass = 3.9;   // USB-side edge of the glass to the circle key's centre (measure)
-key_hole_d = 6;         // round hole for the circle key (0 = none)
+key_room = 3.5;         // window reaches this far past the key's centre toward USB
 
 /* [Fit] */
-rib = 0.8;              // crush ribs on the inside walls: squash to hold the board snug
+rib = 0.35;             // crush ribs on the inside walls (r06: 0.8 bent the screen)
 
 /* [Buttons: measure] */
 // One entry per button:
@@ -60,8 +60,8 @@ rib = 0.8;              // crush ribs on the inside walls: squash to hold the bo
 //   kind: "press" = a printed cap that sits on the board's button and pokes out
 //         of the case; "pin" = a small recessed hole (so it can't be hit by accident)
 // THESE POSITIONS ARE ESTIMATES from product photos. Measure and correct them.
-buttons = [["front", 3.5, "press", -10],   // BOOT (GPIO0): menu
-           ["front", 3.5, "press", 10]];   // KEY (GPIO14): undo
+buttons = [["front", 3.5, "press", -11.5],   // BOOT (GPIO0): menu  (r06: moved out 1.5 mm)
+           ["front", 3.5, "press", 11.5]];   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 5;          // round cap on face buttons
@@ -198,19 +198,16 @@ module shell(with_slots = false) {
 
         // Front window.
         if (window_style == "screen") {
-            // Just the display, with bevelled edges, plus the circle key.
-            wx = board_x + board_l - active_from_far - active_l - screen_margin;
+            // The display plus the circle key below it, as one bevelled window.
+            wx = board_x + tail_l + key_from_glass - key_room;
             wy = out_w / 2 - active_w / 2 - screen_margin;
-            wl = active_l + 2 * screen_margin;
+            wl = board_x + board_l - active_from_far + screen_margin - wx;
             ww = active_w + 2 * screen_margin;
             hull() {
                 translate([wx, wy, front_z - 0.01]) cube([wl, ww, 0.01]);
                 translate([wx - bevel, wy - bevel, out_h]) cube([wl + 2 * bevel, ww + 2 * bevel, 0.01]);
             }
             translate([wx, wy, front_z - 1]) cube([wl, ww, 1.02]);
-            if (key_hole_d > 0)
-                translate([board_x + tail_l + key_from_glass, out_w / 2, front_z - 1])
-                    cylinder(d1 = key_hole_d, d2 = key_hole_d + bevel, h = front + 1.02 + 0.01);
         } else {
             // The whole glass (the frame covers the bare board at the USB end).
             translate([board_x + tail_l + lip, board_y + lip, front_z - 1])
