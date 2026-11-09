@@ -38,6 +38,7 @@ print can be traced back to its design.
 | r09 | Slimmer: walls 2.0 → 1.6, front 1.6 → 1.2, lid 1.8 → 1.4, separator 1.6 → 1.2, 1 mm front-edge chamfer, board pocket 0.25 mm clearance; ribs squeeze 0.08 mm (end ribs push the board against the USB end); buttons ±10.75; USB slot just for the plug shell (9.6 × 4.2), wall thinned to 0.8 mm from inside |
 | r10 | Thin frame: new window_style "border" shows most of the glass's black border (3 mm past the display each side, 2.5 mm at the far end); meant for black filament |
 | r11 | Rounded window corners (r = 2.5, follows the glass) and 0.5 mm less at the far end (r10 corners showed a gap); circle key covered (`cover_key`); buttons ±10.3; USB slot 0.5 mm toward the front |
+| r12 | Buttons asymmetric (−9.3 / +7.3: the board's switches are off-centre); round 6 mm notch off the window over the circle key so it can be pressed (`key_notch`) |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

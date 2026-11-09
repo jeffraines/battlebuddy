@@ -50,6 +50,9 @@ window_r = 2.5;         // window corner radius, to follow the glass's rounded c
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
 key_from_glass = 1.9;   // USB-side edge of the glass to the circle key's centre (from the r08/r10 photos)
 cover_key = true;       // true: the frame hides the circle touch key (dice stay in the menu)
+key_notch = true;       // with cover_key: a round notch off the window exposes just the key
+key_notch_d = 6;        // notch diameter at the glass
+key_notch_bevel = 1.0;  // notch edge slope (kept clear of the button holes)
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
 key_room = 1.5;         // without it, window reaches this far past the key's centre toward USB
 
@@ -71,8 +74,9 @@ end_rib = 2 * board_clr + rib_squeeze;   // far-end ribs: also push the board ag
 //   kind: "press" = a printed cap that sits on the board's button and pokes out
 //         of the case; "pin" = a small recessed hole (so it can't be hit by accident)
 // THESE POSITIONS ARE ESTIMATES from product photos. Measure and correct them.
-buttons = [["front", 3.5, "press", -10.3],   // BOOT (GPIO0): menu  (r05 +-10 in, r06 +-11.5 out, r10 +-10.75 still out)
-           ["front", 3.5, "press", 10.3]];   // KEY (GPIO14): undo
+// The board's two switches are not symmetric about its centre line (r11 print).
+buttons = [["front", 3.5, "press", -9.3],   // BOOT (GPIO0): menu  (r11 -10.3: 1 mm too far out)
+           ["front", 3.5, "press", 7.3]];   // KEY (GPIO14): undo  (r11 +10.3: ~3 mm too far out)   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 5;          // round cap on face buttons
@@ -233,6 +237,10 @@ module shell(with_slots = false) {
                 translate([wx - bevel, wy - bevel, out_h]) rounded_box(wl + 2 * bevel, ww + 2 * bevel, 0.01, window_r + bevel);
             }
             translate([wx, wy, front_z - 1]) rounded_box(wl, ww, 1.02, window_r);
+            // Round notch off the window's USB-side edge over the circle key.
+            if (cover_key && key_notch)
+                hull() for (x = [key_x, wx + window_r]) translate([x, out_w / 2, front_z - 1])
+                    cylinder(d1 = key_notch_d, d2 = key_notch_d + 2 * key_notch_bevel * (front + 1) / front, h = front + 1.01);
         } else {
             // The whole glass (the frame covers the bare board at the USB end).
             translate([board_x + tail_l + lip, board_y + lip, front_z - 1])
