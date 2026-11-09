@@ -39,6 +39,7 @@ print can be traced back to its design.
 | r10 | Thin frame: new window_style "border" shows most of the glass's black border (3 mm past the display each side, 2.5 mm at the far end); meant for black filament |
 | r11 | Rounded window corners (r = 2.5, follows the glass) and 0.5 mm less at the far end (r10 corners showed a gap); circle key covered (`cover_key`); buttons ±10.3; USB slot 0.5 mm toward the front |
 | r12 | Buttons asymmetric (−9.3 / +7.3: the board's switches are off-centre); round 6 mm notch off the window over the circle key so it can be pressed (`key_notch`) |
+| r13 | Key notch replaced by a curved (half-ellipse) USB end on the window: full width at the corners, sweeping out to just past the circle key (`key_arch`) |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

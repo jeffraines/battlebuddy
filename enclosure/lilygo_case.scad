@@ -50,9 +50,8 @@ window_r = 2.5;         // window corner radius, to follow the glass's rounded c
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
 key_from_glass = 1.9;   // USB-side edge of the glass to the circle key's centre (from the r08/r10 photos)
 cover_key = true;       // true: the frame hides the circle touch key (dice stay in the menu)
-key_notch = true;       // with cover_key: a round notch off the window exposes just the key
-key_notch_d = 6;        // notch diameter at the glass
-key_notch_bevel = 1.0;  // notch edge slope (kept clear of the button holes)
+key_arch = true;        // with cover_key: the window's USB end sweeps out in a curve over the key
+key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centre toward USB
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
 key_room = 1.5;         // without it, window reaches this far past the key's centre toward USB
 
@@ -209,6 +208,10 @@ module plunger(b) {
     }
 }
 
+// Half-ellipse end of the window: ww wide at x = wx, reaching depth toward USB; grown by g.
+module window_arch(wx, ww, depth, g, z, h)
+    translate([wx, out_w / 2, z]) scale([(depth + g) / (ww / 2 + g), 1, 1]) cylinder(r = ww / 2 + g, h = h, $fn = 120);
+
 module shell(with_slots = false) {
     difference() {
         hull() {
@@ -237,10 +240,17 @@ module shell(with_slots = false) {
                 translate([wx - bevel, wy - bevel, out_h]) rounded_box(wl + 2 * bevel, ww + 2 * bevel, 0.01, window_r + bevel);
             }
             translate([wx, wy, front_z - 1]) rounded_box(wl, ww, 1.02, window_r);
-            // Round notch off the window's USB-side edge over the circle key.
-            if (cover_key && key_notch)
-                hull() for (x = [key_x, wx + window_r]) translate([x, out_w / 2, front_z - 1])
-                    cylinder(d1 = key_notch_d, d2 = key_notch_d + 2 * key_notch_bevel * (front + 1) / front, h = front + 1.01);
+            // Curved (half-ellipse) USB end: full window width at the corners,
+            // sweeping out to a tip just past the circle key.
+            if (cover_key && key_arch) {
+                ax = wx + window_r;   // start past the rounded corners so the curve joins smoothly
+                depth = ax - (key_x - key_arch_past);
+                hull() {
+                    window_arch(ax, ww, depth, 0, front_z - 0.01, 0.01);
+                    window_arch(ax, ww, depth, bevel, out_h, 0.01);
+                }
+                window_arch(ax, ww, depth, 0, front_z - 1, 1.02);
+            }
         } else {
             // The whole glass (the frame covers the bare board at the USB end).
             translate([board_x + tail_l + lip, board_y + lip, front_z - 1])
