@@ -28,8 +28,8 @@ board_w = 32;    // width
 board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
-switch_h = 0.8;  // face buttons: height above the board's top surface
-                 // (r16: the switch tops sit ~3.2 mm below the glass, about a USB-C plug's thickness)
+switch_depth = 4.85; // face buttons: glass front down to the switch tops
+                     // (r16 guessed 3.2; the r17 longest plunger was still ~1.25 mm short)
 usb_from_front = 5.7;  // front glass to the USB-C centre (the first print showed it sits lower)
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
 
@@ -49,12 +49,13 @@ border_side = 2.8;      // "border": window this much wider than the display on 
 border_far = 2.0;       //           and this much past it at the far end (r10 2.5 showed a gap)
 window_r = 2.5;         // window corner radius, to follow the glass's rounded corners
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
+bevel_usb = 0.5;        // smaller slope on the USB-side edge, next to the button holes
 key_from_glass = 1.9;   // USB-side edge of the glass to the circle key's centre (from the r08/r10 photos)
 cover_key = false;      // true: the frame hides the circle touch key (dice stay in the menu)
 key_arch = true;        // with cover_key: the window's USB end sweeps out in a curve over the key
 key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centre toward USB
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
-key_room = 1.6;         // without it, window reaches this far past the key's centre toward USB
+key_room = 2.3;         // without it, window reaches this far past the key's centre toward USB
                         // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
 key_tongue = false;     // window also reaches between the two face buttons toward USB
 tongue_tip = 3;         // tongue reaches to this far from the board's USB end
@@ -87,6 +88,7 @@ button_stick_out = 0.5;  // side / end buttons: how far they stick out past the 
 face_cap_d = 5;          // round cap on face buttons
 face_flange_d = 6.2;     // face button: thin round flange under the frame (bigger than the hole, keeps it in)
 face_flange_t = 0.8;
+face_flange_cut = face_cap_d / 2;  // flange is cut flat this far toward the display (r18: it hit the display's acrylic)
 face_stem_d = 3;         // narrow stem from the flange down to the switch (r17: the 6.5 x 8 block hit the display)
 cap_l = 7;               // plunger cap, along the case
 cap_h = 4;               // plunger cap height
@@ -162,7 +164,7 @@ block_l = cap_l + 3;
 block_h = cap_h + 3;
 
 // Gap between the inside of the wall and the button on a button's side.
-function button_gap(b) = b[0] == "front" ? clr + glass_drop - switch_h
+function button_gap(b) = b[0] == "front" ? clr + switch_depth
                        : b[0] == "end" ? out_l - wall - (board_x + board_l) - button_stick_out
                        : gap_side - button_stick_out;
 // Wall thickness the cap passes through.
@@ -192,7 +194,10 @@ module button_hole(b) {
             translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = pin_d, h = w + button_gap(b) + 2);
         } else if (b[0] == "front") {
             translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = face_cap_d + 2 * plunger_clr, h = w + 2);
-            translate([0, w - 0.01, 0]) rotate([-90, 0, 0]) cylinder(d = face_flange_d + 0.6, h = face_flange_t + 0.4);
+            translate([0, w - 0.01, 0]) rotate([-90, 0, 0]) intersection() {
+                cylinder(d = face_flange_d + 0.6, h = face_flange_t + 0.4);
+                translate([-10, -10, 0]) cube([10 + face_flange_cut + 0.3, 20, 5]);
+            }
         } else {
             translate([-cap_l / 2 - plunger_clr, -1, -cap_h / 2 - plunger_clr])
                 cube([cap_l + 2 * plunger_clr, w + 2, cap_h + 2 * plunger_clr]);
@@ -209,7 +214,10 @@ module plunger(b) {
     w = wall_of(b);
     if (b[0] == "front") {
         translate([0, w, 0]) rotate([-90, 0, 0]) {
-            cylinder(d = face_flange_d, h = face_flange_t);
+            intersection() {   // D-shaped: flat on the display side
+                cylinder(d = face_flange_d, h = face_flange_t);
+                translate([-10, -10, 0]) cube([10 + face_flange_cut, 20, 5]);
+            }
             cylinder(d = face_stem_d, h = t);
         }
         translate([0, -cap_proud, 0]) rotate([-90, 0, 0]) cylinder(d = face_cap_d, h = w + cap_proud + 0.01);
@@ -276,7 +284,7 @@ module shell(with_slots = false) {
             } else {
                 hull() {
                     translate([wx, wy, front_z - 0.01]) rounded_box(wl, ww, 0.01, window_r);
-                    translate([wx - bevel, wy - bevel, out_h]) rounded_box(wl + 2 * bevel, ww + 2 * bevel, 0.01, window_r + bevel);
+                    translate([wx - bevel_usb, wy - bevel, out_h]) rounded_box(wl + bevel + bevel_usb, ww + 2 * bevel, 0.01, window_r + bevel_usb);
                 }
                 translate([wx, wy, front_z - 1]) rounded_box(wl, ww, 1.02, window_r);
             }

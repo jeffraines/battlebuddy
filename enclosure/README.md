@@ -44,6 +44,7 @@ print can be traced back to its design.
 | r15 | Window tongue reaching between the two face buttons toward USB (`key_tongue`), as wide as the button holes allow (0.8 mm plastic each side), tip 4 mm from the board end |
 | r16 | Window + tongue as one outline with every corner rounded (2 mm fillets, inside corners too), tongue wider/further (0.7 mm web, tip 3 mm from the board end); button plungers 1.4 mm longer (switch tops ~3.2 mm below the glass), plus ±0.4 mm length variants |
 | r17 | Tongue off: window ends at the glass edge again (as r14). Face buttons slimmed: 6.2 mm round flange under the frame + 3 mm stem to the switch (the 6.5 × 8 block hit the display), printed cap-down; ±0.4 mm length variants |
+| r18 | Window USB edge 0.7 mm closer to the buttons (smaller 0.5 mm slope on that edge keeps ~0.85 mm of plastic by the holes); button flange cut flat on the display side (it hit the acrylic); plungers 1.65 mm longer (switch tops ~4.85 mm below the glass), ±0.5 mm variants |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
