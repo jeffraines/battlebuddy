@@ -56,7 +56,7 @@ key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centr
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
 key_room = 1.6;         // without it, window reaches this far past the key's centre toward USB
                         // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
-key_tongue = true;      // window also reaches between the two face buttons toward USB
+key_tongue = false;     // window also reaches between the two face buttons toward USB
 tongue_tip = 3;         // tongue reaches to this far from the board's USB end
 tongue_web = 0.7;       // plastic left between the tongue and each button hole (at the surface)
 tongue_fillet = 2;      // every corner of the window + tongue outline rounded this much
@@ -85,7 +85,9 @@ buttons = [["front", 3.5, "press", -9.8],   // BOOT (GPIO0): menu  (r11 -10.3 ou
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 5;          // round cap on face buttons
-face_block = [6.5, 8];   // face button's inner block (along, across)
+face_flange_d = 6.2;     // face button: thin round flange under the frame (bigger than the hole, keeps it in)
+face_flange_t = 0.8;
+face_stem_d = 3;         // narrow stem from the flange down to the switch (r17: the 6.5 x 8 block hit the display)
 cap_l = 7;               // plunger cap, along the case
 cap_h = 4;               // plunger cap height
 cap_proud = 1.2;         // how far the cap stands out of the wall
@@ -190,8 +192,7 @@ module button_hole(b) {
             translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = pin_d, h = w + button_gap(b) + 2);
         } else if (b[0] == "front") {
             translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = face_cap_d + 2 * plunger_clr, h = w + 2);
-            translate([-face_block[0] / 2 - 0.3, w - 0.01, -face_block[1] / 2 - 0.3])
-                cube([face_block[0] + 0.6, button_gap(b) + 0.01, face_block[1] + 0.6]);
+            translate([0, w - 0.01, 0]) rotate([-90, 0, 0]) cylinder(d = face_flange_d + 0.6, h = face_flange_t + 0.4);
         } else {
             translate([-cap_l / 2 - plunger_clr, -1, -cap_h / 2 - plunger_clr])
                 cube([cap_l + 2 * plunger_clr, w + 2, cap_h + 2 * plunger_clr]);
@@ -207,7 +208,10 @@ module plunger(b) {
     t = block_thick(b);
     w = wall_of(b);
     if (b[0] == "front") {
-        translate([-face_block[0] / 2, w, -face_block[1] / 2]) cube([face_block[0], t, face_block[1]]);
+        translate([0, w, 0]) rotate([-90, 0, 0]) {
+            cylinder(d = face_flange_d, h = face_flange_t);
+            cylinder(d = face_stem_d, h = t);
+        }
         translate([0, -cap_proud, 0]) rotate([-90, 0, 0]) cylinder(d = face_cap_d, h = w + cap_proud + 0.01);
     } else {
         translate([-block_l / 2, w, -block_h / 2]) cube([block_l, t, block_h]);
@@ -400,11 +404,15 @@ if (part == "shell") {
 } else if (part == "lid") {
     lid();
 } else if (part == "buttons") {
-    // Laid out flat: inner block on the bed, cap pointing up.
+    // Face buttons stand cap-down on the bed (flat cap face, flange above it);
+    // side buttons lie with the inner block on the bed.
     presses = [for (b = buttons) if (b[2] == "press") b];
     for (i = [0 : len(presses) - 1])
-        translate([i * (block_l + 4) + block_l / 2, block_l / 2, 0])
-            rotate([-90, 0, 0]) translate([0, -wall_of(presses[i]) - block_thick(presses[i]), 0]) plunger(presses[i]);
+        if (presses[i][0] == "front")
+            translate([i * 10 + 5, 5, cap_proud]) rotate([90, 0, 0]) plunger(presses[i]);
+        else
+            translate([i * (block_l + 4) + block_l / 2, block_l / 2, 0])
+                rotate([-90, 0, 0]) translate([0, -wall_of(presses[i]) - block_thick(presses[i]), 0]) plunger(presses[i]);
 } else if (part == "fitcheck") {
     translate([0, out_w, out_h]) rotate([180, 0, 0]) fitcheck();
 } else {
