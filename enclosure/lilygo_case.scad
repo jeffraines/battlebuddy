@@ -55,6 +55,9 @@ key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centr
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
 key_room = 1.6;         // without it, window reaches this far past the key's centre toward USB
                         // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
+key_tongue = true;      // window also reaches between the two face buttons toward USB
+tongue_tip = 4;         // tongue reaches to this far from the board's USB end
+tongue_web = 0.8;       // plastic left between the tongue and each button hole
 
 /* [Fit] */
 board_clr = 0.25;       // gap around the board in its pocket (sides and ends)
@@ -241,6 +244,21 @@ module shell(with_slots = false) {
                 translate([wx - bevel, wy - bevel, out_h]) rounded_box(wl + 2 * bevel, ww + 2 * bevel, 0.01, window_r + bevel);
             }
             translate([wx, wy, front_z - 1]) rounded_box(wl, ww, 1.02, window_r);
+            // Tongue between the face buttons, as wide as the button holes allow.
+            if (!cover_key && key_tongue) {
+                offs = [for (b = buttons) if (b[0] == "front") b[3]];
+                hole_r = face_cap_d / 2 + plunger_clr;
+                lo = board_y + board_w / 2 + max([for (o = offs) if (o < 0) o]) + hole_r + tongue_web;
+                hi = board_y + board_w / 2 + min([for (o = offs) if (o > 0) o]) - hole_r - tongue_web;
+                tx = board_x + tongue_tip;
+                tl = wx + window_r + 1 - tx;
+                tr = min(2, (hi - lo) / 2 - bevel - 0.01);
+                hull() {
+                    translate([tx + bevel, lo + bevel, front_z - 0.01]) rounded_box(tl - bevel, hi - lo - 2 * bevel, 0.01, tr);
+                    translate([tx, lo, out_h]) rounded_box(tl, hi - lo, 0.01, tr + bevel);
+                }
+                translate([tx + bevel, lo + bevel, front_z - 1]) rounded_box(tl - bevel, hi - lo - 2 * bevel, 1.02, tr);
+            }
             // Curved (half-ellipse) USB end: full window width at the corners,
             // sweeping out to a tip just past the circle key.
             if (cover_key && key_arch) {

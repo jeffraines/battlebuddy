@@ -41,6 +41,7 @@ print can be traced back to its design.
 | r12 | Buttons asymmetric (−9.3 / +7.3: the board's switches are off-centre); round 6 mm notch off the window over the circle key so it can be pressed (`key_notch`) |
 | r13 | Key notch replaced by a curved (half-ellipse) USB end on the window: full width at the corners, sweeping out to just past the circle key (`key_arch`) |
 | r14 | Back to a plain rounded-rectangle window, now reaching as close to the buttons as they allow (key ring at the window edge); buttons −9.8 / +8.3. Extra `fitcheck_r14_variant-key-covered.stl` with the key covered |
+| r15 | Window tongue reaching between the two face buttons toward USB (`key_tongue`), as wide as the button holes allow (0.8 mm plastic each side), tip 4 mm from the board end |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
