@@ -28,7 +28,8 @@ board_w = 32;    // width
 board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
-switch_h = 2.2;  // face buttons: height above the board's top surface
+switch_h = 0.8;  // face buttons: height above the board's top surface
+                 // (r16: the switch tops sit ~3.2 mm below the glass, about a USB-C plug's thickness)
 usb_from_front = 5.7;  // front glass to the USB-C centre (the first print showed it sits lower)
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
 
@@ -56,8 +57,9 @@ key_cover = 2.3;        // with cover_key, window starts this far past the key's
 key_room = 1.6;         // without it, window reaches this far past the key's centre toward USB
                         // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
 key_tongue = true;      // window also reaches between the two face buttons toward USB
-tongue_tip = 4;         // tongue reaches to this far from the board's USB end
-tongue_web = 0.8;       // plastic left between the tongue and each button hole
+tongue_tip = 3;         // tongue reaches to this far from the board's USB end
+tongue_web = 0.7;       // plastic left between the tongue and each button hole (at the surface)
+tongue_fillet = 2;      // every corner of the window + tongue outline rounded this much
 
 /* [Fit] */
 board_clr = 0.25;       // gap around the board in its pocket (sides and ends)
@@ -164,7 +166,8 @@ function button_gap(b) = b[0] == "front" ? clr + glass_drop - switch_h
 // Wall thickness the cap passes through.
 function wall_of(b) = b[0] == "front" ? front : wall;
 // Thickness of a cap's inner block (the part that sits on the button).
-function block_thick(b) = button_gap(b) - 0.2;
+block_extra = 0;  // lengthen (+) or shorten (-) the button plungers to tune the click
+function block_thick(b) = button_gap(b) - 0.2 + block_extra;
 
 // Places children in a button's frame: origin on the outside of the case at
 // the button's centre, +y pointing into the case.
@@ -212,6 +215,18 @@ module plunger(b) {
     }
 }
 
+// Window outline at the glass with a tongue toward USB between y = lo..hi,
+// all corners rounded (fillet radius tongue_fillet), convex and concave.
+module window_outline(wx, wy, wl, ww, tx, lo, hi) {
+    f = tongue_fillet;
+    offset(r = -f) offset(delta = f)      // round the inside corners
+        offset(r = f) offset(delta = -f)  // round the outside corners
+            union() {
+                translate([wx, wy]) square([wl, ww]);
+                translate([tx, lo]) square([wx + window_r + 1 - tx, hi - lo]);
+            }
+}
+
 // Half-ellipse end of the window: ww wide at x = wx, reaching depth toward USB; grown by g.
 module window_arch(wx, ww, depth, g, z, h)
     translate([wx, out_w / 2, z]) scale([(depth + g) / (ww / 2 + g), 1, 1]) cylinder(r = ww / 2 + g, h = h, $fn = 120);
@@ -239,25 +254,27 @@ module shell(with_slots = false) {
             wy = out_w / 2 - active_w / 2 - side;
             wl = board_x + board_l - active_from_far + far - wx;
             ww = active_w + 2 * side;
-            hull() {
-                translate([wx, wy, front_z - 0.01]) rounded_box(wl, ww, 0.01, window_r);
-                translate([wx - bevel, wy - bevel, out_h]) rounded_box(wl + 2 * bevel, ww + 2 * bevel, 0.01, window_r + bevel);
-            }
-            translate([wx, wy, front_z - 1]) rounded_box(wl, ww, 1.02, window_r);
-            // Tongue between the face buttons, as wide as the button holes allow.
             if (!cover_key && key_tongue) {
+                // Window plus a tongue between the face buttons, as one outline with
+                // every corner rounded (inside corners too), bevelled in print-layer
+                // steps,.
                 offs = [for (b = buttons) if (b[0] == "front") b[3]];
                 hole_r = face_cap_d / 2 + plunger_clr;
-                lo = board_y + board_w / 2 + max([for (o = offs) if (o < 0) o]) + hole_r + tongue_web;
-                hi = board_y + board_w / 2 + min([for (o = offs) if (o > 0) o]) - hole_r - tongue_web;
+                lo = board_y + board_w / 2 + max([for (o = offs) if (o < 0) o]) + hole_r + tongue_web + bevel;
+                hi = board_y + board_w / 2 + min([for (o = offs) if (o > 0) o]) - hole_r - tongue_web - bevel;
                 tx = board_x + tongue_tip;
-                tl = wx + window_r + 1 - tx;
-                tr = min(2, (hi - lo) / 2 - bevel - 0.01);
+                steps = ceil(front / 0.2);
+                for (k = [0 : steps - 1])
+                    translate([0, 0, front_z + k * front / steps])
+                        linear_extrude(front / steps + 0.01)
+                            offset(delta = bevel * (k + 1) / steps) window_outline(wx, wy, wl, ww, tx, lo, hi);
+                translate([0, 0, front_z - 1]) linear_extrude(1.02) window_outline(wx, wy, wl, ww, tx, lo, hi);
+            } else {
                 hull() {
-                    translate([tx + bevel, lo + bevel, front_z - 0.01]) rounded_box(tl - bevel, hi - lo - 2 * bevel, 0.01, tr);
-                    translate([tx, lo, out_h]) rounded_box(tl, hi - lo, 0.01, tr + bevel);
+                    translate([wx, wy, front_z - 0.01]) rounded_box(wl, ww, 0.01, window_r);
+                    translate([wx - bevel, wy - bevel, out_h]) rounded_box(wl + 2 * bevel, ww + 2 * bevel, 0.01, window_r + bevel);
                 }
-                translate([tx + bevel, lo + bevel, front_z - 1]) rounded_box(tl - bevel, hi - lo - 2 * bevel, 1.02, tr);
+                translate([wx, wy, front_z - 1]) rounded_box(wl, ww, 1.02, window_r);
             }
             // Curved (half-ellipse) USB end: full window width at the corners,
             // sweeping out to a tip just past the circle key.
