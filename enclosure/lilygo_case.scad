@@ -29,7 +29,7 @@ board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
 switch_h = 2.2;  // face buttons: height above the board's top surface
-usb_from_front = 6.2;  // front glass to the USB-C centre (the first print showed it sits lower)
+usb_from_front = 5.7;  // front glass to the USB-C centre (the first print showed it sits lower)
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
 
 /* [Front window: measure] */
@@ -44,11 +44,14 @@ active_w = 22.7;        // visible display area (1.9" 170x320 panel)
 active_l = 42.7;
 active_from_far = 6.3;  // far edge of the glass to the start of the display (measure)
 screen_margin = 0.4;    // "screen": window this much bigger than the display all round
-border_side = 3.0;      // "border": window this much wider than the display on each long side
-border_far = 2.5;       //           and this much past it at the far end
+border_side = 2.8;      // "border": window this much wider than the display on each long side
+border_far = 2.0;       //           and this much past it at the far end (r10 2.5 showed a gap)
+window_r = 2.5;         // window corner radius, to follow the glass's rounded corners
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
-key_from_glass = 3.9;   // USB-side edge of the glass to the circle key's centre (measure)
-key_room = 3.5;         // window reaches this far past the key's centre toward USB
+key_from_glass = 1.9;   // USB-side edge of the glass to the circle key's centre (from the r08/r10 photos)
+cover_key = true;       // true: the frame hides the circle touch key (dice stay in the menu)
+key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
+key_room = 1.5;         // without it, window reaches this far past the key's centre toward USB
 
 /* [Fit] */
 board_clr = 0.25;       // gap around the board in its pocket (sides and ends)
@@ -68,8 +71,8 @@ end_rib = 2 * board_clr + rib_squeeze;   // far-end ribs: also push the board ag
 //   kind: "press" = a printed cap that sits on the board's button and pokes out
 //         of the case; "pin" = a small recessed hole (so it can't be hit by accident)
 // THESE POSITIONS ARE ESTIMATES from product photos. Measure and correct them.
-buttons = [["front", 3.5, "press", -10.75],   // BOOT (GPIO0): menu  (r05 +-10 too far in, r06 +-11.5 too far out)
-           ["front", 3.5, "press", 10.75]];   // KEY (GPIO14): undo
+buttons = [["front", 3.5, "press", -10.3],   // BOOT (GPIO0): menu  (r05 +-10 in, r06 +-11.5 out, r10 +-10.75 still out)
+           ["front", 3.5, "press", 10.3]];   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 5;          // round cap on face buttons
@@ -217,18 +220,19 @@ module shell(with_slots = false) {
 
         // Front window.
         if (window_style == "screen" || window_style == "border") {
-            // The display plus the circle key below it, as one bevelled window.
-            wx = board_x + tail_l + key_from_glass - key_room;
+            // The display (and optionally the circle key), as one bevelled, rounded window.
+            key_x = board_x + tail_l + key_from_glass;
+            wx = cover_key ? key_x + key_cover : key_x - key_room;
             side = window_style == "border" ? border_side : screen_margin;
             far = window_style == "border" ? border_far : screen_margin;
             wy = out_w / 2 - active_w / 2 - side;
             wl = board_x + board_l - active_from_far + far - wx;
             ww = active_w + 2 * side;
             hull() {
-                translate([wx, wy, front_z - 0.01]) cube([wl, ww, 0.01]);
-                translate([wx - bevel, wy - bevel, out_h]) cube([wl + 2 * bevel, ww + 2 * bevel, 0.01]);
+                translate([wx, wy, front_z - 0.01]) rounded_box(wl, ww, 0.01, window_r);
+                translate([wx - bevel, wy - bevel, out_h]) rounded_box(wl + 2 * bevel, ww + 2 * bevel, 0.01, window_r + bevel);
             }
-            translate([wx, wy, front_z - 1]) cube([wl, ww, 1.02]);
+            translate([wx, wy, front_z - 1]) rounded_box(wl, ww, 1.02, window_r);
         } else {
             // The whole glass (the frame covers the bare board at the USB end).
             translate([board_x + tail_l + lip, board_y + lip, front_z - 1])
