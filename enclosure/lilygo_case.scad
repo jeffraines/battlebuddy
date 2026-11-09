@@ -49,11 +49,12 @@ border_far = 2.0;       //           and this much past it at the far end (r10 2
 window_r = 2.5;         // window corner radius, to follow the glass's rounded corners
 bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
 key_from_glass = 1.9;   // USB-side edge of the glass to the circle key's centre (from the r08/r10 photos)
-cover_key = true;       // true: the frame hides the circle touch key (dice stay in the menu)
+cover_key = false;      // true: the frame hides the circle touch key (dice stay in the menu)
 key_arch = true;        // with cover_key: the window's USB end sweeps out in a curve over the key
 key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centre toward USB
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
-key_room = 1.5;         // without it, window reaches this far past the key's centre toward USB
+key_room = 1.6;         // without it, window reaches this far past the key's centre toward USB
+                        // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
 
 /* [Fit] */
 board_clr = 0.25;       // gap around the board in its pocket (sides and ends)
@@ -74,8 +75,8 @@ end_rib = 2 * board_clr + rib_squeeze;   // far-end ribs: also push the board ag
 //         of the case; "pin" = a small recessed hole (so it can't be hit by accident)
 // THESE POSITIONS ARE ESTIMATES from product photos. Measure and correct them.
 // The board's two switches are not symmetric about its centre line (r11 print).
-buttons = [["front", 3.5, "press", -9.3],   // BOOT (GPIO0): menu  (r11 -10.3: 1 mm too far out)
-           ["front", 3.5, "press", 7.3]];   // KEY (GPIO14): undo  (r11 +10.3: ~3 mm too far out)   // KEY (GPIO14): undo
+buttons = [["front", 3.5, "press", -9.8],   // BOOT (GPIO0): menu  (r11 -10.3 out, r13 -9.3 in)
+           ["front", 3.5, "press", 8.3]];   // KEY (GPIO14): undo  (r11 +10.3 out, r13 +7.3 in)   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 5;          // round cap on face buttons

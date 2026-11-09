@@ -40,6 +40,7 @@ print can be traced back to its design.
 | r11 | Rounded window corners (r = 2.5, follows the glass) and 0.5 mm less at the far end (r10 corners showed a gap); circle key covered (`cover_key`); buttons ±10.3; USB slot 0.5 mm toward the front |
 | r12 | Buttons asymmetric (−9.3 / +7.3: the board's switches are off-centre); round 6 mm notch off the window over the circle key so it can be pressed (`key_notch`) |
 | r13 | Key notch replaced by a curved (half-ellipse) USB end on the window: full width at the corners, sweeping out to just past the circle key (`key_arch`) |
+| r14 | Back to a plain rounded-rectangle window, now reaching as close to the buttons as they allow (key ring at the window edge); buttons −9.8 / +8.3. Extra `fitcheck_r14_variant-key-covered.stl` with the key covered |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
