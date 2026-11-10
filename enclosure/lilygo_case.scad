@@ -28,8 +28,8 @@ board_w = 32;    // width
 board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
-switch_depth = 4.35; // face buttons: glass front down to the switch tops
-                     // (r18: the 0.5 mm shorter plunger clicked best)
+switch_depth = 3.55; // face buttons: glass front down to the switch tops
+                     // (r19: even the 0.3 mm shorter plunger held the case ~0.5 mm off)
 usb_from_front = 5.7;  // front glass to the USB-C centre (the first print showed it sits lower)
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
 
@@ -55,7 +55,7 @@ cover_key = false;      // true: the frame hides the circle touch key (dice stay
 key_arch = true;        // with cover_key: the window's USB end sweeps out in a curve over the key
 key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centre toward USB
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
-key_room = 3.3;         // without it, window reaches this far past the key's centre toward USB
+key_room = 3.8;         // without it, window reaches this far past the key's centre toward USB
                         // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
 key_tongue = false;     // window also reaches between the two face buttons toward USB
 tongue_tip = 3;         // tongue reaches to this far from the board's USB end
@@ -66,7 +66,7 @@ tongue_fillet = 2;      // every corner of the window + tongue outline rounded t
 board_clr = 0.25;       // gap around the board in its pocket (sides and ends)
 rib_squeeze = 0.08;     // crush ribs reach this far past the board edge (r05 0.3 bent the screen, r06 -0.15 rattled)
 rib = board_clr + rib_squeeze;           // side ribs
-end_rib = 2 * board_clr + rib_squeeze;   // far-end ribs: also push the board against the USB end
+end_rib = 2 * board_clr + rib_squeeze + 0.15;  // (r20: +0.15, the board still slid lengthwise)   // far-end ribs: also push the board against the USB end
 
 /* [Buttons: measure] */
 // One entry per button:
@@ -81,8 +81,9 @@ end_rib = 2 * board_clr + rib_squeeze;   // far-end ribs: also push the board ag
 //         of the case; "pin" = a small recessed hole (so it can't be hit by accident)
 // THESE POSITIONS ARE ESTIMATES from product photos. Measure and correct them.
 // The board's two switches are not symmetric about its centre line (r11 print).
-buttons = [["front", 3.5, "press", -9.8],   // BOOT (GPIO0): menu  (r11 -10.3 out, r13 -9.3 in)
-           ["front", 3.5, "press", 8.3]];   // KEY (GPIO14): undo  (r11 +10.3 out, r13 +7.3 in)   // KEY (GPIO14): undo
+// r20: both 0.5 mm toward USB and 0.5 mm toward +y (down, holding it USB-right).
+buttons = [["front", 3.0, "press", -9.3],   // BOOT (GPIO0): menu
+           ["front", 3.0, "press", 8.8]];   // KEY (GPIO14): undo   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 4.4;        // round cap on face buttons (r19: 5 -> 4.4 to make room for the window)
@@ -92,7 +93,7 @@ face_flange_cut = 0;     // flange stops at the cap's centre line: nothing on th
 face_stem_d = 3;         // narrow stem from the flange down to the switch (r17: the 6.5 x 8 block hit the display)
 cap_l = 7;               // plunger cap, along the case
 cap_h = 4;               // plunger cap height
-cap_proud = 1.2;         // how far the cap stands out of the wall
+cap_proud = 2.2;         // how far the cap stands out of the wall
 plunger_clr = 0.25;      // gap around the cap in its hole
 pin_d = 2.2;             // reset pinhole
 
