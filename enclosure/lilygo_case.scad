@@ -101,7 +101,23 @@ rst_tab = [6.5, 4];       // tab size (along the case, up-down)
 rst_tab_gap = 0.5;        // cut around the tab
 rst_tab_free = 2.5;       // tab's free end is this far toward USB from the switch centre
 rst_tab_recess = 0.6;     // tab surface sits this far below the wall (also makes it flex)
-rst_nub = [2.5, 2, 0.25]; // nub on the inside (along, up-down, reach past the wall's inner face)   // KEY (GPIO14): undo
+rst_nub = [2.5, 2, 0.25]; // nub on the inside (along, up-down, reach past the wall's inner face)
+rst_bump_d = 3;           // dome on the outside of the tab so a fingertip finds it
+rst_bump_h = 0.9;         // (stands ~0.3 mm proud of the wall: findable, not easily knocked)
+
+/* [Split: how it goes together] */
+// The case is a body (walls, separator, battery bay) plus a faceplate (the
+// front frame and the top of the walls). Assembly: drop the separator plate
+// into the body, the board on top of it screen-up, the buttons into the
+// faceplate, then snap the faceplate on. Battery and lid go on the back.
+// The faceplate is also the part to print in different colours.
+split_drop = 2.5;         // seam this far below the inside of the front frame
+tongue_t = 0.7;           // body's tongue (inner part of the wall) that the faceplate slips over
+tongue_h = 2.0;
+tongue_clr = 0.1;
+snap_r = 0.3;             // snap ridges on the tongue
+snap_len = 8;
+ledge = 0.9;              // ledges the separator rests on (plus the screw bosses)   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 4.0;        // round cap on face buttons (r19 5 -> 4.4, r22 -> 4.0: thicker wall by the window)
@@ -347,10 +363,7 @@ module shell(with_slots = false) {
             translate([x0 - g, out_w - rst_tab_recess, zc - rst_tab[1] / 2 - g]) cube([x1 - x0 + 2 * g, 1, rst_tab[1] + 2 * g]);
         }
 
-        // Small rounded slot for the plug's metal shell only.
-        translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall + 2) usb_slot(0);
-        // Wall thinned from the inside round the port so the plug housing gets close enough to seat.
-        translate([usb_web, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall) usb_slot(2.5);
+        usb_cuts();
 
         if (with_slots) {
             // Fit check: long slots in both long walls.
@@ -387,6 +400,12 @@ module shell(with_slots = false) {
 
     // Reset tab's nub, on the inside of the tab, facing the switch.
     if (rst_style == "flex")
+        intersection() {   // dome on the outside of the tab
+            translate([board_x + rst_from_usb, out_w - rst_tab_recess, board_z + rst_z_above_back])
+                scale([1, rst_bump_h / (rst_bump_d / 2), 1]) sphere(d = rst_bump_d, $fn = 32);
+            translate([0, out_w - rst_tab_recess, 0]) cube([out_l, 2, out_h]);
+        }
+    if (rst_style == "flex")
         translate([board_x + rst_from_usb - rst_nub[0] / 2, out_w - wall - rst_nub[2], board_z + rst_z_above_back - rst_nub[1] / 2])
             cube([rst_nub[0], rst_nub[2] + 0.01, rst_nub[1]]);
 
@@ -394,11 +413,11 @@ module shell(with_slots = false) {
     // squash as the board goes in, so it sits snug instead of rattling.
     if (rib > 0) {
         for (x = [board_x + 15, board_x + 31, board_x + 47]) {
-            translate([x - 0.5, wall - 0.01, board_z]) cube([1, rib, front_z - board_z]);
-            translate([x - 0.5, out_w - wall - rib + 0.01, board_z]) cube([1, rib, front_z - board_z]);
+            translate([x - 0.5, wall - 0.01, board_z]) cube([1, rib, split_z - 0.2 - board_z]);
+            translate([x - 0.5, out_w - wall - rib + 0.01, board_z]) cube([1, rib, split_z - 0.2 - board_z]);
         }
         for (y = [out_w / 2 - 9, out_w / 2 + 9])
-            translate([out_l - wall - end_rib + 0.01, y - 0.5, board_z]) cube([end_rib, 1, front_z - board_z]);
+            translate([out_l - wall - end_rib + 0.01, y - 0.5, board_z]) cube([end_rib, 1, split_z - 0.2 - board_z]);
     }
 
     // Screw bosses in the battery bay corners (the battery sits between them).
@@ -429,6 +448,61 @@ module lid() {
 // depth so the port can be checked too. Prints in a fraction of the time.
 fit_walls = 4;     // wall height below the front frame
 fit_usb_len = 18;  // length of the full-depth piece at the USB end (covers the reset hole too)
+
+split_z = front_z - split_drop;
+
+module usb_cuts() {
+    // Small rounded slot for the plug's metal shell only.
+    translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall + 2) usb_slot(0);
+    // Wall thinned from the inside round the port so the plug housing gets close enough to seat.
+    translate([usb_web, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall) usb_slot(2.5);
+}
+
+// The body's tongue: the inner part of the wall standing above the seam,
+// with snap ridges on its long sides. Grown by g to cut the faceplate's groove.
+module tongue(g) {
+    difference() {
+        union() {
+            translate([wall - tongue_t - g, wall - tongue_t - g, split_z - 0.01])
+                cube([in_l + 2 * (tongue_t + g), in_w + 2 * (tongue_t + g), tongue_h + g + 0.01]);
+        }
+        e = g > 0 ? 0.05 : 0;   // the faceplate cut reaches a hair into the pocket (no coincident faces)
+        translate([wall + e, wall + e, split_z - 1]) cube([in_l - 2 * e, in_w - 2 * e, tongue_h + 3]);
+    }
+    for (x = [out_l * 0.3, out_l * 0.7], y = [wall - tongue_t, out_w - wall + tongue_t])
+        translate([x - snap_len / 2, y, split_z + tongue_h / 2]) rotate([0, 90, 0]) cylinder(r = snap_r + g, h = snap_len, $fn = 16);
+}
+
+module body() {
+    difference() {
+        union() {
+            intersection() { shell(); translate([-1, -1, -1]) cube([out_l + 2, out_w + 2, split_z + 1]); }
+            difference() { tongue(0); usb_cuts(); }
+        }
+        // The separator is a separate plate now, so the board can go in from the front.
+        translate([wall, wall, bay_h]) cube([in_l, in_w, shelf + 0.01]);
+    }
+    // Ledges the separator plate rests on, along the long walls (45 deg underneath, no supports).
+    for (y = [wall, out_w - wall])
+        for (x = [out_l * 0.3, out_l * 0.7])
+            translate([x - 6, y, bay_h]) mirror([0, y > out_w / 2 ? 1 : 0, 0])
+                translate([0, 0, -ledge]) rotate([90, 0, 90]) linear_extrude(12) polygon([[0, 0], [ledge, ledge], [0, ledge]]);
+}
+
+module faceplate() {
+    difference() {
+        intersection() { shell(); translate([-1, -1, split_z]) cube([out_l + 2, out_w + 2, out_h]); }
+        tongue(tongue_clr);
+    }
+}
+
+module separator() {
+    difference() {
+        translate([wall + 0.2, wall + 0.2, 0]) cube([in_l - 0.4, in_w - 0.4, shelf]);
+        translate([board_x + wire_notch_x - wire_notch[0] / 2, out_w / 2 - wire_notch[1] / 2, -1])
+            cube([wire_notch[0], wire_notch[1], shelf + 2]);
+    }
+}
 
 module fitcheck() {
     intersection() {
@@ -463,6 +537,14 @@ if (part == "shell") {
         else
             translate([i * (block_l + 4) + block_l / 2, block_l / 2, 0])
                 rotate([-90, 0, 0]) translate([0, -wall_of(presses[i]) - block_thick(presses[i]), 0]) plunger(presses[i]);
+} else if (part == "none") {
+    // nothing (for including this file from another)
+} else if (part == "body") {
+    body();   // printed as it sits: back on the bed
+} else if (part == "faceplate") {
+    translate([0, out_w, out_h]) rotate([180, 0, 0]) faceplate();   // face-down
+} else if (part == "separator") {
+    translate([-wall, -wall, 0]) separator();
 } else if (part == "fitcheck") {
     translate([0, out_w, out_h]) rotate([180, 0, 0]) fitcheck();
 } else {

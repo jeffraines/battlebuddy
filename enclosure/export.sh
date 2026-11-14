@@ -16,13 +16,13 @@ rev=$(printf "r%02d" "$1")
 desc=$(echo "$2" | tr ' A-Z' '-a-z' | tr -cd 'a-z0-9-')
 
 mkdir -p stl
-for part in shell lid buttons fitcheck; do
+for part in body faceplate separator lid buttons; do
     if ls "stl/${part}_${rev}_"*.stl >/dev/null 2>&1; then
         echo "revision $rev already exported for $part; use a new revision number" >&2
         exit 1
     fi
 done
-for part in shell lid buttons fitcheck; do
+for part in body faceplate separator lid buttons; do
     out="stl/${part}_${rev}_${desc}.stl"
     openscad -q -D "part=\"$part\"" -o "$out" lilygo_case.scad
     echo "wrote $out"

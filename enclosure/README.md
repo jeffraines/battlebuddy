@@ -2,23 +2,31 @@
 
 ![Case preview](preview.png)
 
-A 3D-printed case: a **shell** that holds the board face-down behind a front
-window with the battery in its own bay underneath (a printed separator plate
-keeps them apart, with a small notch for the wire), a **lid** that screws on
-with 4 x M2 x 6 self-tapping screws (remove it to swap the battery), and
-**button caps**: the T-Display-S3's BOOT and KEY buttons are on its face,
-either side of the USB port, so the front frame covers that bare end of the
-board and two round caps poke up through it and sit on the buttons (no
-membrane needed). Outer size about **67 x 37 x 25 mm**.
+A 3D-printed case in five parts (from r24):
+
+- **body**: the walls, the battery bay with its screw posts, and a reset
+  press tab in the side wall. Open at the front and the back.
+- **separator**: a flat plate that drops into the body and sits between the
+  board and the battery (notch for the battery wire).
+- **faceplate**: the front frame (window, button holes) and the top few mm of
+  the walls. Snaps over a tongue on the body. This is the part to print in
+  different colours.
+- **lid**: closes the battery bay with 4 x M2 x 6 self-tapping screws.
+- **buttons**: the BOOT and KEY plungers. Those buttons are on the board's
+  face either side of the USB port, so caps poke through the faceplate.
+
+Outer size about **66 x 36 x 24 mm**.
 
 | File | What |
 |---|---|
 | `lilygo_case.scad` | Parametric OpenSCAD model; edit the values at the top |
 | `export.sh` | Exports all parts with a revision number and description |
-| `stl/shell_rNN_*.stl` | Print face-down (front on the bed), no supports |
+| `stl/body_rNN_*.stl` | Print as exported (back on the bed); no supports |
+| `stl/faceplate_rNN_*.stl` | Print face-down (front on the bed); no supports |
+| `stl/separator_rNN_*.stl` | Flat plate |
 | `stl/lid_rNN_*.stl` | Print flat, countersinks on the bed |
-| `stl/buttons_rNN_*.stl` | The press caps, laid out flat; no supports |
-| `stl/fitcheck_rNN_*.stl` | Front frame with short walls plus the USB end at full depth (~5 g); for checking fit fast |
+| `stl/buttons_rNN_*.stl` | Button plungers, cap-down; no supports |
+| `stl/shell_*`, `stl/fitcheck_*` | r01-r23: one-piece shell and quick fit check (superseded) |
 
 Use the files with the highest revision number. Older revisions stay so every
 print can be traced back to its design.
@@ -50,6 +58,7 @@ print can be traced back to its design.
 | r21 | Buttons on one line 2.75 mm from the board end, −8.8 / +9.05 (top 0.5 mm down, bottom 0.25 mm down, both 0.25 mm toward USB); window USB edge 0.4 mm closer (~0.5 mm plastic by the holes); reset pinhole slot in the +y wall (estimated position); fit check’s full-depth USB end now 14 mm long so it includes the reset slot |
 | r22 | Full-case print. Buttons 0.5 mm up (−9.3 / +8.55); caps 4.4 → 4.0 mm (flange 5.4) so the wall between each hole and the window is ~0.2 mm thicker with the window unchanged; reset slot 0.5 mm toward the front; ±0.3 mm button variants |
 | r23 | Reset is now a flexing press tab moulded into the +y wall (`rst_style = "flex"`): 6.5 × 4 mm tab cut free on three sides, hinged toward the far end, recessed 0.6 mm (1 mm thick so it bends), small nub inside on the switch. Pinhole slot still available (`"pin"`). Fit check full-depth USB end 18 mm to include it |
+| r24 | **Split so it can be assembled:** body + snap-on faceplate (seam 2.5 mm below the front frame, tongue with snap ridges) + separate separator plate on ledges, so the board goes in from the front. Domed bump on the reset tab. Ribs stop below the seam |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
@@ -83,13 +92,17 @@ Then export a new revision (it never overwrites an existing one):
 
 ## Assembly
 
-1. Plug the battery into the board (check polarity: red to +).
-2. Drop the two button caps into their holes from the inside, caps out.
-   Their inner blocks are bigger than the holes, so the board holds them in.
-3. Drop the board face-down into the shell, screen against the window.
-4. Route the battery wire through the slot in the floor and lay the battery
-   in the bay.
-5. Screw the lid on. Stick four 8 mm rubber feet into the recesses.
+1. Drop the separator plate into the body from the front, wire notch at the
+   USB end. It rests on the screw posts and small ledges.
+2. Feed the battery lead through the notch, plug it into the board (check
+   polarity: red to +), and set the board screen-up into the body, USB end
+   first so the port lines up with its slot.
+3. Put the two buttons into the faceplate's holes from the inside, caps out.
+4. Press the faceplate on until it snaps over the body's tongue.
+5. Lay the battery in the bay from the back, screw the lid on, and stick
+   four 8 mm rubber feet into the recesses.
+
+To reset the board, press the small domed tab on the side wall.
 
 Thin crush ribs on the inside walls squash as the board goes in so it sits
 snug (`rib`; shave them with a knife if it's too tight). If it still rattles,
