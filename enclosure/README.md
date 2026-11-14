@@ -49,6 +49,7 @@ print can be traced back to its design.
 | r20 | Buttons 0.5 mm toward USB and 0.5 mm toward +y (down, USB on the right): −9.3 / +8.8 at 3.0 from the board end; window follows 0.5 mm; plungers 0.8 mm shorter (switch tops 3.55 mm below the glass); caps stand 2.2 mm proud (was 1.2); far-end ribs +0.15 mm for the lengthwise slop |
 | r21 | Buttons on one line 2.75 mm from the board end, −8.8 / +9.05 (top 0.5 mm down, bottom 0.25 mm down, both 0.25 mm toward USB); window USB edge 0.4 mm closer (~0.5 mm plastic by the holes); reset pinhole slot in the +y wall (estimated position); fit check’s full-depth USB end now 14 mm long so it includes the reset slot |
 | r22 | Full-case print. Buttons 0.5 mm up (−9.3 / +8.55); caps 4.4 → 4.0 mm (flange 5.4) so the wall between each hole and the window is ~0.2 mm thicker with the window unchanged; reset slot 0.5 mm toward the front; ±0.3 mm button variants |
+| r23 | Reset is now a flexing press tab moulded into the +y wall (`rst_style = "flex"`): 6.5 × 4 mm tab cut free on three sides, hinged toward the far end, recessed 0.6 mm (1 mm thick so it bends), small nub inside on the switch. Pinhole slot still available (`"pin"`). Fit check full-depth USB end 18 mm to include it |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

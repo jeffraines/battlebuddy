@@ -90,10 +90,18 @@ buttons = [["front", 2.75, "press", -9.3],   // BOOT (GPIO0): menu
 // Reset (RST): a side-push switch on the back of the board, on the +y long
 // edge near the USB end. A pinhole slot in the wall (press it with a
 // paperclip; a pinhole avoids accidental resets). Position estimated from photos.
-rst_hole = true;
+rst_style = "flex";       // "flex": press tab moulded into the wall; "pin": paperclip slot; "none"
 rst_from_usb = 10.8;      // board's USB end to the switch centre
 rst_z_above_back = 2.5;     // switch centre above the back of the board pocket
-rst_slot = [2.2, 3.5];    // slot size (along the case, up-down): room for estimate error   // KEY (GPIO14): undo
+rst_slot = [2.2, 3.5];    // "pin": slot size (along the case, up-down): room for estimate error
+// "flex": a tab cut free on three sides, hinged toward the far end. Pressing it
+// bends it in; a small nub on the inside pushes the switch. Recessed so it is
+// hard to press by accident. Nothing to print separately or lose.
+rst_tab = [6.5, 4];       // tab size (along the case, up-down)
+rst_tab_gap = 0.5;        // cut around the tab
+rst_tab_free = 2.5;       // tab's free end is this far toward USB from the switch centre
+rst_tab_recess = 0.6;     // tab surface sits this far below the wall (also makes it flex)
+rst_nub = [2.5, 2, 0.25]; // nub on the inside (along, up-down, reach past the wall's inner face)   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 4.0;        // round cap on face buttons (r19 5 -> 4.4, r22 -> 4.0: thicker wall by the window)
@@ -322,10 +330,22 @@ module shell(with_slots = false) {
 
         // USB-C at the board end.
         // Reset pinhole slot in the +y long wall.
-        if (rst_hole)
+        if (rst_style == "pin")
             translate([board_x + rst_from_usb, out_w + 1, board_z + rst_z_above_back]) rotate([90, 0, 0])
                 hull() for (dz = [-1, 1]) translate([0, dz * (rst_slot[1] - rst_slot[0]) / 2, 0])
                     cylinder(d = rst_slot[0], h = wall + 2, $fn = 32);
+        if (rst_style == "flex") {
+            x0 = board_x + rst_from_usb - rst_tab_free;   // free end
+            x1 = x0 + rst_tab[0];                          // hinge
+            zc = board_z + rst_z_above_back;
+            g = rst_tab_gap;
+            difference() {   // U-shaped cut through the wall round the tab
+                translate([x0 - g, out_w - wall - 1, zc - rst_tab[1] / 2 - g]) cube([x1 - x0 + g, wall + 2, rst_tab[1] + 2 * g]);
+                translate([x0, out_w - wall - 1, zc - rst_tab[1] / 2]) cube([x1 - x0 + 1, wall + 2, rst_tab[1]]);
+            }
+            // Recess the tab's outer face so it is thinner (flexes) and sits below the wall.
+            translate([x0 - g, out_w - rst_tab_recess, zc - rst_tab[1] / 2 - g]) cube([x1 - x0 + 2 * g, 1, rst_tab[1] + 2 * g]);
+        }
 
         // Small rounded slot for the plug's metal shell only.
         translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall + 2) usb_slot(0);
@@ -365,6 +385,11 @@ module shell(with_slots = false) {
             for (b = buttons) if (b[0] == "end") button_hole(b);
         }
 
+    // Reset tab's nub, on the inside of the tab, facing the switch.
+    if (rst_style == "flex")
+        translate([board_x + rst_from_usb - rst_nub[0] / 2, out_w - wall - rst_nub[2], board_z + rst_z_above_back - rst_nub[1] / 2])
+            cube([rst_nub[0], rst_nub[2] + 0.01, rst_nub[1]]);
+
     // Crush ribs: thin ridges on the inside walls of the board pocket that
     // squash as the board goes in, so it sits snug instead of rattling.
     if (rib > 0) {
@@ -403,7 +428,7 @@ module lid() {
 // outline, window, key hole and button holes), plus the USB end at full
 // depth so the port can be checked too. Prints in a fraction of the time.
 fit_walls = 4;     // wall height below the front frame
-fit_usb_len = 14;  // length of the full-depth piece at the USB end (covers the reset hole too)
+fit_usb_len = 18;  // length of the full-depth piece at the USB end (covers the reset hole too)
 
 module fitcheck() {
     intersection() {
