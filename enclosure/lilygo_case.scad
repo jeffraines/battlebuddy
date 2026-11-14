@@ -55,7 +55,7 @@ cover_key = false;      // true: the frame hides the circle touch key (dice stay
 key_arch = true;        // with cover_key: the window's USB end sweeps out in a curve over the key
 key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centre toward USB
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
-key_room = 3.8;         // without it, window reaches this far past the key's centre toward USB
+key_room = 4.2;         // without it, window reaches this far past the key's centre toward USB
                         // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
 key_tongue = false;     // window also reaches between the two face buttons toward USB
 tongue_tip = 3;         // tongue reaches to this far from the board's USB end
@@ -81,9 +81,18 @@ end_rib = 2 * board_clr + rib_squeeze + 0.15;  // (r20: +0.15, the board still s
 //         of the case; "pin" = a small recessed hole (so it can't be hit by accident)
 // THESE POSITIONS ARE ESTIMATES from product photos. Measure and correct them.
 // The board's two switches are not symmetric about its centre line (r11 print).
-// r20: both 0.5 mm toward USB and 0.5 mm toward +y (down, holding it USB-right).
-buttons = [["front", 3.0, "press", -9.3],   // BOOT (GPIO0): menu
-           ["front", 3.0, "press", 8.8]];   // KEY (GPIO14): undo   // KEY (GPIO14): undo
+// r21 (holding it USB-right): top one 0.5 mm down, bottom one 0.25 mm down,
+// both 0.25 mm toward USB, on the same line.
+buttons = [["front", 2.75, "press", -8.8],   // BOOT (GPIO0): menu
+           ["front", 2.75, "press", 9.05]];  // KEY (GPIO14): undo
+
+// Reset (RST): a side-push switch on the back of the board, on the +y long
+// edge near the USB end. A pinhole slot in the wall (press it with a
+// paperclip; a pinhole avoids accidental resets). Position estimated from photos.
+rst_hole = true;
+rst_from_usb = 10.8;      // board's USB end to the switch centre
+rst_z_above_back = 2;     // switch centre above the back of the board pocket
+rst_slot = [2.2, 3.5];    // slot size (along the case, up-down): room for estimate error   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 4.4;        // round cap on face buttons (r19: 5 -> 4.4 to make room for the window)
@@ -311,6 +320,12 @@ module shell(with_slots = false) {
             cube([wire_notch[0], wire_notch[1], shelf + 2]);
 
         // USB-C at the board end.
+        // Reset pinhole slot in the +y long wall.
+        if (rst_hole)
+            translate([board_x + rst_from_usb, out_w + 1, board_z + rst_z_above_back]) rotate([90, 0, 0])
+                hull() for (dz = [-1, 1]) translate([0, dz * (rst_slot[1] - rst_slot[0]) / 2, 0])
+                    cylinder(d = rst_slot[0], h = wall + 2, $fn = 32);
+
         // Small rounded slot for the plug's metal shell only.
         translate([-1, out_w / 2, usb_z]) rotate([0, 90, 0]) linear_extrude(wall + 2) usb_slot(0);
         // Wall thinned from the inside round the port so the plug housing gets close enough to seat.
@@ -387,7 +402,7 @@ module lid() {
 // outline, window, key hole and button holes), plus the USB end at full
 // depth so the port can be checked too. Prints in a fraction of the time.
 fit_walls = 4;     // wall height below the front frame
-fit_usb_len = 6;   // length of the full-depth piece at the USB end
+fit_usb_len = 14;  // length of the full-depth piece at the USB end (covers the reset hole too)
 
 module fitcheck() {
     intersection() {
