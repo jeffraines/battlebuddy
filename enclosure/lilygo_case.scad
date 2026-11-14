@@ -83,20 +83,21 @@ end_rib = 2 * board_clr + rib_squeeze + 0.15;  // (r20: +0.15, the board still s
 // The board's two switches are not symmetric about its centre line (r11 print).
 // r21 (holding it USB-right): top one 0.5 mm down, bottom one 0.25 mm down,
 // both 0.25 mm toward USB, on the same line.
-buttons = [["front", 2.75, "press", -8.8],   // BOOT (GPIO0): menu
-           ["front", 2.75, "press", 9.05]];  // KEY (GPIO14): undo
+// r22: both 0.5 mm up (toward -y).
+buttons = [["front", 2.75, "press", -9.3],   // BOOT (GPIO0): menu
+           ["front", 2.75, "press", 8.55]];  // KEY (GPIO14): undo
 
 // Reset (RST): a side-push switch on the back of the board, on the +y long
 // edge near the USB end. A pinhole slot in the wall (press it with a
 // paperclip; a pinhole avoids accidental resets). Position estimated from photos.
 rst_hole = true;
 rst_from_usb = 10.8;      // board's USB end to the switch centre
-rst_z_above_back = 2;     // switch centre above the back of the board pocket
+rst_z_above_back = 2.5;     // switch centre above the back of the board pocket
 rst_slot = [2.2, 3.5];    // slot size (along the case, up-down): room for estimate error   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
-face_cap_d = 4.4;        // round cap on face buttons (r19: 5 -> 4.4 to make room for the window)
-face_flange_d = 5.8;     // face button: thin round flange under the frame (bigger than the hole, keeps it in)
+face_cap_d = 4.0;        // round cap on face buttons (r19 5 -> 4.4, r22 -> 4.0: thicker wall by the window)
+face_flange_d = 5.4;     // face button: thin round flange under the frame (bigger than the hole, keeps it in)
 face_flange_t = 0.8;
 face_flange_cut = 0;     // flange stops at the cap's centre line: nothing on the display side (r18 still hit the acrylic)
 face_stem_d = 3;         // narrow stem from the flange down to the switch (r17: the 6.5 x 8 block hit the display)
