@@ -115,15 +115,19 @@ rst_proud = 0.7;          // stem stands out of the wall this much
 rst_nub_h = 0.3;          // nub on the head toward the switch
 
 /* [Side label inlay] */
-// Letters recessed into the -y long wall (the top edge when you hold it with
-// the USB on the right). Print the "inlay" part in a contrasting colour and
-// stick each letter into its slot (double-sided tape or a dab of glue).
+// A rectangular recess in the -y long wall (the top edge when you hold it
+// with the USB on the right) takes a one-piece badge: a plate with the
+// letters raised on it. Print the badge face-up with a colour change where
+// the letters start, then tape or glue it into the recess.
 label_text = "BATTLE BUDDY";
 label_font = "Liberation Sans:style=Bold";
 label_size = 4.6;         // letter height
 label_depth = 0.8;        // recess depth in the wall (1.6 mm wall)
-label_inlay_t = 0.6;      // inlay letters: leaves ~0.2 mm for tape
-label_fit = 0.1;          // inlay letters are this much smaller all round
+badge = [56, 7.6];        // recess size (along the case, up-down)
+badge_r = 1.2;            // recess corner radius
+badge_t = 0.6;            // badge plate (sits 0.2 mm below the wall: room for tape)
+badge_letters = 0.4;      // letters raised on the plate (colour change at badge_t)
+label_fit = 0.15;         // badge plate is this much smaller all round than the recess
 
 /* [Split: how it goes together] */
 // The case is a body (walls, separator, battery bay) plus a faceplate (the
@@ -533,7 +537,7 @@ module body() {
             difference() { tongue(0); usb_cuts(); }
         }
         // Side label recess.
-        translate([out_l / 2, label_depth, split_z / 2]) rotate([90, 0, 0]) linear_extrude(label_depth + 1) label_2d();
+        translate([out_l / 2, label_depth, split_z / 2]) rotate([90, 0, 0]) linear_extrude(label_depth + 1) badge_2d();
         // The separator is a separate plate now, so the board can go in from the front.
         translate([wall, wall, bay_h]) cube([in_l, in_w, shelf + 0.01]);
     }
@@ -555,6 +559,10 @@ module faceplate() {
 
 module label_2d(g = 0) {
     offset(delta = g) text(label_text, size = label_size, font = label_font, halign = "center", valign = "center");
+}
+
+module badge_2d(g = 0) {
+    offset(r = badge_r + g) square([badge[0] - 2 * badge_r, badge[1] - 2 * badge_r], center = true);
 }
 
 module separator() {
@@ -610,7 +618,9 @@ if (part == "shell") {
 } else if (part == "faceplate") {
     translate([0, out_w, out_h]) rotate([180, 0, 0]) faceplate();   // face-down
 } else if (part == "inlay") {
-    linear_extrude(label_inlay_t) label_2d(-label_fit);
+    // Face-up: plate on the bed, letters on top. Change colour at badge_t.
+    linear_extrude(badge_t) badge_2d(-label_fit);
+    translate([0, 0, badge_t - 0.01]) linear_extrude(badge_letters + 0.01) label_2d();
 } else if (part == "separator") {
     translate([-wall, -wall, 0]) separator();
 } else if (part == "fitcheck") {
