@@ -396,6 +396,13 @@ int main(int argc, char **argv)
         s.test_text = "3h 12m";
         s.last_test = "9h 41m";
         save(frame, s, "menu-page2-battery-test");
+        s.menu_page = 2;
+        s.brightness_text = "80%";
+        s.dim_after_text = "30 s";
+        s.dim_to_text = "8%";
+        s.sleep_after_text = "10 min";
+        save(frame, s, "menu-screen");
+        s.menu_page = 1;
         s.always_on = false;
         s.test_text = nullptr;
         s.last_test = nullptr;

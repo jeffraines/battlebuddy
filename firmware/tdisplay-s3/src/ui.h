@@ -56,7 +56,7 @@ struct UiState {
     bool flipped;        // whole screen rotated 180 degrees (menu label only)
     bool vivid;          // Look setting: vivid colors and glows instead of subdued
     bool menu;           // menu screen instead of the counter
-    int menu_page;       // 0 = main settings, 1 = more
+    int menu_page;       // 0 = main settings, 1 = more, 2 = screen
     int counter_style;   // Counter setting: 0 = themed (each game's own look), 1 = d20, 2 = digits
     const uint16_t *spin;  // per-player change animation progress (0..1000, 1000 = still), or nullptr
     const int8_t *spin_dir; // per-player direction of the last change (+1 / -1)
@@ -74,7 +74,12 @@ struct UiState {
     const PickerState *picker; // game picker, or nullptr
     const EntryState *entry;   // number pad, or nullptr
 
-    bool always_on = false;         // Screen setting: never dim or auto-sleep
+    bool always_on = false;         // screen never dims or sleeps (settings, or a battery test)
+    // Screen page values (menu_page 2), already formatted.
+    const char *brightness_text = nullptr;
+    const char *dim_after_text = nullptr;
+    const char *dim_to_text = nullptr;
+    const char *sleep_after_text = nullptr;
     const char *test_text = nullptr; // Battery test tile: "Start" or the time so far
     const char *last_test = nullptr; // Last test tile: how long the last test ran, or nullptr
 };
@@ -99,7 +104,11 @@ struct UiAction {
         MenuCounter,
         MenuSleep,
         MenuUndo,
-        MenuScreen,      // toggle always-on screen
+        MenuScreen,      // open the Screen settings page
+        ScreenBrightness, // cycle each Screen setting
+        ScreenDimAfter,
+        ScreenDimTo,
+        ScreenSleepAfter,
         MenuBatteryTest, // start / stop the battery test
         MenuEnd,       // open the "who won?" screen
         DeclareWinner, // `player` won this game

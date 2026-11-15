@@ -1230,6 +1230,20 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
             {"More", ">", UiAction::MenuMore, true},
         };
         memcpy(out, tiles, sizeof(tiles));
+    } else if (s.menu_page == 2) {
+        auto v = [](const char *t) { return t ? t : "-"; };
+        MenuTile tiles[kMenuTiles] = {
+            {"Brightness", v(s.brightness_text), UiAction::ScreenBrightness, true},
+            {"Dim after", v(s.dim_after_text), UiAction::ScreenDimAfter, true},
+            {"Dim to", v(s.dim_to_text), UiAction::ScreenDimTo, true},
+            {"Sleep after", v(s.sleep_after_text), UiAction::ScreenSleepAfter, true},
+            {nullptr, nullptr, UiAction::None, false},
+            {nullptr, nullptr, UiAction::None, false},
+            {nullptr, nullptr, UiAction::None, false},
+            {nullptr, nullptr, UiAction::None, false},
+            {"Back", "<", UiAction::MenuBack, true},
+        };
+        memcpy(out, tiles, sizeof(tiles));
     } else {
         MenuTile tiles[kMenuTiles] = {
             {"Look", s.vivid ? "Vivid" : "Subdued", UiAction::MenuLook, true},
@@ -1237,7 +1251,7 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
              counter_style_plain(g)},
             {"Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true},
             {"Sleep", "KEY wakes", UiAction::MenuSleep, true},
-            {"Screen", s.always_on ? "Always on" : "Auto dim", UiAction::MenuScreen, true},
+            {"Screen", s.always_on ? "Always on" : "Settings", UiAction::MenuScreen, true},
             {"Battery test", s.test_text ? s.test_text : "Start", UiAction::MenuBatteryTest, true},
             {"Last test", s.last_test ? s.last_test : "-", UiAction::None, false},
             {nullptr, nullptr, UiAction::None, false},
@@ -2167,7 +2181,7 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
     // in place of the game name.
     bool toast_in_header = state.toast && !state.menu && has_kinds(*state.game) && state.game->players == 2;
     draw_header(frame, t, state,
-                state.menu ? (state.menu_page ? "MORE" : "MENU") : toast_in_header ? "" : state.game->profile->name,
+                state.menu ? (state.menu_page == 2 ? "SCREEN" : state.menu_page ? "MORE" : "MENU") : toast_in_header ? "" : state.game->profile->name,
                 !state.menu);
 
     if (state.menu) {

@@ -33,7 +33,7 @@ Hold the board landscape, USB port on the right.
 | More → Counter | For plain life counters (Magic, Commander, Lorcana, FaB). *Themed* (default): each game's own look, below. *d20*: life on a d20 that spins a face toward each change. *Digits*: just the number |
 | More → Flip | Rotates the whole screen 180° (USB port on the left) |
 | More → Sleep | Sleep now; KEY wakes |
-| More → Screen | Auto dim (default) or Always on: never dims or sleeps |
+| More → Screen | Brightness (25/50/80/100 %), Dim after (never, 15 s to 5 min), Dim to (off, 4–40 %), Sleep after (never, 5–30 min). Tap a tile to step through; saved across power-off |
 | More → Battery test | Start: screen stays lit and the board counts how long the battery lasts. Tap again to stop. Last test shows the result |
 
 **Themed counters:** Magic and Commander show a quiet row of five colored
@@ -94,8 +94,8 @@ For games other than Riftbound, quick taps are grouped: changes within 1.5 s
 of each other show as a pending `+3` / `-2`, then become one history entry
 along the bottom (colored by player in two-player mode).
 
-Each game has its own colors and its own title lettering. The screen dims after 30 s idle and the
-board sleeps after 10 minutes; the first touch or press after dimming only
+Each game has its own colors and its own title lettering. By default the screen dims to 8 % after
+30 s idle and the board sleeps after 10 minutes (More → Screen changes all of these); the first touch or press after dimming only
 wakes the screen. The game survives sleep, but not a reset or power cut.
 
 **Battery test.** Charge fully, unplug, then More → Battery test → Start. The

@@ -31,12 +31,13 @@ constexpr uint32_t kTapMaxMs = 700;       // longer presses without repeat don't
 constexpr uint32_t kButtonGuardMs = 250;  // ignore touches this soon after a physical button
 constexpr uint32_t kRepeatIntervalMs = 150;
 constexpr uint32_t kLongPressMs = 1000;
-constexpr uint32_t kDimAfterMs = 30000;
-constexpr uint32_t kSleepAfterMs = 10 * 60 * 1000;
+// Screen settings (More -> Screen). Index 0 of the times means never.
+constexpr uint8_t kBrightnessPct[] = {25, 50, 80, 100};
+constexpr uint16_t kDimAfterS[] = {0, 15, 30, 60, 120, 300};
+constexpr uint8_t kDimToPct[] = {0, 4, 8, 20, 40}; // 0 = screen off while dimmed
+constexpr uint16_t kSleepAfterMin[] = {0, 5, 10, 20, 30};
 constexpr uint32_t kBatteryPollMs = 5000;
 constexpr uint32_t kToastMs = 1500;
-constexpr uint8_t kBrightness = 200;
-constexpr uint8_t kDimBrightness = 20;
 constexpr uint32_t kRollMs = 900;      // tumble before showing a roll
 constexpr uint32_t kPopMs = 350;       // landing effect after a roll
 constexpr uint32_t kCelebrateMs = 1100; // longer effect for the top or bottom face
@@ -48,7 +49,7 @@ constexpr uint32_t kSpinMs = 420;      // counter change animation (roll, spin, 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0009;
+constexpr uint32_t kSavedMagic = 0xBB0B000A;
 constexpr uint32_t kTestSaveS = 60; // battery test: save progress to flash this often
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
@@ -65,7 +66,6 @@ struct Saved {
     uint8_t best_of;       // 0 = match tracking off
     uint8_t timer_minutes; // 0 = no timer
     uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
-    bool always_on;        // Screen setting: never dim or auto-sleep
     bb_match_t match;
     bb_game_t game;
 };
@@ -104,6 +104,16 @@ uint32_t last_input_ms = 0;
 bool dimmed = false;
 int battery_percent = -1; // -1 = on USB / unknown
 uint16_t battery_mv = 0;
+
+// Screen settings, saved to flash so they survive power-off. Indexes into the tables above.
+struct ScreenPrefs {
+    uint8_t brightness = 2; // 80 %
+    uint8_t dim_after = 2;  // 30 s
+    uint8_t dim_to = 2;     // 8 %
+    uint8_t sleep_after = 2; // 10 min
+};
+ScreenPrefs screen;
+char brightness_text[8], dim_after_text[10], dim_to_text[8], sleep_after_text[10];
 
 // Battery test: runs the screen always on and counts how long the battery
 // lasts. Progress is saved to flash every minute, so when the battery dies the
@@ -193,7 +203,11 @@ UiState ui_state()
     s.dice = dice_open ? &dice : nullptr;
     s.picker = picker_open ? &picker : nullptr;
     s.entry = entry_open ? &entry : nullptr;
-    s.always_on = saved.always_on || test.running;
+    s.always_on = test.running || (kDimAfterS[screen.dim_after] == 0 && kSleepAfterMin[screen.sleep_after] == 0);
+    s.brightness_text = brightness_text;
+    s.dim_after_text = dim_after_text;
+    s.dim_to_text = dim_to_text;
+    s.sleep_after_text = sleep_after_text;
     s.test_text = test.running ? test_text : nullptr;
     s.last_test = test.last_secs ? last_test_text : nullptr;
     return s;
@@ -221,13 +235,59 @@ void start_game(size_t index, uint8_t players)
     dirty = true;
 }
 
+uint8_t pct_to_level(uint8_t pct)
+{
+    return (uint8_t)((pct * 255 + 50) / 100);
+}
+
+uint8_t full_brightness()
+{
+    return pct_to_level(kBrightnessPct[screen.brightness]);
+}
+
+void screen_texts()
+{
+    snprintf(brightness_text, sizeof(brightness_text), "%u%%", kBrightnessPct[screen.brightness]);
+    uint16_t d = kDimAfterS[screen.dim_after];
+    if (d == 0) {
+        snprintf(dim_after_text, sizeof(dim_after_text), "Never");
+    } else if (d < 60) {
+        snprintf(dim_after_text, sizeof(dim_after_text), "%u s", d);
+    } else {
+        snprintf(dim_after_text, sizeof(dim_after_text), "%u min", d / 60);
+    }
+    uint8_t to = kDimToPct[screen.dim_to];
+    snprintf(dim_to_text, sizeof(dim_to_text), to ? "%u%%" : "Off", to);
+    uint16_t m = kSleepAfterMin[screen.sleep_after];
+    snprintf(sleep_after_text, sizeof(sleep_after_text), m ? "%u min" : "Never", m);
+}
+
+void screen_load()
+{
+    screen.brightness = prefs.getUChar("s_br", screen.brightness) % sizeof(kBrightnessPct);
+    screen.dim_after = prefs.getUChar("s_da", screen.dim_after) % (sizeof(kDimAfterS) / sizeof(kDimAfterS[0]));
+    screen.dim_to = prefs.getUChar("s_dt", screen.dim_to) % sizeof(kDimToPct);
+    screen.sleep_after =
+        prefs.getUChar("s_sa", screen.sleep_after) % (sizeof(kSleepAfterMin) / sizeof(kSleepAfterMin[0]));
+    screen_texts();
+}
+
+void screen_save()
+{
+    prefs.putUChar("s_br", screen.brightness);
+    prefs.putUChar("s_da", screen.dim_after);
+    prefs.putUChar("s_dt", screen.dim_to);
+    prefs.putUChar("s_sa", screen.sleep_after);
+    screen_texts();
+}
+
 // Returns true if this input should be ignored because it only woke the screen.
 bool register_input(uint32_t now)
 {
     last_input_ms = now;
     if (dimmed) {
         dimmed = false;
-        lcd.setBrightness(kBrightness);
+        lcd.setBrightness(full_brightness());
         return true;
     }
     return false;
@@ -588,7 +648,7 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuBack:
-        menu_page = 0;
+        menu_page = menu_page == 2 ? 1 : 0;
         dirty = true;
         break;
     case UiAction::MenuCounter:
@@ -639,7 +699,29 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuScreen:
-        saved.always_on = !saved.always_on;
+        menu_page = 2;
+        dirty = true;
+        break;
+    case UiAction::ScreenBrightness:
+        screen.brightness = (uint8_t)((screen.brightness + 1) % sizeof(kBrightnessPct));
+        screen_save();
+        lcd.setBrightness(full_brightness());
+        dirty = true;
+        break;
+    case UiAction::ScreenDimAfter:
+        screen.dim_after = (uint8_t)((screen.dim_after + 1) % (sizeof(kDimAfterS) / sizeof(kDimAfterS[0])));
+        screen_save();
+        dirty = true;
+        break;
+    case UiAction::ScreenDimTo:
+        screen.dim_to = (uint8_t)((screen.dim_to + 1) % sizeof(kDimToPct));
+        screen_save();
+        dirty = true;
+        break;
+    case UiAction::ScreenSleepAfter:
+        screen.sleep_after =
+            (uint8_t)((screen.sleep_after + 1) % (sizeof(kSleepAfterMin) / sizeof(kSleepAfterMin[0])));
+        screen_save();
         dirty = true;
         break;
     case UiAction::MenuBatteryTest:
@@ -857,7 +939,6 @@ void setup()
         saved.counter_style = 0;
         saved.best_of = 1;
         saved.timer_minutes = 0;
-        saved.always_on = false;
         start_game(0, 1);
     }
 
@@ -868,11 +949,12 @@ void setup()
         test_finish();
     }
     test_texts();
+    screen_load();
     saved.magic = 0; // only trusted again after the next sleep
 
     lcd.init();
     lcd.setRotation(saved.flipped ? 3 : 1); // landscape; unflipped = USB port on the right
-    lcd.setBrightness(kBrightness);
+    lcd.setBrightness(full_brightness());
 
     frame.setColorDepth(16);
     frame.setPsram(psramFound());
@@ -941,14 +1023,16 @@ void loop()
     }
 
     uint32_t idle = now - last_input_ms;
-    if (saved.always_on || test.running) {
-        idle = 0; // never dim or sleep
+    uint32_t dim_ms = (uint32_t)kDimAfterS[screen.dim_after] * 1000;
+    uint32_t sleep_ms = (uint32_t)kSleepAfterMin[screen.sleep_after] * 60 * 1000;
+    if (test.running) {
+        dim_ms = sleep_ms = 0; // the battery test keeps the screen lit
     }
-    if (!dimmed && idle >= kDimAfterMs) {
+    if (!dimmed && dim_ms && idle >= dim_ms) {
         dimmed = true;
-        lcd.setBrightness(kDimBrightness);
+        lcd.setBrightness(pct_to_level(kDimToPct[screen.dim_to]));
     }
-    if (idle >= kSleepAfterMs) {
+    if (sleep_ms && idle >= sleep_ms) {
         go_to_sleep();
     }
 
