@@ -617,6 +617,10 @@ if (part == "shell") {
     body();   // printed as it sits: back on the bed
 } else if (part == "faceplate") {
     translate([0, out_w, out_h]) rotate([180, 0, 0]) faceplate();   // face-down
+} else if (part == "badge_plate") {   // the badge split in two, for two filaments
+    linear_extrude(badge_t) badge_2d(-label_fit);
+} else if (part == "badge_letters") {
+    translate([0, 0, badge_t]) linear_extrude(badge_letters) label_2d();
 } else if (part == "inlay") {
     // Face-up: plate on the bed, letters on top. Change colour at badge_t.
     linear_extrude(badge_t) badge_2d(-label_fit);
