@@ -28,7 +28,7 @@ board_w = 32;    // width
 board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
-switch_depth = 3.55; // face buttons: glass front down to the switch tops
+switch_depth = 4.35; // face buttons: glass front down to the switch tops
                      // (r19: even the 0.3 mm shorter plunger held the case ~0.5 mm off)
 usb_from_front = 5.7;  // front glass to the USB-C centre (the first print showed it sits lower)
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
@@ -111,8 +111,10 @@ rst_cap_d = 2.6;          // stem through the wall
 rst_head_d = 4.4;         // head inside (bigger than the hole, so it can't fall out)
 rst_head_t = 0.7;
 rst_pocket = 0.9;         // pocket depth in the wall's inside face (wall left: 0.7)
-rst_proud = 0.7;          // stem stands out of the wall this much
-rst_nub_h = 0.3;          // nub on the head toward the switch
+rst_proud = 1.5;          // stem stands out of the wall this much (r27: 0.7 was too little to press)
+rst_nub_h = 1.7;          // nub on the head toward the switch (r27: the PCB is ~2 mm narrower than the
+                          // glass each side and the switch pokes ~0.5 mm past the PCB, so it sits
+                          // ~1.75 mm in from the wall; the nub rests ~0.25 mm short of it)
 
 /* [Side label inlay] */
 // A rectangular recess in the -y long wall (the top edge when you hold it
@@ -157,6 +159,12 @@ sep_cut_w = 27;           // window width (centred)
 conn_h = 3.0;             // the connectors' height on the board's back (estimate)
 rail_h = conn_h + clr_default / 2;// rails hold the board's back this high above the plate
 rail_w = 1.0;             // rails sit under the board's very edge (clear of the header pads)
+rails = false;            // r27: off. The PCB is ~2 mm narrower than the glass each side, so the
+                          // rails were under the display, not the board.
+// The board rests on a ~2 mm IC in the middle and tips; a pad under the far
+// end (away from the connectors) holds that end up.
+shim_h = 2.0;             // pad height above the separator
+shim = [7, 14];           // pad size (along, across), centred across, at the board's far end
 rail_from_usb = 14;       // rails start here (clear of the reset switch on the back edge)   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
@@ -571,9 +579,13 @@ module separator() {
         // Window under the connectors (also the way through for the battery lead).
         translate([wall - 1, out_w / 2 - sep_cut_w / 2, -1]) cube([board_x - wall + 1 + sep_cut_l, sep_cut_w, shelf + 2]);
     }
-    // Rails under the board's long edges.
-    for (y = [board_y + 0.15, board_y + board_w - rail_w - 0.15])   // 0.15 in: clear of the crush ribs
-        translate([board_x + rail_from_usb, y, shelf - 0.01]) cube([board_l - rail_from_usb - 1, rail_w, rail_h + 0.01]);
+    // Rails under the board's long edges (off by default).
+    if (rails)
+        for (y = [board_y + 0.15, board_y + board_w - rail_w - 0.15])   // 0.15 in: clear of the crush ribs
+            translate([board_x + rail_from_usb, y, shelf - 0.01]) cube([board_l - rail_from_usb - 1, rail_w, rail_h + 0.01]);
+    // Pad under the board's far end.
+    if (shim_h > 0)
+        translate([board_x + board_l - 1 - shim[0], out_w / 2 - shim[1] / 2, shelf - 0.01]) cube([shim[0], shim[1], shim_h + 0.01]);
 }
 
 module fitcheck() {

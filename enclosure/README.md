@@ -62,6 +62,7 @@ print can be traced back to its design.
 | r24 | **Split so it can be assembled:** body + snap-on faceplate (seam 2.5 mm below the front frame, tongue with snap ridges) + separate separator plate on ledges, so the board goes in from the front. Domed bump on the reset tab. Ribs stop below the seam |
 | r25 | Faceplate held by barbed snaps (flat catch, sloped entry) + pry notch at the far end; window bevel 0.8 mm on all four sides incl. the USB side; separator has a window under the back connectors (battery plug reachable from the bay) and rails along the board edges (`conn_h` estimate, 3 mm); reset is now a small T-shaped button through the wall; "BATTLE BUDDY" recess on the −y wall + `inlay` part; bay takes up to an 803050 |
 | r26 | Side label is a one-piece badge: 56 × 7.6 mm rounded recess (0.8 deep) + badge plate 0.6 mm with letters raised 0.4 mm (two-colour print with a colour change) |
+| r27 | Reset button reaches ~1.75 mm in (nub 1.7) and stands 1.5 mm proud; separator rails off (the PCB is ~2 mm narrower than the glass each side), 2 mm pad under the board's far end instead; face plungers 0.8 mm longer, ±0.4 variants. Body, faceplate, lid unchanged |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
