@@ -48,14 +48,14 @@ screen_margin = 0.4;    // "screen": window this much bigger than the display al
 border_side = 2.8;      // "border": window this much wider than the display on each long side
 border_far = 2.0;       //           and this much past it at the far end (r10 2.5 showed a gap)
 window_r = 2.5;         // window corner radius, to follow the glass's rounded corners
-bevel = 1.2;            // window edges slope outward by this much (room for a fingertip)
-bevel_usb = 0;          // smaller slope on the USB-side edge, next to the button holes
+bevel = 0.8;            // window edges slope outward by this much, all four sides (r25: 1.2 -> 0.8 so the USB side can match)
+bevel_usb = bevel;       // smaller slope on the USB-side edge, next to the button holes
 key_from_glass = 1.9;   // USB-side edge of the glass to the circle key's centre (from the r08/r10 photos)
 cover_key = false;      // true: the frame hides the circle touch key (dice stay in the menu)
 key_arch = true;        // with cover_key: the window's USB end sweeps out in a curve over the key
 key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centre toward USB
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
-key_room = 4.2;         // without it, window reaches this far past the key's centre toward USB
+key_room = 3.4;         // without it, window reaches this far past the key's centre toward USB
                         // (r14: as far as the button holes allow, ~0.85 mm of plastic between)
 key_tongue = false;     // window also reaches between the two face buttons toward USB
 tongue_tip = 3;         // tongue reaches to this far from the board's USB end
@@ -90,7 +90,7 @@ buttons = [["front", 2.75, "press", -9.3],   // BOOT (GPIO0): menu
 // Reset (RST): a side-push switch on the back of the board, on the +y long
 // edge near the USB end. A pinhole slot in the wall (press it with a
 // paperclip; a pinhole avoids accidental resets). Position estimated from photos.
-rst_style = "flex";       // "flex": press tab moulded into the wall; "pin": paperclip slot; "none"
+rst_style = "plunger";    // "plunger": small T-shaped button through the wall; "flex": press tab (r23-24, didn't work); "pin": paperclip slot; "none"
 rst_from_usb = 10.8;      // board's USB end to the switch centre
 rst_z_above_back = 2.5;     // switch centre above the back of the board pocket
 rst_slot = [2.2, 3.5];    // "pin": slot size (along the case, up-down): room for estimate error
@@ -104,6 +104,26 @@ rst_tab_recess = 0.6;     // tab surface sits this far below the wall (also make
 rst_nub = [2.5, 2, 0.25]; // nub on the inside (along, up-down, reach past the wall's inner face)
 rst_bump_d = 3;           // dome on the outside of the tab so a fingertip finds it
 rst_bump_h = 0.9;         // (stands ~0.3 mm proud of the wall: findable, not easily knocked)
+// "plunger": a tiny T-shaped button. Its head sits in a pocket in the inside
+// face of the wall (put it in from the inside before the board), its stem
+// pokes out through a hole. Rigid, nothing to bend.
+rst_cap_d = 2.6;          // stem through the wall
+rst_head_d = 4.4;         // head inside (bigger than the hole, so it can't fall out)
+rst_head_t = 0.7;
+rst_pocket = 0.9;         // pocket depth in the wall's inside face (wall left: 0.7)
+rst_proud = 0.7;          // stem stands out of the wall this much
+rst_nub_h = 0.3;          // nub on the head toward the switch
+
+/* [Side label inlay] */
+// Letters recessed into the -y long wall (the top edge when you hold it with
+// the USB on the right). Print the "inlay" part in a contrasting colour and
+// stick each letter into its slot (double-sided tape or a dab of glue).
+label_text = "BATTLE BUDDY";
+label_font = "Liberation Sans:style=Bold";
+label_size = 4.6;         // letter height
+label_depth = 0.8;        // recess depth in the wall (1.6 mm wall)
+label_inlay_t = 0.6;      // inlay letters: leaves ~0.2 mm for tape
+label_fit = 0.1;          // inlay letters are this much smaller all round
 
 /* [Split: how it goes together] */
 // The case is a body (walls, separator, battery bay) plus a faceplate (the
@@ -113,11 +133,27 @@ rst_bump_h = 0.9;         // (stands ~0.3 mm proud of the wall: findable, not ea
 // The faceplate is also the part to print in different colours.
 split_drop = 2.5;         // seam this far below the inside of the front frame
 tongue_t = 0.7;           // body's tongue (inner part of the wall) that the faceplate slips over
-tongue_h = 2.0;
+tongue_h = 2.6;
 tongue_clr = 0.1;
-snap_r = 0.3;             // snap ridges on the tongue
-snap_len = 8;
-ledge = 0.9;              // ledges the separator rests on (plus the screw bosses)   // KEY (GPIO14): undo
+// Snap catches (r25): barbs on the tongue, sloped on top so the faceplate
+// slides on, flat underneath so it can't slide back off. A notch at the far
+// end of the seam takes a fingernail or coin to pry it off.
+snap_out = 0.45;          // how far a barb sticks out of the tongue
+snap_ramp = 1.4;          // height of the sloped face
+snap_from_seam = 0.8;     // flat catch face this far above the seam
+snap_len = 14;
+pry_notch = [8, 0.9];     // (width, height) at the far end of the seam
+ledge = 0.9;              // ledges the separator rests on (plus the screw bosses)
+// The board has two tall connectors on its back at the USB end (battery and a
+// 4-pin), so on a flat plate it tipped. The separator now has a window under
+// them (the battery plug can be reached from the bay, no need to lift the
+// plate) and two rails along the board's long edges that hold it level.
+sep_cut_l = 9;            // window length from the board's USB end
+sep_cut_w = 27;           // window width (centred)
+conn_h = 3.0;             // the connectors' height on the board's back (estimate)
+rail_h = conn_h + clr_default / 2;// rails hold the board's back this high above the plate
+rail_w = 1.0;             // rails sit under the board's very edge (clear of the header pads)
+rail_from_usb = 14;       // rails start here (clear of the reset switch on the back edge)   // KEY (GPIO14): undo
 button_from_front = 5;   // side / end buttons: front glass to their centre (measure)
 button_stick_out = 0.5;  // side / end buttons: how far they stick out past the board edge
 face_cap_d = 4.0;        // round cap on face buttons (r19 5 -> 4.4, r22 -> 4.0: thicker wall by the window)
@@ -137,7 +173,7 @@ slots_right = [[4, 30]];
 slot_h = 6;
 
 /* [Battery] */
-batt_l = 40;
+batt_l = 40;    // the bay also takes an 803050 (50 mm, ~1500 mAh): longest that clears the screw posts
 batt_w = 30;
 batt_t = 8;
 
@@ -244,6 +280,14 @@ module button_hole(b) {
 
 // A press button: a cap that pokes out of the case, on an inner block that is
 // bigger than the hole (so it can't fall out) and sits on the board's button.
+// The reset button: stem out through the wall, head inside, nub toward the switch.
+// Built along +z from the outside face of the wall (z = 0) inward.
+module reset_pin() {
+    translate([0, 0, -rst_proud]) cylinder(d = rst_cap_d, h = rst_proud + wall - rst_pocket + 0.01, $fn = 32);
+    translate([0, 0, wall - rst_pocket]) cylinder(d = rst_head_d, h = rst_head_t, $fn = 40);
+    translate([0, 0, wall - rst_pocket + rst_head_t - 0.01]) cylinder(d = 2, h = rst_nub_h + 0.01, $fn = 24);
+}
+
 module plunger(b) {
     t = block_thick(b);
     w = wall_of(b);
@@ -350,6 +394,11 @@ module shell(with_slots = false) {
             translate([board_x + rst_from_usb, out_w + 1, board_z + rst_z_above_back]) rotate([90, 0, 0])
                 hull() for (dz = [-1, 1]) translate([0, dz * (rst_slot[1] - rst_slot[0]) / 2, 0])
                     cylinder(d = rst_slot[0], h = wall + 2, $fn = 32);
+        if (rst_style == "plunger")
+            translate([board_x + rst_from_usb, out_w + 1, board_z + rst_z_above_back]) rotate([90, 0, 0]) {
+                cylinder(d = rst_cap_d + 0.3, h = wall + 2, $fn = 32);
+                translate([0, 0, 1 + wall - rst_pocket]) cylinder(d = rst_head_d + 0.4, h = rst_pocket + 1, $fn = 40);
+            }
         if (rst_style == "flex") {
             x0 = board_x + rst_from_usb - rst_tab_free;   // free end
             x1 = x0 + rst_tab[0];                          // hinge
@@ -469,8 +518,12 @@ module tongue(g) {
         e = g > 0 ? 0.05 : 0;   // the faceplate cut reaches a hair into the pocket (no coincident faces)
         translate([wall + e, wall + e, split_z - 1]) cube([in_l - 2 * e, in_w - 2 * e, tongue_h + 3]);
     }
-    for (x = [out_l * 0.3, out_l * 0.7], y = [wall - tongue_t, out_w - wall + tongue_t])
-        translate([x - snap_len / 2, y, split_z + tongue_h / 2]) rotate([0, 90, 0]) cylinder(r = snap_r + g, h = snap_len, $fn = 16);
+    // Barbs on both long sides: flat catch underneath, slope above.
+    for (x = [out_l * 0.3, out_l * 0.7], side = [0, 1])
+        translate([x - snap_len / 2 - g, side == 0 ? wall - tongue_t : out_w - wall + tongue_t, split_z + snap_from_seam - g])
+            mirror([0, side == 0 ? 1 : 0, 0])
+                rotate([90, 0, 90]) linear_extrude(snap_len + 2 * g)
+                    polygon([[-0.01, 0], [snap_out + g, 0], [-0.01, snap_ramp + 2 * g]]);
 }
 
 module body() {
@@ -479,6 +532,8 @@ module body() {
             intersection() { shell(); translate([-1, -1, -1]) cube([out_l + 2, out_w + 2, split_z + 1]); }
             difference() { tongue(0); usb_cuts(); }
         }
+        // Side label recess.
+        translate([out_l / 2, label_depth, split_z / 2]) rotate([90, 0, 0]) linear_extrude(label_depth + 1) label_2d();
         // The separator is a separate plate now, so the board can go in from the front.
         translate([wall, wall, bay_h]) cube([in_l, in_w, shelf + 0.01]);
     }
@@ -493,15 +548,24 @@ module faceplate() {
     difference() {
         intersection() { shell(); translate([-1, -1, split_z]) cube([out_l + 2, out_w + 2, out_h]); }
         tongue(tongue_clr);
+        // Pry notch on the outside of the seam at the far end.
+        translate([out_l - wall - 1, out_w / 2 - pry_notch[0] / 2, split_z - 1]) cube([wall + 2, pry_notch[0], pry_notch[1] + 1]);
     }
+}
+
+module label_2d(g = 0) {
+    offset(delta = g) text(label_text, size = label_size, font = label_font, halign = "center", valign = "center");
 }
 
 module separator() {
     difference() {
         translate([wall + 0.2, wall + 0.2, 0]) cube([in_l - 0.4, in_w - 0.4, shelf]);
-        translate([board_x + wire_notch_x - wire_notch[0] / 2, out_w / 2 - wire_notch[1] / 2, -1])
-            cube([wire_notch[0], wire_notch[1], shelf + 2]);
+        // Window under the connectors (also the way through for the battery lead).
+        translate([wall - 1, out_w / 2 - sep_cut_w / 2, -1]) cube([board_x - wall + 1 + sep_cut_l, sep_cut_w, shelf + 2]);
     }
+    // Rails under the board's long edges.
+    for (y = [board_y + 0.15, board_y + board_w - rail_w - 0.15])   // 0.15 in: clear of the crush ribs
+        translate([board_x + rail_from_usb, y, shelf - 0.01]) cube([board_l - rail_from_usb - 1, rail_w, rail_h + 0.01]);
 }
 
 module fitcheck() {
@@ -531,6 +595,8 @@ if (part == "shell") {
     // Face buttons stand cap-down on the bed (flat cap face, flange above it);
     // side buttons lie with the inner block on the bed.
     presses = [for (b = buttons) if (b[2] == "press") b];
+    if (rst_style == "plunger")   // stem-down on the bed, head on top
+        translate([len(presses) * 10 + 5, 5, rst_proud]) reset_pin();
     for (i = [0 : len(presses) - 1])
         if (presses[i][0] == "front")
             translate([i * 10 + 5, 5, cap_proud]) rotate([90, 0, 0]) plunger(presses[i]);
@@ -543,6 +609,8 @@ if (part == "shell") {
     body();   // printed as it sits: back on the bed
 } else if (part == "faceplate") {
     translate([0, out_w, out_h]) rotate([180, 0, 0]) faceplate();   // face-down
+} else if (part == "inlay") {
+    linear_extrude(label_inlay_t) label_2d(-label_fit);
 } else if (part == "separator") {
     translate([-wall, -wall, 0]) separator();
 } else if (part == "fitcheck") {
@@ -554,6 +622,8 @@ if (part == "shell") {
     for (b = buttons)
         if (b[2] == "press")
             color("Orange") at_button(b) plunger(b);
+    if (rst_style == "plunger")
+        color("Orange") translate([board_x + rst_from_usb, out_w, board_z + rst_z_above_back]) rotate([90, 0, 0]) reset_pin();
     color("SlateGray") translate([0, 0, -lid_t - 6]) lid();
 }
 

@@ -25,7 +25,8 @@ Outer size about **66 x 36 x 24 mm**.
 | `stl/faceplate_rNN_*.stl` | Print face-down (front on the bed); no supports |
 | `stl/separator_rNN_*.stl` | Flat plate |
 | `stl/lid_rNN_*.stl` | Print flat, countersinks on the bed |
-| `stl/buttons_rNN_*.stl` | Button plungers, cap-down; no supports |
+| `stl/buttons_rNN_*.stl` | Face button plungers and the reset button, cap/stem-down; no supports |
+| `stl/inlay_rNN_*.stl` | "BATTLE BUDDY" letters for the side recess; print in a contrasting colour |
 | `stl/shell_*`, `stl/fitcheck_*` | r01-r23: one-piece shell and quick fit check (superseded) |
 
 Use the files with the highest revision number. Older revisions stay so every
@@ -59,6 +60,7 @@ print can be traced back to its design.
 | r22 | Full-case print. Buttons 0.5 mm up (−9.3 / +8.55); caps 4.4 → 4.0 mm (flange 5.4) so the wall between each hole and the window is ~0.2 mm thicker with the window unchanged; reset slot 0.5 mm toward the front; ±0.3 mm button variants |
 | r23 | Reset is now a flexing press tab moulded into the +y wall (`rst_style = "flex"`): 6.5 × 4 mm tab cut free on three sides, hinged toward the far end, recessed 0.6 mm (1 mm thick so it bends), small nub inside on the switch. Pinhole slot still available (`"pin"`). Fit check full-depth USB end 18 mm to include it |
 | r24 | **Split so it can be assembled:** body + snap-on faceplate (seam 2.5 mm below the front frame, tongue with snap ridges) + separate separator plate on ledges, so the board goes in from the front. Domed bump on the reset tab. Ribs stop below the seam |
+| r25 | Faceplate held by barbed snaps (flat catch, sloped entry) + pry notch at the far end; window bevel 0.8 mm on all four sides incl. the USB side; separator has a window under the back connectors (battery plug reachable from the bay) and rails along the board edges (`conn_h` estimate, 3 mm); reset is now a small T-shaped button through the wall; "BATTLE BUDDY" recess on the −y wall + `inlay` part; bay takes up to an 803050 |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
@@ -92,17 +94,21 @@ Then export a new revision (it never overwrites an existing one):
 
 ## Assembly
 
-1. Drop the separator plate into the body from the front, wire notch at the
-   USB end. It rests on the screw posts and small ledges.
-2. Feed the battery lead through the notch, plug it into the board (check
-   polarity: red to +), and set the board screen-up into the body, USB end
-   first so the port lines up with its slot.
-3. Put the two buttons into the faceplate's holes from the inside, caps out.
-4. Press the faceplate on until it snaps over the body's tongue.
-5. Lay the battery in the bay from the back, screw the lid on, and stick
+1. Push the reset button into its hole in the side wall from the inside
+   (stem out, head in the pocket).
+2. Drop the separator plate into the body from the front, rails up, the window
+   at the USB end. It rests on the screw posts and small ledges.
+3. Plug the battery lead into the board (check polarity: red to +), feed it
+   down through the separator's window, and set the board screen-up on the
+   rails, USB end first so the port lines up with its slot.
+4. Put the two face buttons into the faceplate's holes from the inside.
+5. Press the faceplate on until it clicks over the body's barbs. To take it
+   off, pry at the notch on the seam at the far end.
+6. Lay the battery in the bay from the back, screw the lid on, and stick
    four 8 mm rubber feet into the recesses.
+7. Optional: stick the inlay letters into the side recess.
 
-To reset the board, press the small domed tab on the side wall.
+To reset the board, press the small button on the side wall.
 
 Thin crush ribs on the inside walls squash as the board goes in so it sits
 snug (`rib`; shave them with a knife if it's too tight). If it still rattles,
