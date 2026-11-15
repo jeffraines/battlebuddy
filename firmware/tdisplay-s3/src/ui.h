@@ -73,6 +73,10 @@ struct UiState {
     const DiceState *dice; // dice screen instead of the counter, or nullptr
     const PickerState *picker; // game picker, or nullptr
     const EntryState *entry;   // number pad, or nullptr
+
+    bool always_on = false;         // Screen setting: never dim or auto-sleep
+    const char *test_text = nullptr; // Battery test tile: "Start" or the time so far
+    const char *last_test = nullptr; // Last test tile: how long the last test ran, or nullptr
 };
 
 struct UiAction {
@@ -95,6 +99,8 @@ struct UiAction {
         MenuCounter,
         MenuSleep,
         MenuUndo,
+        MenuScreen,      // toggle always-on screen
+        MenuBatteryTest, // start / stop the battery test
         MenuEnd,       // open the "who won?" screen
         DeclareWinner, // `player` won this game
         EndRestart,    // restart without recording a result

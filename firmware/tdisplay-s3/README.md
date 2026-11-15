@@ -33,6 +33,8 @@ Hold the board landscape, USB port on the right.
 | More → Counter | For plain life counters (Magic, Commander, Lorcana, FaB). *Themed* (default): each game's own look, below. *d20*: life on a d20 that spins a face toward each change. *Digits*: just the number |
 | More → Flip | Rotates the whole screen 180° (USB port on the left) |
 | More → Sleep | Sleep now; KEY wakes |
+| More → Screen | Auto dim (default) or Always on: never dims or sleeps |
+| More → Battery test | Start: screen stays lit and the board counts how long the battery lasts. Tap again to stop. Last test shows the result |
 
 **Themed counters:** Magic and Commander show a quiet row of five colored
 dots under life; on a change they ripple and the number briefly tints red
@@ -95,6 +97,13 @@ along the bottom (colored by player in two-player mode).
 Each game has its own colors and its own title lettering. The screen dims after 30 s idle and the
 board sleeps after 10 minutes; the first touch or press after dimming only
 wakes the screen. The game survives sleep, but not a reset or power cut.
+
+**Battery test.** Charge fully, unplug, then More → Battery test → Start. The
+screen stays at full brightness and never sleeps. The time so far is saved to
+flash every minute, so when the battery runs out the total survives: charge
+it, power on, and More → Last test shows how long it lasted (to within a
+minute). The start and end battery voltages are printed on the serial port.
+Tapping Battery test again stops the test early and files it the same way.
 
 ## Build and flash
 

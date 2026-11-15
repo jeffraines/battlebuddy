@@ -392,6 +392,13 @@ int main(int argc, char **argv)
         save(frame, s, "menu-page1");
         s.menu_page = 1;
         save(frame, s, "menu-page2");
+        s.always_on = true;
+        s.test_text = "3h 12m";
+        s.last_test = "9h 41m";
+        save(frame, s, "menu-page2-battery-test");
+        s.always_on = false;
+        s.test_text = nullptr;
+        s.last_test = nullptr;
         s.menu = false;
         s.end_prompt = true;
         save(frame, s, "end-prompt");

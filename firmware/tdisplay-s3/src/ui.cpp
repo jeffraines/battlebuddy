@@ -1237,9 +1237,9 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
              counter_style_plain(g)},
             {"Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true},
             {"Sleep", "KEY wakes", UiAction::MenuSleep, true},
-            {nullptr, nullptr, UiAction::None, false},
-            {nullptr, nullptr, UiAction::None, false},
-            {nullptr, nullptr, UiAction::None, false},
+            {"Screen", s.always_on ? "Always on" : "Auto dim", UiAction::MenuScreen, true},
+            {"Battery test", s.test_text ? s.test_text : "Start", UiAction::MenuBatteryTest, true},
+            {"Last test", s.last_test ? s.last_test : "-", UiAction::None, false},
             {nullptr, nullptr, UiAction::None, false},
             {"Back", "<", UiAction::MenuBack, true},
         };

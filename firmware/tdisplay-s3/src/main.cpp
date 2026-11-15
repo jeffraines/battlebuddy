@@ -12,6 +12,7 @@
 
 #include <Arduino.h>
 #include <driver/rtc_io.h>
+#include <Preferences.h>
 #include <esp_sleep.h>
 #include <time.h>
 
@@ -47,7 +48,8 @@ constexpr uint32_t kSpinMs = 420;      // counter change animation (roll, spin, 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B0008;
+constexpr uint32_t kSavedMagic = 0xBB0B0009;
+constexpr uint32_t kTestSaveS = 60; // battery test: save progress to flash this often
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
 constexpr uint8_t kTimerChoices[] = {0, 30, 50, 60}; // minutes, 0 = off
@@ -63,6 +65,7 @@ struct Saved {
     uint8_t best_of;       // 0 = match tracking off
     uint8_t timer_minutes; // 0 = no timer
     uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
+    bool always_on;        // Screen setting: never dim or auto-sleep
     bb_match_t match;
     bb_game_t game;
 };
@@ -100,6 +103,26 @@ uint32_t anim_frame_ms = 0;
 uint32_t last_input_ms = 0;
 bool dimmed = false;
 int battery_percent = -1; // -1 = on USB / unknown
+uint16_t battery_mv = 0;
+
+// Battery test: runs the screen always on and counts how long the battery
+// lasts. Progress is saved to flash every minute, so when the battery dies the
+// total survives; the next power-up files it as the last test.
+struct BatteryTest {
+    bool running = false;
+    uint32_t secs = 0;      // time so far (includes any sleep in between)
+    uint16_t start_mv = 0;
+    uint16_t end_mv = 0;    // latest reading
+    uint32_t last_secs = 0; // the last finished test; 0 = none
+    uint16_t last_start_mv = 0;
+    uint16_t last_end_mv = 0;
+};
+BatteryTest test;
+RTC_DATA_ATTR uint32_t test_tick_s = 0; // RTC seconds when test.secs was last advanced
+uint32_t test_saved_s = 0;
+Preferences prefs;
+char test_text[16];
+char last_test_text[16];
 
 char toast_text[40];
 uint32_t toast_until = 0;
@@ -170,6 +193,9 @@ UiState ui_state()
     s.dice = dice_open ? &dice : nullptr;
     s.picker = picker_open ? &picker : nullptr;
     s.entry = entry_open ? &entry : nullptr;
+    s.always_on = saved.always_on || test.running;
+    s.test_text = test.running ? test_text : nullptr;
+    s.last_test = test.last_secs ? last_test_text : nullptr;
     return s;
 }
 
@@ -207,11 +233,103 @@ bool register_input(uint32_t now)
     return false;
 }
 
+void format_duration(char *out, size_t n, uint32_t secs)
+{
+    uint32_t m = secs / 60;
+    if (m >= 60) {
+        snprintf(out, n, "%luh %02lum", (unsigned long)(m / 60), (unsigned long)(m % 60));
+    } else {
+        snprintf(out, n, "%lum", (unsigned long)m);
+    }
+}
+
+void test_texts()
+{
+    format_duration(test_text, sizeof(test_text), test.secs);
+    format_duration(last_test_text, sizeof(last_test_text), test.last_secs);
+}
+
+void test_save()
+{
+    prefs.putBool("t_run", test.running);
+    prefs.putUInt("t_secs", test.secs);
+    prefs.putUShort("t_mv0", test.start_mv);
+    prefs.putUShort("t_mv", test.end_mv);
+    prefs.putUInt("l_secs", test.last_secs);
+    prefs.putUShort("l_mv0", test.last_start_mv);
+    prefs.putUShort("l_mv", test.last_end_mv);
+}
+
+void test_load()
+{
+    test.running = prefs.getBool("t_run", false);
+    test.secs = prefs.getUInt("t_secs", 0);
+    test.start_mv = prefs.getUShort("t_mv0", 0);
+    test.end_mv = prefs.getUShort("t_mv", 0);
+    test.last_secs = prefs.getUInt("l_secs", 0);
+    test.last_start_mv = prefs.getUShort("l_mv0", 0);
+    test.last_end_mv = prefs.getUShort("l_mv", 0);
+}
+
+// Files the running test as the last one.
+void test_finish()
+{
+    test.running = false;
+    test.last_secs = test.secs;
+    test.last_start_mv = test.start_mv;
+    test.last_end_mv = test.end_mv;
+    test_save();
+    test_texts();
+    Serial.printf("battery test: %lu s, %u -> %u mV\n", (unsigned long)test.last_secs, test.last_start_mv,
+                  test.last_end_mv);
+}
+
+void test_start()
+{
+    test.running = true;
+    test.secs = 0;
+    test.start_mv = test.end_mv = battery_mv;
+    test_tick_s = now_s();
+    test_saved_s = test_tick_s;
+    test_save();
+    test_texts();
+}
+
+// Advances the running test; called with each battery reading.
+void test_tick()
+{
+    if (!test.running) {
+        return;
+    }
+    uint32_t t = now_s();
+    uint32_t d = t - test_tick_s;
+    test_tick_s = t;
+    if (d > 24 * 3600) {
+        d = 0; // the RTC clock was reset; skip rather than count nonsense
+    }
+    test.secs += d;
+    test.end_mv = battery_mv;
+    char before[16];
+    snprintf(before, sizeof(before), "%s", test_text);
+    test_texts();
+    if (strcmp(before, test_text) != 0) {
+        dirty = true;
+    }
+    if (t - test_saved_s >= kTestSaveS) {
+        test_saved_s = t;
+        test_save();
+    }
+}
+
 void go_to_sleep()
 {
     Serial.println("sleeping");
     bb_game_commit(&game);
     saved.magic = kSavedMagic;
+    if (test.running) {
+        test_tick_s = now_s();
+        test_save();
+    }
 
     lcd.setBrightness(0);
     lcd.sleep();
@@ -520,6 +638,22 @@ void perform(const UiAction &a, uint32_t now)
         end_prompt = false;
         dirty = true;
         break;
+    case UiAction::MenuScreen:
+        saved.always_on = !saved.always_on;
+        dirty = true;
+        break;
+    case UiAction::MenuBatteryTest:
+        if (test.running) {
+            test_finish();
+            show_toast("Battery test stopped", millis());
+        } else if (battery_percent < 0) {
+            show_toast("Unplug USB first", millis());
+        } else {
+            test_start();
+            show_toast("Test on: screen stays lit", millis());
+        }
+        dirty = true;
+        break;
     case UiAction::MenuLook:
         saved.vivid = !saved.vivid;
         dirty = true;
@@ -685,6 +819,8 @@ void poll_battery(uint32_t now)
     last_poll = now;
 
     uint32_t mv = analogReadMilliVolts(PIN_BAT_VOLT) * 2;
+    battery_mv = (uint16_t)mv;
+    test_tick();
     int percent = mv > 4300 ? -1 : constrain(((int)mv - 3300) * 100 / 900, 0, 100);
     if (percent != battery_percent) {
         battery_percent = percent;
@@ -721,8 +857,17 @@ void setup()
         saved.counter_style = 0;
         saved.best_of = 1;
         saved.timer_minutes = 0;
+        saved.always_on = false;
         start_game(0, 1);
     }
+
+    prefs.begin("bb", false);
+    test_load();
+    if (test.running && !woke) {
+        // Power came back after the battery ran out (or a reset): that test is done.
+        test_finish();
+    }
+    test_texts();
     saved.magic = 0; // only trusted again after the next sleep
 
     lcd.init();
@@ -796,6 +941,9 @@ void loop()
     }
 
     uint32_t idle = now - last_input_ms;
+    if (saved.always_on || test.running) {
+        idle = 0; // never dim or sleep
+    }
     if (!dimmed && idle >= kDimAfterMs) {
         dimmed = true;
         lcd.setBrightness(kDimBrightness);
