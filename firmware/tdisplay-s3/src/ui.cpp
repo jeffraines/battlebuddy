@@ -1225,8 +1225,9 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
         if (s.match_legend[0] == kNoLegend && s.match_legend[1] == kNoLegend) {
             snprintf(legends, sizeof(legends), "Pick");
         } else {
-            snprintf(legends, sizeof(legends), "%s v %s", ui_legend_name(s, s.match_legend[0]),
-                     ui_legend_name(s, s.match_legend[1]));
+            char a[24], b[24];
+            snprintf(legends, sizeof(legends), "%s v %s", ui_legend_label(s, s.match_legend[0], a, sizeof(a)),
+                     ui_legend_label(s, s.match_legend[1], b, sizeof(b)));
         }
         MenuTile tiles[kMenuTiles] = {
             {"Game", name, UiAction::MenuGame, true},
@@ -2164,25 +2165,48 @@ UiAction kind_hit(const UiState &s, uint8_t p, int x, int y)
 
 // ---- Pop-up screens (overlays) ----------------------------------------------
 
-// Official Riftbound Champion Legends. Stable order (by set), so codes saved in
-// the history keep meaning the same legend: add new sets at the end only.
-const char *const kLegends[] = {
+// Official Riftbound Champion Legends. A champion can have more than one
+// Legend card (Master Yi in Proving Grounds and in Unleashed), so each entry is
+// a card: name plus set. Stable order: codes saved in the history are indexes
+// here, so add new cards at the end only.
+// Set codes: OGN Origins, OGS Proving Grounds, SFD Spiritforged, UNL Unleashed,
+// VEN Vendetta, RAD Radiance (RAD is ours; no official code found yet).
+const char *const kSetCodes[] = {"OGN", "OGS", "SFD", "UNL", "VEN", "RAD"};
+
+struct LegendCard {
+    const char *name;
+    uint8_t set; // index into kSetCodes
+};
+
+const LegendCard kLegends[] = {
     // Origins
-    "Ahri", "Darius", "Jinx", "Kai'Sa", "Lee Sin", "Leona", "Miss Fortune", "Sett", "Teemo", "Viktor",
-    "Volibear", "Yasuo",
+    {"Ahri", 0}, {"Darius", 0}, {"Jinx", 0}, {"Kai'Sa", 0}, {"Lee Sin", 0}, {"Leona", 0},
+    {"Miss Fortune", 0}, {"Sett", 0}, {"Teemo", 0}, {"Viktor", 0}, {"Volibear", 0}, {"Yasuo", 0},
     // Proving Grounds
-    "Annie", "Garen", "Lux", "Master Yi",
+    {"Annie", 1}, {"Garen", 1}, {"Lux", 1}, {"Master Yi", 1},
     // Spiritforged
-    "Azir", "Draven", "Ezreal", "Fiora", "Irelia", "Jax", "Lucian", "Ornn", "Rek'Sai", "Renata Glasc",
-    "Rumble", "Sivir",
-    // Unleashed (Master Yi is above)
-    "Diana", "Ivern", "Jhin", "Kha'Zix", "LeBlanc", "Lillia", "Poppy", "Pyke", "Rengar", "Vex", "Vi",
+    {"Azir", 2}, {"Draven", 2}, {"Ezreal", 2}, {"Fiora", 2}, {"Irelia", 2}, {"Jax", 2}, {"Lucian", 2},
+    {"Ornn", 2}, {"Rek'Sai", 2}, {"Renata Glasc", 2}, {"Rumble", 2}, {"Sivir", 2},
+    // Unleashed (its Master Yi is at the end: added later, codes must not move)
+    {"Diana", 3}, {"Ivern", 3}, {"Jhin", 3}, {"Kha'Zix", 3}, {"LeBlanc", 3}, {"Lillia", 3}, {"Poppy", 3},
+    {"Pyke", 3}, {"Rengar", 3}, {"Vex", 3}, {"Vi", 3},
     // Vendetta
-    "Akali", "Ambessa", "Jayce", "Kennen", "Mel", "Nasus", "Renekton", "Shen", "Zed",
+    {"Akali", 4}, {"Ambessa", 4}, {"Jayce", 4}, {"Kennen", 4}, {"Mel", 4}, {"Nasus", 4}, {"Renekton", 4},
+    {"Shen", 4}, {"Zed", 4},
     // Radiance
-    "Ekko", "Evelynn", "Jarvan IV", "K'Sante", "Mordekaiser", "Orianna", "Riven", "Seraphine", "Ziggs",
+    {"Ekko", 5}, {"Evelynn", 5}, {"Jarvan IV", 5}, {"K'Sante", 5}, {"Mordekaiser", 5}, {"Orianna", 5},
+    {"Riven", 5}, {"Seraphine", 5}, {"Ziggs", 5},
+    // Added later
+    {"Master Yi", 3},
 };
 constexpr size_t kLegendCount = sizeof(kLegends) / sizeof(kLegends[0]);
+
+// A-Z by name, then by set (oldest first).
+bool legend_before(uint8_t a, uint8_t b)
+{
+    int c = strcasecmp(kLegends[a].name, kLegends[b].name);
+    return c < 0 || (c == 0 && kLegends[a].set < kLegends[b].set);
+}
 
 // Official legends sorted A-Z for the picker (indexes into kLegends).
 const uint8_t *legends_sorted()
@@ -2196,7 +2220,7 @@ const uint8_t *legends_sorted()
         for (size_t i = 1; i < kLegendCount; i++) { // insertion sort, once
             uint8_t v = order[i];
             size_t j = i;
-            while (j > 0 && strcasecmp(kLegends[order[j - 1]], kLegends[v]) > 0) {
+            while (j > 0 && legend_before(v, order[j - 1])) {
                 order[j] = order[j - 1];
                 j--;
             }
@@ -2493,7 +2517,9 @@ void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextColor(t.muted);
         f.setTextDatum(textdatum_t::bottom_left);
         if (entry_has_kinds(e) && (e.legend[0] != kNoLegend || e.legend[1] != kNoLegend)) {
-            snprintf(buf, sizeof(buf), "%s v %s", ui_legend_name(s, e.legend[0]), ui_legend_name(s, e.legend[1]));
+            char a[24], b[24];
+            snprintf(buf, sizeof(buf), "%s v %s", ui_legend_label(s, e.legend[0], a, sizeof(a)),
+                     ui_legend_label(s, e.legend[1], b, sizeof(b)));
         } else if (e.best_of > 1) {
             snprintf(buf, sizeof(buf), "Bo%u game %u", e.best_of, e.game_in_match);
         } else {
@@ -2586,7 +2612,11 @@ void draw_history_detail(LGFX_Sprite &f, const Theme &t, const UiState &s)
             f.setTextDatum(textdatum_t::top_left);
             f.drawString(side == 0 ? "Your legend" : "Their legend", r.x + 6, r.y + 2);
             Rect v{r.x, r.y + 14, r.w, r.h - 14};
-            tile_text(f, v, ui_legend_name(s, e.legend[side]), t.accent);
+            tile_text(f, v, ui_legend_name(s, e.legend[side]), t.accent, r.w - 30);
+            f.setFont(&fonts::Font0);
+            f.setTextColor(t.muted);
+            f.setTextDatum(textdatum_t::top_right);
+            f.drawString(ui_legend_set(e.legend[side]), r.x + r.w - 5, r.y + 4);
         }
     }
     Rect r = detail_tile(2);
@@ -2631,7 +2661,7 @@ constexpr Rect kLegendAdd = {162, 147, 84, 21};
 
 Rect legend_tile(int i)
 {
-    return {6 + (i % kLegendCols) * 104, 28 + (i / kLegendCols) * 29, 100, 26};
+    return {6 + (i % kLegendCols) * 104, 27 + (i / kLegendCols) * 30, 100, 28};
 }
 
 void draw_legends(LGFX_Sprite &f, const Theme &t, const UiState &s)
@@ -2658,7 +2688,11 @@ void draw_legends(LGFX_Sprite &f, const Theme &t, const UiState &s)
         }
         f.setTextColor(sel ? kInk : t.text);
         f.setTextDatum(textdatum_t::middle_center);
-        f.drawString(name, r.cx(), r.cy() + 1);
+        f.drawString(name, r.cx(), r.cy() - 3);
+        f.setFont(&fonts::Font0);
+        f.setTextColor(sel ? kInk : t.muted);
+        f.setTextDatum(textdatum_t::bottom_center);
+        f.drawString(ui_legend_set(code), r.cx(), r.y + r.h - 1);
     }
     // Pager arrows sit at the ends of the bottom row, None and New between them.
     char buf[12];
@@ -2889,7 +2923,37 @@ size_t ui_legend_count()
 
 const char *ui_legend_official(size_t i)
 {
-    return i < kLegendCount ? kLegends[i] : "?";
+    return i < kLegendCount ? kLegends[i].name : "?";
+}
+
+const char *ui_legend_label(const UiState &s, uint8_t code, char *buf, size_t n)
+{
+    const char *name = ui_legend_name(s, code);
+    bool shared = false;
+    if (code < kLegendCount) {
+        for (size_t i = 0; i < kLegendCount; i++) {
+            if (i != code && strcmp(kLegends[i].name, name) == 0) {
+                shared = true;
+            }
+        }
+    }
+    if (shared) {
+        snprintf(buf, n, "%s %s", name, kSetCodes[kLegends[code].set]);
+    } else {
+        snprintf(buf, n, "%s", name);
+    }
+    return buf;
+}
+
+const char *ui_legend_set(uint8_t code)
+{
+    if (code == kNoLegend) {
+        return "";
+    }
+    if (code >= kCustomLegend) {
+        return "OWN";
+    }
+    return code < kLegendCount ? kSetCodes[kLegends[code].set] : "";
 }
 
 const char *ui_legend_name(const UiState &s, uint8_t code)

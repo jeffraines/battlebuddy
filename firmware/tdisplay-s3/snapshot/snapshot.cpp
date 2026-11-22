@@ -504,6 +504,10 @@ int main(int argc, char **argv)
         save(frame, s, "new-legends");
         s.legend_page = 2;
         save(frame, s, "new-legends-p3");
+        s.legend_page = 3;
+        s.legend_current = 57; // Master Yi (Unleashed)
+        save(frame, s, "new-legends-yi");
+        s.legend_current = 1;
         s.overlay = Overlay::Keyboard;
         s.keyboard_text = "MEGA TEE";
         save(frame, s, "new-keyboard");

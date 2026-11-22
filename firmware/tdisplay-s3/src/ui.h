@@ -94,6 +94,8 @@ struct HistoryEntry {
 // Official Riftbound legends, A-Z. legend_name() also resolves the player's own.
 size_t ui_legend_count();
 const char *ui_legend_official(size_t i);
+// Set code for a legend ("OGN", "UNL", ...; "OWN" for the player's own, "" for none).
+const char *ui_legend_set(uint8_t code);
 
 struct UiState {
     const bb_game_t *game;
@@ -155,6 +157,8 @@ struct UiState {
 
 // Name for a legend code (kNoLegend gives "-").
 const char *ui_legend_name(const UiState &s, uint8_t code);
+// The name, plus the set code when two cards share the name ("Master Yi UNL"). Writes to buf.
+const char *ui_legend_label(const UiState &s, uint8_t code, char *buf, size_t n);
 
 struct UiAction {
     enum Type : uint8_t {
