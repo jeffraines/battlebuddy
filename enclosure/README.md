@@ -11,7 +11,8 @@ A 3D-printed case in five parts (from r24):
 - **faceplate**: the front frame (window, button holes) and the top few mm of
   the walls. Snaps over a tongue on the body. This is the part to print in
   different colours.
-- **lid**: closes the battery bay with 4 x M2 x 6 self-tapping screws.
+- **lid**: closes the battery bay. Snaps on (a tab at each end clicks into the
+  end walls); four optional M2 screws (pan-head or self-tapping) hold it harder.
 - **buttons**: the BOOT and KEY plungers. Those buttons are on the board's
   face either side of the USB port, so caps poke through the faceplate.
 
@@ -24,9 +25,9 @@ Outer size about **66 x 36 x 24 mm**.
 | `stl/body_rNN_*.stl` | Print as exported (back on the bed); no supports |
 | `stl/faceplate_rNN_*.stl` | Print face-down (front on the bed); no supports |
 | `stl/separator_rNN_*.stl` | Flat plate |
-| `stl/lid_rNN_*.stl` | Print flat, countersinks on the bed |
+| `stl/lid_rNN_*.stl` | Print flat, outside face (with the foot recesses) on the bed; snap tabs up |
 | `stl/buttons_rNN_*.stl` | Face button plungers and the reset button, cap/stem-down; no supports |
-| `stl/inlay_rNN_*.stl` | One-piece "BATTLE BUDDY" badge for the side recess: print face-up, colour change at 0.6 mm (letters) |
+| `stl/inlay_rNN_*.stl`, `stl/badge_plate_*`, `stl/badge_letters_*` | Print two (one for each side). One file with a colour change, or plate + letters as two parts for two filaments |
 | `stl/shell_*`, `stl/fitcheck_*` | r01-r23: one-piece shell and quick fit check (superseded) |
 
 Use the files with the highest revision number. Older revisions stay so every
@@ -63,6 +64,7 @@ print can be traced back to its design.
 | r25 | Faceplate held by barbed snaps (flat catch, sloped entry) + pry notch at the far end; window bevel 0.8 mm on all four sides incl. the USB side; separator has a window under the back connectors (battery plug reachable from the bay) and rails along the board edges (`conn_h` estimate, 3 mm); reset is now a small T-shaped button through the wall; "BATTLE BUDDY" recess on the −y wall + `inlay` part; bay takes up to an 803050 |
 | r26 | Side label is a one-piece badge: 56 × 7.6 mm rounded recess (0.8 deep) + badge plate 0.6 mm with letters raised 0.4 mm (two-colour print with a colour change) |
 | r27 | Reset button reaches ~1.75 mm in (nub 1.7) and stands 1.5 mm proud; separator rails off (the PCB is ~2 mm narrower than the glass each side), 2 mm pad under the board's far end instead; face plungers 0.8 mm longer, ±0.4 variants. Body, faceplate, lid unchanged |
+| r28 | Lid snaps on (tab + barb at each end, grooves in the end walls, pry notch), screw holes kept for plain pan-head M2, chamfered lid edge; face buttons keyed (flat on the display side so they can't turn), tighter (0.15 mm), 0.4 mm longer; circle key covered with a plain rounded window; undo / menu symbols pressed into the faceplate beside the buttons; badge recess on both long sides (44 × 6.8 mm, toward the far end clear of the reset button) |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
@@ -106,9 +108,10 @@ Then export a new revision (it never overwrites an existing one):
 4. Put the two face buttons into the faceplate's holes from the inside.
 5. Press the faceplate on until it clicks over the body's barbs. To take it
    off, pry at the notch on the seam at the far end.
-6. Lay the battery in the bay from the back, screw the lid on, and stick
-   four 8 mm rubber feet into the recesses.
-7. Optional: tape or glue the badge into the side recess.
+6. Lay the battery in the bay from the back and press the lid on until both
+   ends click (pry at the notch at the far end to open). Screws optional.
+   Stick four 8 mm rubber feet into the recesses.
+7. Optional: tape or glue a badge into each side recess.
 
 To reset the board, press the small button on the side wall.
 

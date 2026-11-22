@@ -28,7 +28,7 @@ board_w = 32;    // width
 board_t = 11;    // thickness incl. display, touch glass and parts on the back
 tail_l = 8;      // bare board at the USB end, beyond the glass
 glass_drop = 4;  // front of the glass down to the board's top surface
-switch_depth = 4.35; // face buttons: glass front down to the switch tops
+switch_depth = 4.75; // face buttons: glass front down to the switch tops
                      // (r19: even the 0.3 mm shorter plunger held the case ~0.5 mm off)
 usb_from_front = 5.7;  // front glass to the USB-C centre (the first print showed it sits lower)
 lip = 1.2;            // how far the front frame overlaps the glass edge (window_style "glass")
@@ -51,8 +51,8 @@ window_r = 2.5;         // window corner radius, to follow the glass's rounded c
 bevel = 0.8;            // window edges slope outward by this much, all four sides (r25: 1.2 -> 0.8 so the USB side can match)
 bevel_usb = bevel;       // smaller slope on the USB-side edge, next to the button holes
 key_from_glass = 1.9;   // USB-side edge of the glass to the circle key's centre (from the r08/r10 photos)
-cover_key = false;      // true: the frame hides the circle touch key (dice stay in the menu)
-key_arch = true;        // with cover_key: the window's USB end sweeps out in a curve over the key
+cover_key = true;       // true: the frame hides the circle touch key (dice stay in the menu)
+key_arch = false;       // with cover_key: the window's USB end sweeps out in a curve over the key
 key_arch_past = 2.2;    // the curve's tip reaches this far past the key's centre toward USB
 key_cover = 2.3;        // with cover_key, window starts this far past the key's centre
 key_room = 3.4;         // without it, window reaches this far past the key's centre toward USB
@@ -83,9 +83,14 @@ end_rib = 2 * board_clr + rib_squeeze + 0.15;  // (r20: +0.15, the board still s
 // The board's two switches are not symmetric about its centre line (r11 print).
 // r21 (holding it USB-right): top one 0.5 mm down, bottom one 0.25 mm down,
 // both 0.25 mm toward USB, on the same line.
-// r22: both 0.5 mm up (toward -y).
-buttons = [["front", 2.75, "press", -9.3],   // BOOT (GPIO0): menu
-           ["front", 2.75, "press", 8.55]];  // KEY (GPIO14): undo
+// r22: both 0.5 mm up (toward -y). Holding it with the USB on the right, -y is
+// the top: the top button is KEY (undo), the bottom one BOOT (menu).
+buttons = [["front", 2.75, "press", -9.3],   // KEY (GPIO14): top, undo
+           ["front", 2.75, "press", 8.55]];  // BOOT (GPIO0): bottom, menu
+button_symbols = true;    // small undo / menu symbols pressed into the faceplate next to the buttons
+symbol_size = 3.6;
+symbol_depth = 0.4;
+symbol_gap = 4.4;         // symbol centre this far from its button's centre, toward the middle
 
 // Reset (RST): a side-push switch on the back of the board, on the +y long
 // edge near the USB end. A pinhole slot in the wall (press it with a
@@ -123,9 +128,10 @@ rst_nub_h = 1.7;          // nub on the head toward the switch (r27: the PCB is 
 // the letters start, then tape or glue it into the recess.
 label_text = "BATTLE BUDDY";
 label_font = "Liberation Sans:style=Bold";
-label_size = 4.6;         // letter height
+label_size = 3.8;         // letter height
 label_depth = 0.8;        // recess depth in the wall (1.6 mm wall)
-badge = [56, 7.6];        // recess size (along the case, up-down)
+badge = [44, 6.8];        // recess size (along the case, up-down); one on each long side
+badge_end_gap = 5;        // badge ends this far from the far end (the reset button is near the USB end)
 badge_r = 1.2;            // recess corner radius
 badge_t = 0.6;            // badge plate (sits 0.2 mm below the wall: room for tape)
 badge_letters = 0.4;      // letters raised on the plate (colour change at badge_t)
@@ -176,7 +182,8 @@ face_stem_d = 3;         // narrow stem from the flange down to the switch (r17:
 cap_l = 7;               // plunger cap, along the case
 cap_h = 4;               // plunger cap height
 cap_proud = 2.2;         // how far the cap stands out of the wall
-plunger_clr = 0.25;      // gap around the cap in its hole
+plunger_clr = 0.15;      // gap around the cap in its hole (r28: 0.25 let them wobble)
+face_cap_flat = 0.5;     // cap and hole have a flat on the display side, so the button can't turn
 pin_d = 2.2;             // reset pinhole
 
 // Fit check: long slots on both sides instead of buttons, to find positions.
@@ -197,6 +204,14 @@ shelf = 1.2;      // separator plate between board and battery
 wire_notch_x = 10;   // where the battery wire passes the separator, mm from the USB end
 wire_notch = [6, 4]; // notch size (along the case, across)
 lid_t = 1.4;
+// Lid snaps (r28): a tab at each short end rises into the bay and clicks into a
+// groove in the end wall. Screws are optional (plain M2 pan-head or self-tapping).
+lid_tab = [14, 0.8, 5];   // tab width, thickness, height above the lid
+lid_barb = 0.35;          // barb on the tab, toward the wall
+lid_barb_z = 3.4;         // flat catch face this far above the lid's inside face
+lid_barb_ramp = 0.9;
+lid_edge_ch = 0.8;        // chamfer round the lid's outside edge
+lid_screws = true;        // keep the screw holes (pan-head screws, no countersink needed)
 clr = clr_default; // clearance around board and battery
 corner_r = 4;
 usb_w = 9.6;      // USB-C opening: just the plug's metal shell (8.4 x 2.6) plus room for error
@@ -276,7 +291,10 @@ module button_hole(b) {
         if (b[2] == "pin") {
             translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = pin_d, h = w + button_gap(b) + 2);
         } else if (b[0] == "front") {
-            translate([0, -1, 0]) rotate([-90, 0, 0]) cylinder(d = face_cap_d + 2 * plunger_clr, h = w + 2);
+            translate([0, -1, 0]) rotate([-90, 0, 0]) intersection() {
+                cylinder(d = face_cap_d + 2 * plunger_clr, h = w + 2);
+                translate([-10, -10, -1]) cube([10 + face_cap_d / 2 - face_cap_flat + plunger_clr, 20, w + 4]);
+            }
             translate([0, w - 0.01, 0]) rotate([-90, 0, 0]) intersection() {
                 cylinder(d = face_flange_d + 0.6, h = face_flange_t + 0.4);
                 translate([-10, -10, 0]) cube([10 + face_flange_cut + 0.3, 20, 5]);
@@ -311,7 +329,10 @@ module plunger(b) {
             }
             cylinder(d = face_stem_d, h = t);
         }
-        translate([0, -cap_proud, 0]) rotate([-90, 0, 0]) cylinder(d = face_cap_d, h = w + cap_proud + 0.01);
+        translate([0, -cap_proud, 0]) rotate([-90, 0, 0]) intersection() {
+            cylinder(d = face_cap_d, h = w + cap_proud + 0.01);
+            translate([-10, -10, -1]) cube([10 + face_cap_d / 2 - face_cap_flat, 20, w + cap_proud + 2]);
+        }
     } else {
         translate([-block_l / 2, w, -block_h / 2]) cube([block_l, t, block_h]);
         translate([-cap_l / 2, -cap_proud, -cap_h / 2]) cube([cap_l, w + cap_proud + 0.01, cap_h]);
@@ -435,6 +456,14 @@ module shell(with_slots = false) {
         } else {
             for (b = buttons) button_hole(b);
         }
+        // Undo / menu symbols beside the face buttons.
+        if (button_symbols) {
+            // buttons[0] is the top one (undo), buttons[1] the bottom one (menu).
+            translate([board_x + buttons[0][1], board_y + board_w / 2 + buttons[0][3] + symbol_gap, out_h - symbol_depth])
+                linear_extrude(symbol_depth + 1) rotate(180) undo_symbol();
+            translate([board_x + buttons[1][1], board_y + board_w / 2 + buttons[1][3] - symbol_gap, out_h - symbol_depth])
+                linear_extrude(symbol_depth + 1) menu_symbol();
+        }
     }
 
     // Side rails that centre the narrower board in the pocket.
@@ -492,16 +521,27 @@ module shell(with_slots = false) {
 
 module lid() {
     difference() {
-        rounded_box(out_l, out_w, lid_t, corner_r);
-        for (p = boss_xy)
-            translate([p[0], p[1], -1]) {
-                cylinder(d = screw_clear, h = lid_t + 2);
-                cylinder(d1 = 4.4, d2 = screw_clear, h = 1.2 + 1); // countersink, outside face
-            }
+        hull() {
+            translate([lid_edge_ch, lid_edge_ch, 0]) rounded_box(out_l - 2 * lid_edge_ch, out_w - 2 * lid_edge_ch, lid_t, corner_r - lid_edge_ch);
+            translate([0, 0, lid_edge_ch]) rounded_box(out_l, out_w, lid_t - lid_edge_ch, corner_r);
+        }
+        if (lid_screws)
+            for (p = boss_xy)
+                translate([p[0], p[1], -1]) cylinder(d = screw_clear, h = lid_t + 2);
         // Recesses for four 8 mm stick-on rubber feet.
         for (x = [10, out_l - 10], y = [9, out_w - 9])
             translate([x, y, -1]) cylinder(d = 8.6, h = 1.6);
+        // Pry notch at the far end, for a fingernail or coin.
+        translate([out_l - 1.2, out_w / 2 - 4, lid_t - 0.8]) cube([2, 8, 1]);
     }
+    // Snap tabs, one at each end, with a barb toward the wall.
+    for (end = [0, 1])
+        translate([end == 0 ? wall + 0.1 : out_l - wall - 0.1, out_w / 2 - lid_tab[0] / 2, lid_t - 0.01])
+            mirror([end == 0 ? 0 : 1, 0, 0]) {
+                cube([lid_tab[1], lid_tab[0], lid_tab[2] + 0.01]);
+                translate([0, 0, lid_barb_z]) rotate([90, 0, 0]) mirror([0, 0, 1]) linear_extrude(lid_tab[0])
+                    polygon([[0.01, 0], [-lid_barb, 0], [0.01, lid_barb_ramp]]);
+            }
 }
 
 // Quick fit check: the front frame with short walls (enough to check the
@@ -545,7 +585,14 @@ module body() {
             difference() { tongue(0); usb_cuts(); }
         }
         // Side label recess.
-        translate([out_l / 2, label_depth, split_z / 2]) rotate([90, 0, 0]) linear_extrude(label_depth + 1) badge_2d();
+        for (side = [0, 1])
+            translate([badge_x, side == 0 ? label_depth : out_w - label_depth, split_z / 2])
+                rotate([side == 0 ? 90 : -90, 0, 0]) linear_extrude(label_depth + 1) badge_2d();
+        // Grooves for the lid's snap tabs, in the inside of both end walls.
+        for (end = [0, 1])
+            translate([end == 0 ? wall - lid_barb - 0.15 : out_l - wall - 0.01,
+                       out_w / 2 - lid_tab[0] / 2 - 0.3, lid_barb_z - 0.15])
+                cube([lid_barb + 0.16, lid_tab[0] + 0.6, lid_barb_ramp + 0.5]);
         // The separator is a separate plate now, so the board can go in from the front.
         translate([wall, wall, bay_h]) cube([in_l, in_w, shelf + 0.01]);
     }
@@ -567,6 +614,32 @@ module faceplate() {
 
 module label_2d(g = 0) {
     offset(delta = g) text(label_text, size = label_size, font = label_font, halign = "center", valign = "center");
+}
+
+badge_x = out_l - badge_end_gap - badge[0] / 2;
+
+// A curved arrow (undo) and three bars (menu), symbol_size across, centred.
+module undo_symbol() {
+    // Top half of a ring with the head on the left, pointing down (like a curved "back" arrow).
+    r = symbol_size / 2;
+    w = symbol_size * 0.18;
+    ro = r - 0.2;
+    rm = ro - w / 2;
+    translate([0.15 * r, -0.3 * r]) {
+        difference() {
+            circle(r = ro, $fn = 48);
+            circle(r = ro - w, $fn = 48);
+            translate([-2 * r, -2 * r]) square([4 * r, 2 * r]);
+        }
+        polygon([[-rm - w * 1.35, 0.01], [-rm + w * 1.35, 0.01], [-rm, -w * 1.8]]);
+    }
+}
+
+module menu_symbol() {
+    w = symbol_size * 0.85;
+    t = symbol_size * 0.16;
+    for (k = [-1, 0, 1])
+        translate([0, k * symbol_size * 0.32]) square([w, t], center = true);
 }
 
 module badge_2d(g = 0) {
