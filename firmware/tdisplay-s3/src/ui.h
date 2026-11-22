@@ -48,6 +48,53 @@ struct EntryState {
     int32_t amount = 0;
 };
 
+// Pop-up screens drawn over everything else.
+enum class Overlay : uint8_t {
+    None,
+    Quick,         // quick menu: undo / dice / menu / turn off
+    OffPrompt,     // "Turn off?"
+    Sleeping,      // shown for a moment before sleeping
+    Editor,        // one Screen setting: slider or - / +, with presets
+    History,       // list of past games
+    HistoryDetail, // one past game
+    Legends,       // pick a Riftbound legend
+    Keyboard,      // type a new legend name
+};
+
+// One Screen setting being edited.
+struct EditorView {
+    const char *title = "";
+    const char *value = "";
+    bool slider = false;   // drag a slider (else - / + buttons)
+    uint16_t frac = 0;     // slider position, 0..1000
+    uint8_t preset_count = 0;
+    const char *presets[6] = {};
+    int8_t preset_sel = -1; // highlighted preset, -1 = none
+};
+
+constexpr uint8_t kNoLegend = 0xFF;
+constexpr uint8_t kCustomLegend = 0x80; // codes from here up are the player's own legends
+constexpr int kMaxCustomLegends = 12;
+constexpr int kLegendNameLen = 15;      // characters, plus the terminator
+
+// One finished game, as kept in the history.
+struct HistoryEntry {
+    uint16_t number;      // counts up from the first game recorded
+    uint8_t profile_index;
+    uint8_t players;
+    uint8_t result;       // 0 = side 0 (YOU) won, 1 = side 1 won, 2 = draw
+    uint8_t best_of;      // 0 = no match
+    uint8_t game_in_match; // 1-based
+    uint8_t legend[2];    // kNoLegend, an official legend index, or kCustomLegend + i
+    uint16_t minutes;     // how long the game took
+    int16_t value[2];     // final scores (side 1 is 0 with one counter)
+    int16_t tally[2][2];  // per side, per kind (Riftbound: Conquer, Hold)
+};
+
+// Official Riftbound legends, A-Z. legend_name() also resolves the player's own.
+size_t ui_legend_count();
+const char *ui_legend_official(size_t i);
+
 struct UiState {
     const bb_game_t *game;
     int step;            // single-player +/- step (1 or 5)
@@ -56,7 +103,7 @@ struct UiState {
     bool flipped;        // whole screen rotated 180 degrees (menu label only)
     bool vivid;          // Look setting: vivid colors and glows instead of subdued
     bool menu;           // menu screen instead of the counter
-    int menu_page;       // 0 = main settings, 1 = more, 2 = screen
+    int menu_page;       // 0 = main, 1 = more, 2 = screen, 3 = controls, 4 = battery
     int counter_style;   // Counter setting: 0 = themed (each game's own look), 1 = d20, 2 = digits
     const uint16_t *spin;  // per-player change animation progress (0..1000, 1000 = still), or nullptr
     const int8_t *spin_dir; // per-player direction of the last change (+1 / -1)
@@ -82,7 +129,32 @@ struct UiState {
     const char *sleep_after_text = nullptr;
     const char *test_text = nullptr; // Battery test tile: "Start" or the time so far
     const char *last_test = nullptr; // Last test tile: how long the last test ran, or nullptr
+    const char *since_charge = nullptr; // Battery page: time on battery since the last charge
+
+    // Controls page: what each button press / hold and swipe does, as text
+    // (top press, top hold, bottom press, bottom hold, swipe up, down, left, right).
+    const char *controls[8] = {};
+
+    Overlay overlay = Overlay::None;
+    const EditorView *editor = nullptr;
+
+    // History and legends.
+    const HistoryEntry *history = nullptr; // newest first
+    int history_count = 0;
+    int history_page = 0;
+    int history_sel = -1;           // the game shown in HistoryDetail
+    bool history_delete_armed = false;
+    uint8_t match_legend[2] = {kNoLegend, kNoLegend}; // legends for the match being played
+    uint8_t legend_side = 0;        // whose legend the picker is choosing
+    uint8_t legend_current = kNoLegend;
+    int legend_page = 0;
+    const char (*custom_legends)[kLegendNameLen + 1] = nullptr;
+    int custom_legend_count = 0;
+    const char *keyboard_text = "";
 };
+
+// Name for a legend code (kNoLegend gives "-").
+const char *ui_legend_name(const UiState &s, uint8_t code);
 
 struct UiAction {
     enum Type : uint8_t {
@@ -102,14 +174,39 @@ struct UiAction {
         MenuMore,
         MenuBack,
         MenuCounter,
-        MenuSleep,
         MenuUndo,
         MenuScreen,      // open the Screen settings page
-        ScreenBrightness, // cycle each Screen setting
-        ScreenDimAfter,
-        ScreenDimTo,
-        ScreenSleepAfter,
+        MenuControls,    // open the Controls page
+        MenuBattery,     // open the Battery page
+        MenuHistory,     // open the game history
+        MenuLegends,     // pick the legends for this match
+        MenuOff,         // "Turn off?"
         MenuBatteryTest, // start / stop the battery test
+        ScreenOpen,      // edit Screen setting `kind` (0 brightness, 1 dim after, 2 dim to, 3 sleep after)
+        EditorSlide,     // slider moved to `delta` (0..1000)
+        EditorStep,      // - / + by `delta`
+        EditorPreset,    // preset `kind`
+        EditorClose,
+        ControlCycle,    // next action for control `kind` (0..7)
+        QuickPick,       // quick menu choice `kind`: 0 undo, 1 dice, 2 menu, 3 turn off
+        QuickClose,
+        OffYes,
+        OffNo,
+        HistoryOpen,     // show game `kind` (index, newest first)
+        HistoryPage,     // page by `delta`
+        HistoryClose,
+        HistoryLegend,   // edit side `player`'s legend for the open game
+        HistoryDelete,   // first tap arms, second deletes
+        DetailBack,
+        LegendPick,      // legend code `kind`
+        LegendPage,      // page by `delta`
+        LegendAdd,       // open the keyboard
+        LegendClose,
+        KeyChar,         // type character `kind`
+        KeyDelete,
+        KeyDone,
+        KeyCancel,
+        EndDraw,         // one-counter game: record a draw
         MenuEnd,       // open the "who won?" screen
         DeclareWinner, // `player` won this game
         EndRestart,    // restart without recording a result

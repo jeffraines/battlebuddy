@@ -32,9 +32,13 @@ Hold the board landscape, USB port on the right.
 | More → Look | *Subdued* (the game's palette as is) or *Vivid* (more saturated colors and glowing text) |
 | More → Counter | For plain life counters (Magic, Commander, Lorcana, FaB). *Themed* (default): each game's own look, below. *d20*: life on a d20 that spins a face toward each change. *Digits*: just the number |
 | More → Flip | Rotates the whole screen 180° (USB port on the left) |
-| More → Sleep | Sleep now; KEY wakes |
-| More → Screen | Brightness (25/50/80/100 %), Dim after (never, 15 s to 5 min), Dim to (off, 4–40 %), Sleep after (never, 5–30 min). Tap a tile to step through; saved across power-off |
-| More → Battery test | Start: screen stays lit and the board counts how long the battery lasts. Tap again to stop. Last test shows the result |
+| More → Screen | Brightness and Dim to: drag the slider or tap a preset. Dim after and Sleep after: - / + (hold to change faster) or a preset. Saved across power-off |
+| More → Controls | What the top button (KEY) and bottom button (BOOT) do on a press and on a hold, and what each swipe does: Undo, Menu, Quick menu, Dice, Turn off or None. Defaults: top press undo, top hold quick menu, bottom press menu, bottom hold Turn off?, swipe up menu, swipe down dice |
+| More → Battery | Time on battery since the last charge (spotted from the voltage rising), the battery test and its last result |
+| More → History | Every finished game, newest first: result, score, Riftbound Conquer/Hold split, legends, length. Tap one to see it, change its legends or delete it |
+| More → Turn off | "Turn off?" then deep sleep; the top button wakes it with the game as it was |
+| Menu → Legends (Riftbound) | Pick your legend, then theirs (all official Champion Legends A-Z, plus your own via + New and an on-screen keyboard). Saved with each game |
+| Menu → End game | Who won? With one counter: Won / Lost / Draw, so a best-of works when only you are tracked |
 
 **Themed counters:** Magic and Commander show a quiet row of five colored
 dots under life; on a change they ripple and the number briefly tints red
@@ -96,7 +100,7 @@ along the bottom (colored by player in two-player mode).
 
 Each game has its own colors and its own title lettering. By default the screen dims to 8 % after
 30 s idle and the board sleeps after 10 minutes (More → Screen changes all of these); the first touch or press after dimming only
-wakes the screen. The game survives sleep, but not a reset or power cut.
+wakes the screen. The game and all settings are also saved to flash (every 30 s if anything changed), so they survive a reset or a flat battery.
 
 **Battery test.** Charge fully, unplug, then More → Battery test → Start. The
 screen stays at full brightness and never sleeps. The time so far is saved to

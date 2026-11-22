@@ -411,6 +411,113 @@ int main(int argc, char **argv)
         save(frame, s, "end-prompt");
     }
 
+    // New screens: controls, battery, pop-ups, history, legends, keyboard, solo result.
+    {
+        bb_game_t g;
+        bb_game_init(&g, bb_profile_find("riftbound"), 2);
+        g.value[0] = 6;
+        g.value[1] = 4;
+        UiState s = state_for(g);
+        static const char *ctl[8] = {"Undo", "Quick menu", "Menu", "Turn off", "Menu", "Dice", "None", "None"};
+        for (int i = 0; i < 8; i++) {
+            s.controls[i] = ctl[i];
+        }
+        s.since_charge = "6d 4h";
+        s.menu = true;
+        s.menu_page = 1;
+        save(frame, s, "new-more");
+        s.menu_page = 3;
+        save(frame, s, "new-controls");
+        s.menu_page = 4;
+        s.test_text = nullptr;
+        s.last_test = "9h 41m";
+        save(frame, s, "new-battery");
+        s.menu_page = 0;
+        s.match_legend[0] = 2;  // Jinx
+        s.match_legend[1] = 1;  // Darius
+        save(frame, s, "new-menu-legends");
+        s.menu = false;
+
+        s.overlay = Overlay::Quick;
+        save(frame, s, "new-quick");
+        s.overlay = Overlay::OffPrompt;
+        save(frame, s, "new-off");
+        s.overlay = Overlay::Sleeping;
+        save(frame, s, "new-sleeping");
+
+        EditorView e;
+        e.title = "BRIGHTNESS";
+        e.value = "65%";
+        e.slider = true;
+        e.frac = 632;
+        e.preset_count = 4;
+        const char *bp[] = {"25%", "50%", "80%", "100%"};
+        for (int i = 0; i < 4; i++) e.presets[i] = bp[i];
+        s.overlay = Overlay::Editor;
+        s.editor = &e;
+        save(frame, s, "new-editor-slider");
+        EditorView e2;
+        e2.title = "DIM AFTER";
+        e2.value = "1:15";
+        e2.preset_count = 6;
+        const char *dp[] = {"Never", "15s", "30s", "1m", "2m", "5m"};
+        for (int i = 0; i < 6; i++) e2.presets[i] = dp[i];
+        e2.preset_sel = -1;
+        s.editor = &e2;
+        save(frame, s, "new-editor-stepper");
+
+        static HistoryEntry h[4] = {};
+        uint8_t rb = 0;
+        for (size_t i = 0; i < bb_profile_count(); i++) {
+            if (bb_profile_at(i) == bb_profile_find("riftbound")) rb = (uint8_t)i;
+        }
+        for (int i = 0; i < 4; i++) {
+            h[i].number = (uint16_t)(12 - i);
+            h[i].profile_index = rb;
+            h[i].players = 2;
+            h[i].result = (uint8_t)(i % 3);
+            h[i].best_of = 3;
+            h[i].game_in_match = (uint8_t)(3 - i % 3);
+            h[i].legend[0] = 2;
+            h[i].legend[1] = (uint8_t)(i == 1 ? kCustomLegend : 1);
+            h[i].minutes = (uint16_t)(18 + i * 4);
+            h[i].value[0] = (int16_t)(8 - i);
+            h[i].value[1] = (int16_t)(6 + i);
+            h[i].tally[0][0] = 5; h[i].tally[0][1] = 3;
+            h[i].tally[1][0] = 2; h[i].tally[1][1] = 4;
+        }
+        static char custom[1][kLegendNameLen + 1] = {"Mega Teemo"};
+        s.custom_legends = custom;
+        s.custom_legend_count = 1;
+        s.history = h;
+        s.history_count = 4;
+        s.overlay = Overlay::History;
+        save(frame, s, "new-history");
+        s.overlay = Overlay::HistoryDetail;
+        s.history_sel = 0;
+        save(frame, s, "new-history-detail");
+        s.history_delete_armed = true;
+        save(frame, s, "new-history-delete");
+        s.overlay = Overlay::Legends;
+        s.legend_side = 1;
+        s.legend_current = 1;
+        save(frame, s, "new-legends");
+        s.legend_page = 2;
+        save(frame, s, "new-legends-p3");
+        s.overlay = Overlay::Keyboard;
+        s.keyboard_text = "MEGA TEE";
+        save(frame, s, "new-keyboard");
+
+        bb_game_t solo;
+        bb_game_init(&solo, bb_profile_find("riftbound"), 1);
+        UiState so = state_for(solo);
+        bb_match_t m;
+        bb_match_init(&m, 3);
+        so.match = &m;
+        so.end_prompt = true;
+        save(frame, so, "new-solo-result");
+    }
+
     // Themed counters: Magic, Commander, Lorcana, FaB, at rest and mid-change.
     {
         uint16_t spin[4] = {1000, 1000, 1000, 1000};

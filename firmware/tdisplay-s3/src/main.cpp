@@ -1,10 +1,13 @@
 // BattleBuddy prototype for the LilyGO T-Display-S3 Touch.
 //
-// Buttons (board held landscape):
-//   BOOT (GPIO0), short press: open/close the menu (closes the dice)
-//   BOOT, hold 1 s:            sleep
-//   KEY (GPIO14):              undo; rolls on the dice screen; closes the menu; wakes from sleep
-//   Circle below the screen:   open/close the dice
+// Buttons (board held landscape, USB on the right). What each press, hold and
+// swipe does is set in More > Controls; the defaults are:
+//   KEY (GPIO14, top):     press undo, hold quick menu; wakes from sleep
+//   BOOT (GPIO0, bottom):  press menu, hold "Turn off?"
+//   Swipe up: menu. Swipe down: dice.
+// While a menu, the dice, a picker or a pop-up is open, KEY / BOOT back out of
+// it instead (KEY rolls on the dice screen).
+//   Circle below the screen (if the case leaves it open): open/close the dice
 // Menu: game (opens the game picker), players (1-4, or two teams), layout,
 // flip, best-of match, timer, restart, dice. Yu-Gi-Oh! opens a number pad on
 // tap; Digimon shows a shared memory gauge. The game, match and timer survive sleep (RTC memory and the
@@ -31,11 +34,23 @@ constexpr uint32_t kTapMaxMs = 700;       // longer presses without repeat don't
 constexpr uint32_t kButtonGuardMs = 250;  // ignore touches this soon after a physical button
 constexpr uint32_t kRepeatIntervalMs = 150;
 constexpr uint32_t kLongPressMs = 1000;
-// Screen settings (More -> Screen). Index 0 of the times means never.
-constexpr uint8_t kBrightnessPct[] = {25, 50, 80, 100};
-constexpr uint16_t kDimAfterS[] = {0, 15, 30, 60, 120, 300};
-constexpr uint8_t kDimToPct[] = {0, 4, 8, 20, 40}; // 0 = screen off while dimmed
-constexpr uint16_t kSleepAfterMin[] = {0, 5, 10, 20, 30};
+// Screen settings (More > Screen): presets shown as chips; any value in range can be set.
+constexpr uint8_t kBrightnessPresets[] = {25, 50, 80, 100};
+constexpr uint16_t kDimAfterPresets[] = {0, 15, 30, 60, 120, 300}; // seconds, 0 = never
+constexpr uint8_t kDimToPresets[] = {0, 4, 8, 20};                 // percent, 0 = screen off
+constexpr uint16_t kSleepAfterPresets[] = {0, 5, 10, 20, 30, 60};  // minutes, 0 = never
+constexpr uint8_t kMinBrightness = 5;
+constexpr uint8_t kMaxDimTo = 60;
+constexpr uint16_t kMaxDimAfterS = 3600;
+constexpr uint16_t kMaxSleepMin = 120;
+constexpr uint32_t kSleepingMs = 1500;     // "Turning off" shows this long
+constexpr uint32_t kChargeSaveS = 600;     // since-last-charge: save to flash this often
+constexpr uint16_t kChargeRiseMv = 150;    // a rise this big above the low point means it was charged
+constexpr uint32_t kGameSaveMs = 30000;    // save the game to flash (if changed) this often
+constexpr int kSwipeMinX = 60;             // px of travel for a swipe
+constexpr int kSwipeMinY = 45;
+constexpr uint32_t kSwipeMaxMs = 800;
+constexpr int kMaxHistory = 40;
 constexpr uint32_t kBatteryPollMs = 5000;
 constexpr uint32_t kToastMs = 1500;
 constexpr uint32_t kRollMs = 900;      // tumble before showing a roll
@@ -49,7 +64,7 @@ constexpr uint32_t kSpinMs = 420;      // counter change animation (roll, spin, 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B000A;
+constexpr uint32_t kSavedMagic = 0xBB0B000B;
 constexpr uint32_t kTestSaveS = 60; // battery test: save progress to flash this often
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
@@ -66,6 +81,8 @@ struct Saved {
     uint8_t best_of;       // 0 = match tracking off
     uint8_t timer_minutes; // 0 = no timer
     uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
+    uint32_t game_start;   // RTC seconds at the game's first change; 0 = not yet
+    uint8_t legend[2];     // Riftbound legends for this match (kNoLegend = not picked)
     bb_match_t match;
     bb_game_t game;
 };
@@ -105,15 +122,51 @@ bool dimmed = false;
 int battery_percent = -1; // -1 = on USB / unknown
 uint16_t battery_mv = 0;
 
-// Screen settings, saved to flash so they survive power-off. Indexes into the tables above.
+// Screen settings, saved to flash so they survive power-off.
 struct ScreenPrefs {
-    uint8_t brightness = 2; // 80 %
-    uint8_t dim_after = 2;  // 30 s
-    uint8_t dim_to = 2;     // 8 %
-    uint8_t sleep_after = 2; // 10 min
+    uint8_t brightness = 80; // percent
+    uint16_t dim_after = 60; // seconds, 0 = never
+    uint8_t dim_to = 8;      // percent, 0 = screen off
+    uint16_t sleep_after = 30; // minutes, 0 = never
 };
 ScreenPrefs screen;
-char brightness_text[8], dim_after_text[10], dim_to_text[8], sleep_after_text[10];
+char brightness_text[8], dim_after_text[12], dim_to_text[8], sleep_after_text[12];
+
+// What buttons and swipes do (More > Controls), saved to flash.
+enum Control : uint8_t { CtlNone, CtlUndo, CtlMenu, CtlQuick, CtlDice, CtlOff, CtlCount };
+const char *const kControlNames[] = {"None", "Undo", "Menu", "Quick menu", "Dice", "Turn off"};
+// top press, top hold, bottom press, bottom hold, swipe up, down, left, right
+uint8_t controls[8] = {CtlUndo, CtlQuick, CtlMenu, CtlOff, CtlMenu, CtlDice, CtlNone, CtlNone};
+
+// Pop-ups.
+Overlay overlay = Overlay::None;
+uint32_t sleeping_at = 0;
+EditorView editor;
+uint8_t editor_which = 0; // 0 brightness, 1 dim after, 2 dim to, 3 sleep after
+char editor_value[16];
+
+// Game history (newest first) and legends, saved to flash.
+HistoryEntry history[kMaxHistory];
+int history_count = 0;
+uint16_t history_next = 1;
+int history_page = 0;
+int history_sel = -1;
+bool history_delete_armed = false;
+char custom_legends[kMaxCustomLegends][kLegendNameLen + 1];
+int custom_legend_count = 0;
+uint8_t legend_side = 0;
+int legend_page = 0;
+bool legend_for_history = false; // editing a past game's legend, not this match's
+bool legend_chain = false;       // after picking yours, go on to theirs
+char keyboard_text[kLegendNameLen + 1];
+
+// Time on battery since the last charge (charging shows up as a voltage rise).
+uint32_t charge_secs = 0;
+uint16_t charge_min_mv = 0;
+RTC_DATA_ATTR uint32_t charge_tick_s = 0;
+uint32_t charge_saved_s = 0;
+uint8_t charge_rises = 0;
+char since_charge_text[16];
 
 // Battery test: runs the screen always on and counts how long the battery
 // lasts. Progress is saved to flash every minute, so when the battery dies the
@@ -155,6 +208,8 @@ bool touch_cancelled = false; // a physical button was involved; ignore this tou
 uint32_t last_button_ms = 0;
 UiAction touch_action;
 uint32_t touch_start_ms = 0;
+int touch_x0 = 0, touch_y0 = 0;   // where the touch started (screen coordinates)
+int touch_x = 0, touch_y = 0;     // where it is now
 uint32_t last_repeat_ms = 0;
 
 // Seconds on the RTC clock, which keeps running through deep sleep.
@@ -177,6 +232,8 @@ void new_match()
     bb_match_init(&saved.match, saved.best_of ? saved.best_of : 1);
     saved.match_start = 0;
 }
+
+bool screen_always_on();
 
 UiState ui_state()
 {
@@ -203,13 +260,33 @@ UiState ui_state()
     s.dice = dice_open ? &dice : nullptr;
     s.picker = picker_open ? &picker : nullptr;
     s.entry = entry_open ? &entry : nullptr;
-    s.always_on = test.running || (kDimAfterS[screen.dim_after] == 0 && kSleepAfterMin[screen.sleep_after] == 0);
+    s.always_on = test.running || screen_always_on();
     s.brightness_text = brightness_text;
     s.dim_after_text = dim_after_text;
     s.dim_to_text = dim_to_text;
     s.sleep_after_text = sleep_after_text;
     s.test_text = test.running ? test_text : nullptr;
     s.last_test = test.last_secs ? last_test_text : nullptr;
+    s.since_charge = since_charge_text;
+    for (int i = 0; i < 8; i++) {
+        s.controls[i] = kControlNames[controls[i] % CtlCount];
+    }
+    s.overlay = overlay;
+    s.editor = &editor;
+    s.history = history;
+    s.history_count = history_count;
+    s.history_page = history_page;
+    s.history_sel = history_sel;
+    s.history_delete_armed = history_delete_armed;
+    s.match_legend[0] = saved.legend[0];
+    s.match_legend[1] = saved.legend[1];
+    s.legend_side = legend_side;
+    s.legend_current = legend_for_history && history_sel >= 0 ? history[history_sel].legend[legend_side]
+                                                              : saved.legend[legend_side];
+    s.legend_page = legend_page;
+    s.custom_legends = custom_legends;
+    s.custom_legend_count = custom_legend_count;
+    s.keyboard_text = keyboard_text;
     return s;
 }
 
@@ -242,43 +319,316 @@ uint8_t pct_to_level(uint8_t pct)
 
 uint8_t full_brightness()
 {
-    return pct_to_level(kBrightnessPct[screen.brightness]);
+    return pct_to_level(screen.brightness);
+}
+
+void format_seconds(char *out, size_t n, uint16_t secs)
+{
+    if (secs == 0) {
+        snprintf(out, n, "Never");
+    } else if (secs < 60) {
+        snprintf(out, n, "%u s", secs);
+    } else if (secs % 60 == 0) {
+        snprintf(out, n, "%u min", secs / 60);
+    } else {
+        snprintf(out, n, "%u:%02u", secs / 60, secs % 60);
+    }
+}
+
+void format_minutes(char *out, size_t n, uint16_t mins)
+{
+    if (mins == 0) {
+        snprintf(out, n, "Never");
+    } else {
+        snprintf(out, n, "%u min", mins);
+    }
 }
 
 void screen_texts()
 {
-    snprintf(brightness_text, sizeof(brightness_text), "%u%%", kBrightnessPct[screen.brightness]);
-    uint16_t d = kDimAfterS[screen.dim_after];
-    if (d == 0) {
-        snprintf(dim_after_text, sizeof(dim_after_text), "Never");
-    } else if (d < 60) {
-        snprintf(dim_after_text, sizeof(dim_after_text), "%u s", d);
-    } else {
-        snprintf(dim_after_text, sizeof(dim_after_text), "%u min", d / 60);
-    }
-    uint8_t to = kDimToPct[screen.dim_to];
-    snprintf(dim_to_text, sizeof(dim_to_text), to ? "%u%%" : "Off", to);
-    uint16_t m = kSleepAfterMin[screen.sleep_after];
-    snprintf(sleep_after_text, sizeof(sleep_after_text), m ? "%u min" : "Never", m);
+    snprintf(brightness_text, sizeof(brightness_text), "%u%%", screen.brightness);
+    format_seconds(dim_after_text, sizeof(dim_after_text), screen.dim_after);
+    snprintf(dim_to_text, sizeof(dim_to_text), screen.dim_to ? "%u%%" : "Off", screen.dim_to);
+    format_minutes(sleep_after_text, sizeof(sleep_after_text), screen.sleep_after);
 }
 
 void screen_load()
 {
-    screen.brightness = prefs.getUChar("s_br", screen.brightness) % sizeof(kBrightnessPct);
-    screen.dim_after = prefs.getUChar("s_da", screen.dim_after) % (sizeof(kDimAfterS) / sizeof(kDimAfterS[0]));
-    screen.dim_to = prefs.getUChar("s_dt", screen.dim_to) % sizeof(kDimToPct);
-    screen.sleep_after =
-        prefs.getUChar("s_sa", screen.sleep_after) % (sizeof(kSleepAfterMin) / sizeof(kSleepAfterMin[0]));
+    screen.brightness = constrain(prefs.getUChar("b_pct", screen.brightness), kMinBrightness, 100);
+    screen.dim_after = min<uint16_t>(prefs.getUShort("da_s", screen.dim_after), kMaxDimAfterS);
+    screen.dim_to = min<uint8_t>(prefs.getUChar("dt_pct", screen.dim_to), kMaxDimTo);
+    screen.sleep_after = min<uint16_t>(prefs.getUShort("sa_min", screen.sleep_after), kMaxSleepMin);
     screen_texts();
 }
 
 void screen_save()
 {
-    prefs.putUChar("s_br", screen.brightness);
-    prefs.putUChar("s_da", screen.dim_after);
-    prefs.putUChar("s_dt", screen.dim_to);
-    prefs.putUChar("s_sa", screen.sleep_after);
+    prefs.putUChar("b_pct", screen.brightness);
+    prefs.putUShort("da_s", screen.dim_after);
+    prefs.putUChar("dt_pct", screen.dim_to);
+    prefs.putUShort("sa_min", screen.sleep_after);
     screen_texts();
+}
+
+bool screen_always_on()
+{
+    return screen.dim_after == 0 && screen.sleep_after == 0;
+}
+
+// Fills the editor view for the setting being edited.
+void editor_refresh()
+{
+    editor = EditorView();
+    editor.value = editor_value;
+    switch (editor_which) {
+    case 0:
+        editor.title = "BRIGHTNESS";
+        snprintf(editor_value, sizeof(editor_value), "%u%%", screen.brightness);
+        editor.slider = true;
+        editor.frac = (uint16_t)((screen.brightness - kMinBrightness) * 1000 / (100 - kMinBrightness));
+        editor.preset_count = sizeof(kBrightnessPresets);
+        for (int i = 0; i < editor.preset_count; i++) {
+            static char labels[4][6];
+            snprintf(labels[i], sizeof(labels[i]), "%u%%", kBrightnessPresets[i]);
+            editor.presets[i] = labels[i];
+            if (kBrightnessPresets[i] == screen.brightness) {
+                editor.preset_sel = (int8_t)i;
+            }
+        }
+        break;
+    case 1:
+        editor.title = "DIM AFTER";
+        format_seconds(editor_value, sizeof(editor_value), screen.dim_after);
+        editor.preset_count = sizeof(kDimAfterPresets) / sizeof(kDimAfterPresets[0]);
+        for (int i = 0; i < editor.preset_count; i++) {
+            static char labels[6][8];
+            if (kDimAfterPresets[i] == 0) {
+                snprintf(labels[i], sizeof(labels[i]), "Never");
+            } else if (kDimAfterPresets[i] < 60) {
+                snprintf(labels[i], sizeof(labels[i]), "%us", kDimAfterPresets[i]);
+            } else {
+                snprintf(labels[i], sizeof(labels[i]), "%um", kDimAfterPresets[i] / 60);
+            }
+            editor.presets[i] = labels[i];
+            if (kDimAfterPresets[i] == screen.dim_after) {
+                editor.preset_sel = (int8_t)i;
+            }
+        }
+        break;
+    case 2:
+        editor.title = "DIM TO";
+        snprintf(editor_value, sizeof(editor_value), screen.dim_to ? "%u%%" : "Off", screen.dim_to);
+        editor.slider = true;
+        editor.frac = (uint16_t)(screen.dim_to * 1000 / kMaxDimTo);
+        editor.preset_count = sizeof(kDimToPresets);
+        for (int i = 0; i < editor.preset_count; i++) {
+            static char labels[4][6];
+            snprintf(labels[i], sizeof(labels[i]), kDimToPresets[i] ? "%u%%" : "Off", kDimToPresets[i]);
+            editor.presets[i] = labels[i];
+            if (kDimToPresets[i] == screen.dim_to) {
+                editor.preset_sel = (int8_t)i;
+            }
+        }
+        break;
+    default:
+        editor.title = "SLEEP AFTER";
+        format_minutes(editor_value, sizeof(editor_value), screen.sleep_after);
+        editor.preset_count = sizeof(kSleepAfterPresets) / sizeof(kSleepAfterPresets[0]);
+        for (int i = 0; i < editor.preset_count; i++) {
+            static char labels[6][8];
+            snprintf(labels[i], sizeof(labels[i]), kSleepAfterPresets[i] ? "%um" : "Never", kSleepAfterPresets[i]);
+            editor.presets[i] = labels[i];
+            if (kSleepAfterPresets[i] == screen.sleep_after) {
+                editor.preset_sel = (int8_t)i;
+            }
+        }
+        break;
+    }
+}
+
+// - / + steps: finer near zero, coarser further out.
+uint16_t step_dim_after(uint16_t v, int dir)
+{
+    if (dir > 0) {
+        v = v == 0 ? 5 : v < 60 ? v + 5 : v < 300 ? v + 15 : v + 60;
+        return min<uint16_t>(v, kMaxDimAfterS);
+    }
+    return v <= 5 ? 0 : v <= 60 ? v - 5 : v <= 300 ? v - 15 : v - 60;
+}
+
+uint16_t step_sleep_after(uint16_t v, int dir)
+{
+    if (dir > 0) {
+        v = v < 10 ? v + 1 : v + 5;
+        return min<uint16_t>(v, kMaxSleepMin);
+    }
+    return v <= 1 ? 0 : v <= 10 ? v - 1 : v - 5;
+}
+
+// ---- Flash storage: controls, history, legends, the game ----------------------
+
+void controls_load()
+{
+    uint8_t buf[8];
+    if (prefs.getBytes("ctl", buf, sizeof(buf)) == sizeof(buf)) {
+        for (int i = 0; i < 8; i++) {
+            controls[i] = buf[i] < CtlCount ? buf[i] : CtlNone;
+        }
+    }
+}
+
+void controls_save()
+{
+    prefs.putBytes("ctl", controls, sizeof(controls));
+}
+
+void history_load()
+{
+    history_count = 0;
+    size_t len = prefs.getBytesLength("hist");
+    if (len > 0 && len % sizeof(HistoryEntry) == 0 && len <= sizeof(history)) {
+        prefs.getBytes("hist", history, len);
+        history_count = (int)(len / sizeof(HistoryEntry));
+    }
+    history_next = prefs.getUShort("hist_n", 1);
+}
+
+void history_save()
+{
+    if (history_count > 0) {
+        prefs.putBytes("hist", history, history_count * sizeof(HistoryEntry));
+    } else {
+        prefs.remove("hist");
+    }
+    prefs.putUShort("hist_n", history_next);
+}
+
+void legends_load()
+{
+    custom_legend_count = 0;
+    size_t len = prefs.getBytesLength("legends");
+    if (len > 0 && len % sizeof(custom_legends[0]) == 0 && len <= sizeof(custom_legends)) {
+        prefs.getBytes("legends", custom_legends, len);
+        custom_legend_count = (int)(len / sizeof(custom_legends[0]));
+        for (int i = 0; i < custom_legend_count; i++) {
+            custom_legends[i][kLegendNameLen] = 0;
+        }
+    }
+}
+
+void legends_save()
+{
+    prefs.putBytes("legends", custom_legends, custom_legend_count * sizeof(custom_legends[0]));
+}
+
+// The game and its settings, so a flat battery or a reset doesn't lose them.
+// Only written when something changed, at most every kGameSaveMs.
+Saved last_stored;
+
+void game_store(bool force)
+{
+    static uint32_t last_ms = 0;
+    uint32_t now = millis();
+    if (!force && now - last_ms < kGameSaveMs) {
+        return;
+    }
+    last_ms = now;
+    Saved copy = saved;
+    copy.magic = kSavedMagic;
+    if (memcmp(&copy, &last_stored, sizeof(copy)) == 0) {
+        return;
+    }
+    prefs.putBytes("game", &copy, sizeof(copy));
+    last_stored = copy;
+}
+
+bool game_restore()
+{
+    Saved copy;
+    if (prefs.getBytesLength("game") != sizeof(copy) || prefs.getBytes("game", &copy, sizeof(copy)) != sizeof(copy)) {
+        return false;
+    }
+    if (copy.magic != kSavedMagic || copy.profile_index >= bb_profile_count()) {
+        return false;
+    }
+    last_stored = copy;
+    saved = copy;
+    game.profile = bb_profile_at(saved.profile_index);
+    // The RTC clock restarted, so times measured on it are gone.
+    saved.match_start = 0;
+    saved.game_start = 0;
+    return true;
+}
+
+// Since the last charge.
+void charge_texts()
+{
+    uint32_t m = charge_secs / 60;
+    if (m >= 24 * 60) {
+        snprintf(since_charge_text, sizeof(since_charge_text), "%lud %luh", (unsigned long)(m / 1440),
+                 (unsigned long)(m % 1440 / 60));
+    } else if (m >= 60) {
+        snprintf(since_charge_text, sizeof(since_charge_text), "%luh %02lum", (unsigned long)(m / 60),
+                 (unsigned long)(m % 60));
+    } else {
+        snprintf(since_charge_text, sizeof(since_charge_text), "%lum", (unsigned long)m);
+    }
+}
+
+void charge_save()
+{
+    prefs.putUInt("c_secs", charge_secs);
+    prefs.putUShort("c_min", charge_min_mv);
+}
+
+void charge_load(bool woke)
+{
+    charge_secs = prefs.getUInt("c_secs", 0);
+    charge_min_mv = prefs.getUShort("c_min", 0);
+    if (!woke) {
+        charge_tick_s = 0; // the RTC clock restarted
+    }
+    charge_texts();
+}
+
+// Called with each battery reading.
+void charge_track(uint16_t mv)
+{
+    uint32_t t = now_s();
+    if (charge_tick_s == 0 || t < charge_tick_s) { // long sleeps count: the RTC clock keeps running
+        charge_tick_s = t;
+    }
+    bool usb = mv > 4300;
+    bool rose = charge_min_mv != 0 && mv >= charge_min_mv + kChargeRiseMv;
+    charge_rises = rose ? charge_rises + 1 : 0;
+    if (usb || charge_rises >= 2 || charge_min_mv == 0) {
+        // Charging (or first reading ever): start counting again from here.
+        bool changed = charge_secs != 0 || charge_min_mv != mv;
+        charge_secs = 0;
+        charge_min_mv = mv;
+        charge_rises = 0;
+        charge_tick_s = t;
+        if (changed && t - charge_saved_s >= 60) {
+            charge_saved_s = t;
+            charge_save();
+        }
+    } else {
+        charge_secs += t - charge_tick_s;
+        charge_tick_s = t;
+        if (mv < charge_min_mv) {
+            charge_min_mv = mv;
+        }
+        if (t - charge_saved_s >= kChargeSaveS) {
+            charge_saved_s = t;
+            charge_save();
+        }
+    }
+    char before[16];
+    snprintf(before, sizeof(before), "%s", since_charge_text);
+    charge_texts();
+    if (strcmp(before, since_charge_text) != 0) {
+        dirty = true;
+    }
 }
 
 // Returns true if this input should be ignored because it only woke the screen.
@@ -390,6 +740,9 @@ void go_to_sleep()
         test_tick_s = now_s();
         test_save();
     }
+    charge_save();
+    game_store(true);
+    overlay = Overlay::None;
 
     lcd.setBrightness(0);
     lcd.sleep();
@@ -510,7 +863,121 @@ void adjust(uint8_t player, uint8_t kind, int16_t delta, uint32_t now)
         if (saved.match_start == 0) {
             saved.match_start = now_s(); // the timer starts with the first change
         }
+        if (saved.game_start == 0) {
+            saved.game_start = now_s();
+        }
     }
+}
+
+// Adds the game just finished to the history. result: 0 / 1 = that side won, 2 = draw.
+void record_result(uint8_t result)
+{
+    HistoryEntry e = {};
+    e.number = history_next++;
+    e.profile_index = saved.profile_index;
+    e.players = game.players;
+    e.result = result;
+    e.best_of = saved.best_of;
+    e.game_in_match = (uint8_t)(saved.match.games + 1);
+    e.legend[0] = saved.legend[0];
+    e.legend[1] = saved.legend[1];
+    e.minutes = saved.game_start ? (uint16_t)min<uint32_t>((now_s() - saved.game_start + 30) / 60, 0xFFFF) : 0;
+    for (int side = 0; side < 2 && side < game.players; side++) {
+        e.value[side] = game.value[side];
+        e.tally[side][0] = game.tally[side][0];
+        e.tally[side][1] = game.profile->kind_count >= 2 ? game.tally[side][1] : 0;
+    }
+    int keep = history_count < kMaxHistory ? history_count : kMaxHistory - 1;
+    memmove(&history[1], &history[0], keep * sizeof(HistoryEntry));
+    history[0] = e;
+    history_count = keep + 1;
+    history_save();
+    saved.game_start = 0;
+}
+
+void open_legends(bool for_history, uint8_t side, bool chain)
+{
+    legend_for_history = for_history;
+    legend_side = side;
+    legend_chain = chain;
+    legend_page = 0;
+    overlay = Overlay::Legends;
+    dirty = true;
+}
+
+void set_legend(uint8_t code)
+{
+    if (legend_for_history) {
+        if (history_sel >= 0 && history_sel < history_count) {
+            history[history_sel].legend[legend_side] = code;
+            history_save();
+        }
+        overlay = Overlay::HistoryDetail;
+    } else {
+        saved.legend[legend_side] = code;
+        if (legend_chain && legend_side == 0) {
+            legend_side = 1; // now theirs
+            legend_page = 0;
+        } else {
+            overlay = Overlay::None;
+        }
+    }
+    dirty = true;
+}
+
+void toggle_menu();
+void toggle_dice();
+
+// Runs what a button or swipe is set to do.
+void run_control(uint8_t control, uint32_t now)
+{
+    switch (control) {
+    case CtlUndo:
+        if (overlay == Overlay::None) {
+            undo(now);
+        }
+        break;
+    case CtlMenu:
+        overlay = Overlay::None;
+        toggle_menu();
+        break;
+    case CtlQuick:
+        overlay = overlay == Overlay::Quick ? Overlay::None : Overlay::Quick;
+        dirty = true;
+        break;
+    case CtlDice:
+        overlay = Overlay::None;
+        toggle_dice();
+        break;
+    case CtlOff:
+        overlay = Overlay::OffPrompt;
+        dirty = true;
+        break;
+    default:
+        break;
+    }
+}
+
+// KEY / BOOT pressed while a pop-up is open: back out of it.
+void close_overlay()
+{
+    switch (overlay) {
+    case Overlay::HistoryDetail:
+        overlay = Overlay::History;
+        break;
+    case Overlay::Keyboard:
+        overlay = Overlay::Legends;
+        break;
+    case Overlay::Legends:
+        overlay = legend_for_history ? Overlay::HistoryDetail : Overlay::None;
+        break;
+    case Overlay::Sleeping:
+        return; // too late
+    default:
+        overlay = Overlay::None;
+        break;
+    }
+    dirty = true;
 }
 
 void perform(const UiAction &a, uint32_t now)
@@ -597,6 +1064,7 @@ void perform(const UiAction &a, uint32_t now)
         if (winner < 0) {
             break;
         }
+        record_result((uint8_t)winner);
         bb_match_record(&saved.match, (uint8_t)winner);
         if (bb_match_winner(&saved.match) >= 0) {
             new_match();
@@ -648,15 +1116,226 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuBack:
-        menu_page = menu_page == 2 ? 1 : 0;
+        menu_page = menu_page >= 2 ? 1 : 0;
         dirty = true;
         break;
     case UiAction::MenuCounter:
         saved.counter_style = (uint8_t)((saved.counter_style + 1) % 3);
         dirty = true;
         break;
-    case UiAction::MenuSleep:
-        go_to_sleep();
+    case UiAction::MenuOff:
+        overlay = Overlay::OffPrompt;
+        dirty = true;
+        break;
+    case UiAction::MenuControls:
+        menu_page = 3;
+        dirty = true;
+        break;
+    case UiAction::MenuBattery:
+        menu_page = 4;
+        dirty = true;
+        break;
+    case UiAction::MenuHistory:
+        history_page = 0;
+        history_sel = -1;
+        overlay = Overlay::History;
+        dirty = true;
+        break;
+    case UiAction::MenuLegends:
+        open_legends(false, 0, true);
+        break;
+    case UiAction::ControlCycle:
+        if (a.kind < 8) {
+            controls[a.kind] = (uint8_t)((controls[a.kind] + 1) % CtlCount);
+            controls_save();
+            dirty = true;
+        }
+        break;
+    case UiAction::QuickPick:
+        overlay = Overlay::None;
+        if (a.kind == 0) {
+            undo(now);
+        } else if (a.kind == 1) {
+            menu_open = picker_open = entry_open = end_prompt = false;
+            dice_open = true;
+        } else if (a.kind == 2) {
+            picker_open = entry_open = dice_open = end_prompt = false;
+            menu_open = true;
+            menu_page = 0;
+        } else {
+            overlay = Overlay::OffPrompt;
+        }
+        dirty = true;
+        break;
+    case UiAction::QuickClose:
+    case UiAction::OffNo:
+        overlay = Overlay::None;
+        dirty = true;
+        break;
+    case UiAction::OffYes:
+        overlay = Overlay::Sleeping;
+        sleeping_at = now;
+        dirty = true;
+        break;
+    case UiAction::ScreenOpen:
+        editor_which = a.kind;
+        editor_refresh();
+        overlay = Overlay::Editor;
+        dirty = true;
+        break;
+    case UiAction::EditorSlide: {
+        if (editor_which == 0) {
+            screen.brightness = (uint8_t)(kMinBrightness + (a.delta * (100 - kMinBrightness) + 500) / 1000);
+            lcd.setBrightness(full_brightness());
+        } else if (editor_which == 2) {
+            screen.dim_to = (uint8_t)((a.delta * kMaxDimTo + 500) / 1000);
+        }
+        screen_save();
+        editor_refresh();
+        dirty = true;
+        break;
+    }
+    case UiAction::EditorStep:
+        if (editor_which == 1) {
+            screen.dim_after = step_dim_after(screen.dim_after, a.delta);
+        } else if (editor_which == 3) {
+            screen.sleep_after = step_sleep_after(screen.sleep_after, a.delta);
+        }
+        screen_save();
+        editor_refresh();
+        dirty = true;
+        break;
+    case UiAction::EditorPreset:
+        switch (editor_which) {
+        case 0:
+            screen.brightness = kBrightnessPresets[a.kind % sizeof(kBrightnessPresets)];
+            lcd.setBrightness(full_brightness());
+            break;
+        case 1:
+            screen.dim_after = kDimAfterPresets[a.kind % (sizeof(kDimAfterPresets) / sizeof(kDimAfterPresets[0]))];
+            break;
+        case 2:
+            screen.dim_to = kDimToPresets[a.kind % sizeof(kDimToPresets)];
+            break;
+        default:
+            screen.sleep_after =
+                kSleepAfterPresets[a.kind % (sizeof(kSleepAfterPresets) / sizeof(kSleepAfterPresets[0]))];
+            break;
+        }
+        screen_save();
+        editor_refresh();
+        dirty = true;
+        break;
+    case UiAction::EditorClose:
+        overlay = Overlay::None;
+        dirty = true;
+        break;
+    case UiAction::HistoryOpen:
+        if (a.kind < history_count) {
+            history_sel = a.kind;
+            history_delete_armed = false;
+            overlay = Overlay::HistoryDetail;
+            dirty = true;
+        }
+        break;
+    case UiAction::HistoryPage: {
+        int pages = (history_count + 2) / 3;
+        history_page = constrain(history_page + a.delta, 0, pages > 0 ? pages - 1 : 0);
+        dirty = true;
+        break;
+    }
+    case UiAction::HistoryClose:
+        overlay = Overlay::None;
+        dirty = true;
+        break;
+    case UiAction::DetailBack:
+        overlay = Overlay::History;
+        dirty = true;
+        break;
+    case UiAction::HistoryLegend:
+        open_legends(true, a.player, false);
+        break;
+    case UiAction::HistoryDelete:
+        if (!history_delete_armed) {
+            history_delete_armed = true;
+        } else if (history_sel >= 0 && history_sel < history_count) {
+            memmove(&history[history_sel], &history[history_sel + 1],
+                    (history_count - history_sel - 1) * sizeof(HistoryEntry));
+            history_count--;
+            history_save();
+            history_sel = -1;
+            history_delete_armed = false;
+            int pages = (history_count + 2) / 3;
+            history_page = constrain(history_page, 0, pages > 0 ? pages - 1 : 0);
+            overlay = Overlay::History;
+        }
+        dirty = true;
+        break;
+    case UiAction::LegendPick:
+        set_legend(a.kind);
+        break;
+    case UiAction::LegendPage: {
+        int n = custom_legend_count + (int)ui_legend_count();
+        int pages = (n + 11) / 12;
+        legend_page = constrain(legend_page + a.delta, 0, pages - 1);
+        dirty = true;
+        break;
+    }
+    case UiAction::LegendAdd:
+        if (custom_legend_count >= kMaxCustomLegends) {
+            show_toast("12 own legends max", now);
+            break;
+        }
+        keyboard_text[0] = 0;
+        overlay = Overlay::Keyboard;
+        dirty = true;
+        break;
+    case UiAction::LegendClose:
+        overlay = legend_for_history ? Overlay::HistoryDetail : Overlay::None;
+        dirty = true;
+        break;
+    case UiAction::KeyChar: {
+        size_t len = strlen(keyboard_text);
+        if (len < kLegendNameLen && !(a.kind == ' ' && (len == 0 || keyboard_text[len - 1] == ' '))) {
+            keyboard_text[len] = (char)a.kind;
+            keyboard_text[len + 1] = 0;
+            dirty = true;
+        }
+        break;
+    }
+    case UiAction::KeyDelete: {
+        size_t len = strlen(keyboard_text);
+        if (len > 0) {
+            keyboard_text[len - 1] = 0;
+            dirty = true;
+        }
+        break;
+    }
+    case UiAction::KeyDone: {
+        size_t len = strlen(keyboard_text);
+        while (len > 0 && keyboard_text[len - 1] == ' ') {
+            keyboard_text[--len] = 0;
+        }
+        if (len == 0) {
+            overlay = Overlay::Legends;
+            dirty = true;
+            break;
+        }
+        // "MISS FORTUNE" -> "Miss Fortune"
+        for (size_t i = 0; i < len; i++) {
+            bool word_start = i == 0 || keyboard_text[i - 1] == ' ' || keyboard_text[i - 1] == '-';
+            keyboard_text[i] = word_start ? (char)toupper(keyboard_text[i]) : (char)tolower(keyboard_text[i]);
+        }
+        int idx = custom_legend_count++;
+        snprintf(custom_legends[idx], sizeof(custom_legends[idx]), "%s", keyboard_text);
+        legends_save();
+        overlay = Overlay::Legends;
+        set_legend((uint8_t)(kCustomLegend + idx));
+        break;
+    }
+    case UiAction::KeyCancel:
+        overlay = Overlay::Legends;
+        dirty = true;
         break;
     case UiAction::MenuUndo:
         menu_open = false;
@@ -671,9 +1350,13 @@ void perform(const UiAction &a, uint32_t now)
     case UiAction::DeclareWinner: {
         char msg[40];
         uint8_t game_no = saved.match.games + 1;
+        record_result(a.player);
         bb_match_record(&saved.match, a.player);
-        const char *who = ui_player_label(game, a.player);
+        const char *who = game.players == 1 ? "You" : ui_player_label(game, a.player);
         const char *verb = strcmp(who, "YOU") == 0 ? "win" : "wins";
+        if (game.players == 1) {
+            verb = a.player == 0 ? "won" : "lost";
+        }
         if (bb_match_winner(&saved.match) >= 0 && saved.match.best_of > 1) {
             snprintf(msg, sizeof(msg), "%s %s the match %d-%d", who, verb, saved.match.wins[0],
                      saved.match.wins[1]);
@@ -684,6 +1367,15 @@ void perform(const UiAction &a, uint32_t now)
                 new_match();
             }
         }
+        bb_game_reset(&game);
+        end_prompt = false;
+        show_toast(msg, now);
+        break;
+    }
+    case UiAction::EndDraw: {
+        char msg[40];
+        record_result(2);
+        snprintf(msg, sizeof(msg), "Draw - game %d again", saved.match.games + 1);
         bb_game_reset(&game);
         end_prompt = false;
         show_toast(msg, now);
@@ -700,28 +1392,6 @@ void perform(const UiAction &a, uint32_t now)
         break;
     case UiAction::MenuScreen:
         menu_page = 2;
-        dirty = true;
-        break;
-    case UiAction::ScreenBrightness:
-        screen.brightness = (uint8_t)((screen.brightness + 1) % sizeof(kBrightnessPct));
-        screen_save();
-        lcd.setBrightness(full_brightness());
-        dirty = true;
-        break;
-    case UiAction::ScreenDimAfter:
-        screen.dim_after = (uint8_t)((screen.dim_after + 1) % (sizeof(kDimAfterS) / sizeof(kDimAfterS[0])));
-        screen_save();
-        dirty = true;
-        break;
-    case UiAction::ScreenDimTo:
-        screen.dim_to = (uint8_t)((screen.dim_to + 1) % sizeof(kDimToPct));
-        screen_save();
-        dirty = true;
-        break;
-    case UiAction::ScreenSleepAfter:
-        screen.sleep_after =
-            (uint8_t)((screen.sleep_after + 1) % (sizeof(kSleepAfterMin) / sizeof(kSleepAfterMin[0])));
-        screen_save();
         dirty = true;
         break;
     case UiAction::MenuBatteryTest:
@@ -810,16 +1480,45 @@ void handle_touch(uint32_t now)
 {
     lgfx::touch_point_t tp;
     if (lcd.getTouchRaw(&tp, 1) == 0) {
-        if (touch_down && !touch_fired && !touch_cancelled && now - touch_start_ms <= kTapMaxMs) {
-            perform(touch_action, now);
+        if (touch_down && !touch_fired && !touch_cancelled) {
+            int dx = touch_x - touch_x0;
+            int dy = touch_y - touch_y0;
+            bool swipe = (abs(dx) >= kSwipeMinX || abs(dy) >= kSwipeMinY) && now - touch_start_ms <= kSwipeMaxMs;
+            bool on_counter = overlay == Overlay::None && !menu_open && !picker_open && !entry_open && !dice_open &&
+                              !end_prompt;
+            if (swipe && on_counter) {
+                // up, down, left, right
+                int dir = abs(dx) * kSwipeMinY > abs(dy) * kSwipeMinX ? (dx < 0 ? 2 : 3) : (dy < 0 ? 0 : 1);
+                Serial.printf("swipe %d\n", dir);
+                run_control(controls[4 + dir], now);
+            } else if (!swipe && now - touch_start_ms <= kTapMaxMs) {
+                perform(touch_action, now);
+            }
         }
         touch_down = false;
         return;
     }
 
+    {
+        lgfx::touch_point_t sp = tp;
+        lcd.convertRawXY(&sp, 1);
+        touch_x = sp.x;
+        touch_y = sp.y;
+    }
+
     if (touch_down) {
         // Held press: auto-repeat where the action allows it.
         last_input_ms = now;
+        // Dragging a slider follows the finger.
+        if (touch_action.type == UiAction::EditorSlide && !touch_cancelled) {
+            UiAction a = ui_hit(ui_state(), touch_x, touch_y);
+            if (a.type == UiAction::EditorSlide && a.delta != touch_action.delta) {
+                touch_action = a;
+                perform(a, now);
+            }
+            touch_fired = true;
+            return;
+        }
         if (boot_button.down || key_button.down) {
             touch_cancelled = true;
         }
@@ -838,6 +1537,8 @@ void handle_touch(uint32_t now)
     touch_cancelled = boot_button.down || key_button.down || now - last_button_ms < kButtonGuardMs;
     touch_action = UiAction();
     touch_start_ms = now;
+    touch_x0 = touch_x;
+    touch_y0 = touch_y;
     last_repeat_ms = now;
     Serial.printf("touch raw x=%d y=%d%s\n", tp.x, tp.y, touch_cancelled ? " (ignored)" : "");
 
@@ -854,8 +1555,11 @@ void handle_touch(uint32_t now)
         return;
     }
 
-    lcd.convertRawXY(&tp, 1);
-    touch_action = ui_hit(ui_state(), tp.x, tp.y);
+    touch_action = ui_hit(ui_state(), touch_x, touch_y);
+    if (touch_action.type == UiAction::EditorSlide) {
+        touch_fired = true; // a slider moves on touch, not on release
+        perform(touch_action, now);
+    }
 }
 
 // Calls on_short when released before kLongPressMs, on_long once when held that long.
@@ -903,6 +1607,7 @@ void poll_battery(uint32_t now)
     uint32_t mv = analogReadMilliVolts(PIN_BAT_VOLT) * 2;
     battery_mv = (uint16_t)mv;
     test_tick();
+    charge_track(battery_mv);
     int percent = mv > 4300 ? -1 : constrain(((int)mv - 3300) * 100 / 900, 0, 100);
     if (percent != battery_percent) {
         battery_percent = percent;
@@ -931,7 +1636,7 @@ void setup()
             key_button.down = true;
             key_button.long_fired = true;
         }
-    } else {
+    } else if (!(prefs.begin("bb", false) && game_restore())) {
         saved.step = 1;
         saved.layout = Layout::SideYouLeft;
         saved.flipped = false;
@@ -939,10 +1644,16 @@ void setup()
         saved.counter_style = 0;
         saved.best_of = 1;
         saved.timer_minutes = 0;
+        saved.game_start = 0;
+        saved.legend[0] = saved.legend[1] = kNoLegend;
         start_game(0, 1);
     }
 
-    prefs.begin("bb", false);
+    prefs.begin("bb", false); // (already open after a cold start; opening twice is harmless)
+    controls_load();
+    history_load();
+    legends_load();
+    charge_load(woke);
     test_load();
     if (test.running && !woke) {
         // Power came back after the battery ran out (or a reset): that test is done.
@@ -968,21 +1679,35 @@ void loop()
     uint32_t now = millis();
 
     handle_touch(now);
+    // KEY = top button, BOOT = bottom (USB on the right).
     poll_button(
         key_button, now,
         [now] {
-            if (menu_open || picker_open || entry_open || end_prompt) {
+            if (overlay != Overlay::None) {
+                close_overlay();
+            } else if (menu_open || picker_open || entry_open || end_prompt) {
                 menu_open = picker_open = entry_open = end_prompt = false;
                 menu_page = 0;
                 dirty = true;
             } else if (dice_open) {
                 start_roll(now);
             } else {
-                undo(now);
+                run_control(controls[0], now);
             }
         },
-        [] {});
-    poll_button(boot_button, now, [] { toggle_menu(); }, [] { go_to_sleep(); });
+        [now] { run_control(controls[1], now); });
+    poll_button(
+        boot_button, now,
+        [now] {
+            if (overlay != Overlay::None) {
+                close_overlay();
+            } else if (menu_open || picker_open || entry_open || dice_open || end_prompt) {
+                toggle_menu(); // backs out
+            } else {
+                run_control(controls[2], now);
+            }
+        },
+        [now] { run_control(controls[3], now); });
     poll_battery(now);
 
     if (bb_game_tick(&game, now)) {
@@ -1023,14 +1748,19 @@ void loop()
     }
 
     uint32_t idle = now - last_input_ms;
-    uint32_t dim_ms = (uint32_t)kDimAfterS[screen.dim_after] * 1000;
-    uint32_t sleep_ms = (uint32_t)kSleepAfterMin[screen.sleep_after] * 60 * 1000;
+    if (overlay == Overlay::Sleeping && now - sleeping_at >= kSleepingMs) {
+        go_to_sleep();
+    }
+    game_store(false);
+
+    uint32_t dim_ms = (uint32_t)screen.dim_after * 1000;
+    uint32_t sleep_ms = (uint32_t)screen.sleep_after * 60 * 1000;
     if (test.running) {
         dim_ms = sleep_ms = 0; // the battery test keeps the screen lit
     }
     if (!dimmed && dim_ms && idle >= dim_ms) {
         dimmed = true;
-        lcd.setBrightness(pct_to_level(kDimToPct[screen.dim_to]));
+        lcd.setBrightness(pct_to_level(screen.dim_to));
     }
     if (sleep_ms && idle >= sleep_ms) {
         go_to_sleep();

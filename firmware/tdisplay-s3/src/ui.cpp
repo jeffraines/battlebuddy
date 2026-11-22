@@ -1,6 +1,7 @@
 #include "ui.h"
 
 #include <ctype.h>
+#include <strings.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -1214,8 +1215,19 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
     sprintf(timer, s.timer_minutes ? "%d min" : "Off", s.timer_minutes);
     bool gauge = gauge_style(g);
 
+    const MenuTile blank = {nullptr, nullptr, UiAction::None, false};
+    const MenuTile back = {"Back", "<", UiAction::MenuBack, true};
+
     if (s.menu_page == 0) {
-        bool ending = s.match != nullptr;
+        bool ending = g.players <= 2; // results can be recorded with or without a match
+        bool riftbound = has_kinds(g);
+        static char legends[24];
+        if (s.match_legend[0] == kNoLegend && s.match_legend[1] == kNoLegend) {
+            snprintf(legends, sizeof(legends), "Pick");
+        } else {
+            snprintf(legends, sizeof(legends), "%s v %s", ui_legend_name(s, s.match_legend[0]),
+                     ui_legend_name(s, s.match_legend[1]));
+        }
         MenuTile tiles[kMenuTiles] = {
             {"Game", name, UiAction::MenuGame, true},
             {"Players", players, UiAction::MenuPlayers, !gauge},
@@ -1226,22 +1238,35 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
             {ending ? "End game" : "Restart", ending ? "Who won?" : "New",
              ending ? UiAction::MenuEnd : UiAction::MenuRestart, true},
             {"Dice", "Roll", UiAction::MenuDice, true},
-            {"Undo", "Last", UiAction::MenuUndo, true},
+            riftbound ? MenuTile{"Legends", legends, UiAction::MenuLegends, true}
+                      : MenuTile{"Undo", "Last", UiAction::MenuUndo, true},
             {"More", ">", UiAction::MenuMore, true},
         };
         memcpy(out, tiles, sizeof(tiles));
     } else if (s.menu_page == 2) {
         auto v = [](const char *t) { return t ? t : "-"; };
         MenuTile tiles[kMenuTiles] = {
-            {"Brightness", v(s.brightness_text), UiAction::ScreenBrightness, true},
-            {"Dim after", v(s.dim_after_text), UiAction::ScreenDimAfter, true},
-            {"Dim to", v(s.dim_to_text), UiAction::ScreenDimTo, true},
-            {"Sleep after", v(s.sleep_after_text), UiAction::ScreenSleepAfter, true},
-            {nullptr, nullptr, UiAction::None, false},
-            {nullptr, nullptr, UiAction::None, false},
-            {nullptr, nullptr, UiAction::None, false},
-            {nullptr, nullptr, UiAction::None, false},
-            {"Back", "<", UiAction::MenuBack, true},
+            {"Brightness", v(s.brightness_text), UiAction::ScreenOpen, true},
+            {"Dim after", v(s.dim_after_text), UiAction::ScreenOpen, true},
+            {"Dim to", v(s.dim_to_text), UiAction::ScreenOpen, true},
+            {"Sleep after", v(s.sleep_after_text), UiAction::ScreenOpen, true},
+            blank, blank, blank, blank, back,
+        };
+        memcpy(out, tiles, sizeof(tiles));
+    } else if (s.menu_page == 3) {
+        static const char *const kLabels[8] = {"Top press", "Top hold", "Bottom press", "Bottom hold",
+                                               "Swipe up", "Swipe down", "Swipe left", "Swipe right"};
+        for (int i = 0; i < 8; i++) {
+            out[i] = {kLabels[i], s.controls[i] ? s.controls[i] : "-", UiAction::ControlCycle, true};
+        }
+        out[8] = back;
+    } else if (s.menu_page == 4) {
+        MenuTile tiles[kMenuTiles] = {
+            {"On battery", s.battery_percent < 0 ? "Charging" : s.since_charge ? s.since_charge : "-",
+             UiAction::None, false},
+            {"Battery test", s.test_text ? s.test_text : "Start", UiAction::MenuBatteryTest, true},
+            {"Last test", s.last_test ? s.last_test : "-", UiAction::None, false},
+            blank, blank, blank, blank, blank, back,
         };
         memcpy(out, tiles, sizeof(tiles));
     } else {
@@ -1250,15 +1275,21 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
             {"Counter", counter_style_plain(g) ? kCounterNames[s.counter_style % 3] : "-", UiAction::MenuCounter,
              counter_style_plain(g)},
             {"Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true},
-            {"Sleep", "KEY wakes", UiAction::MenuSleep, true},
             {"Screen", s.always_on ? "Always on" : "Settings", UiAction::MenuScreen, true},
-            {"Battery test", s.test_text ? s.test_text : "Start", UiAction::MenuBatteryTest, true},
-            {"Last test", s.last_test ? s.last_test : "-", UiAction::None, false},
-            {nullptr, nullptr, UiAction::None, false},
-            {"Back", "<", UiAction::MenuBack, true},
+            {"Controls", "Buttons", UiAction::MenuControls, true},
+            {"Battery", s.battery_percent < 0 ? "Charging" : "Info", UiAction::MenuBattery, true},
+            {"History", "Games", UiAction::MenuHistory, true},
+            {"Turn off", "Sleep", UiAction::MenuOff, true},
+            back,
         };
         memcpy(out, tiles, sizeof(tiles));
     }
+}
+
+const char *menu_title(int page)
+{
+    static const char *const kTitles[] = {"MENU", "MORE", "SCREEN", "CONTROLS", "BATTERY"};
+    return page >= 0 && page < 5 ? kTitles[page] : "MENU";
 }
 
 void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
@@ -1302,13 +1333,44 @@ Rect winner_tile(int p)
 
 constexpr Rect kNoResult = {6, 134, 308, 30};
 
+// One counter: you can't be "the other player", so ask Won / Lost / Draw.
+Rect solo_result_tile(int i)
+{
+    return {6 + i * 104, 32, 100, 94};
+}
+
+void draw_solo_end_prompt(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    static const char *const kLabels[] = {"Won", "Lost", "Draw"};
+    const uint32_t colors[] = {kGain, kLoss, t.muted};
+    char buf[24];
+    int game_no = s.match ? s.match->games + 1 : 1;
+    snprintf(buf, sizeof(buf), "game %d", game_no);
+    for (int i = 0; i < 3; i++) {
+        Rect r = solo_result_tile(i);
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 10, t.surface);
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 10, colors[i]);
+        f.drawRoundRect(r.x + 1, r.y + 1, r.w - 2, r.h - 2, 9, mix(t.surface, colors[i], 140));
+        f.setFont(&fonts::FreeSansBold12pt7b);
+        f.setTextSize(1);
+        f.setTextDatum(textdatum_t::middle_center);
+        draw_text_glow(f, t, kLabels[i], r.cx(), r.cy() - 10, colors[i]);
+        f.setFont(&fonts::Font2);
+        f.setTextColor(t.text);
+        f.drawString(buf, r.cx(), r.cy() + 18);
+    }
+}
+
 void draw_end_prompt(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
     const bb_game_t &g = *s.game;
     char buf[24];
     draw_close_mark(f, t);
     int game_no = s.match ? s.match->games + 1 : 1;
-    for (uint8_t p = 0; p < 2; p++) {
+    if (g.players == 1) {
+        draw_solo_end_prompt(f, t, s);
+    }
+    for (uint8_t p = 0; p < 2 && g.players > 1; p++) {
         Rect r = winner_tile(p);
         uint32_t c = player_color(t, p);
         f.fillRoundRect(r.x, r.y, r.w, r.h, 10, t.surface);
@@ -1332,14 +1394,27 @@ void draw_end_prompt(LGFX_Sprite &f, const Theme &t, const UiState &s)
     f.drawString("Restart without a result", r.cx(), r.cy());
 }
 
-UiAction end_prompt_hit(int x, int y)
+UiAction end_prompt_hit(const UiState &s, int x, int y)
 {
     UiAction a;
     if (y < kHeaderH) {
         a.type = UiAction::EndCancel;
         return a;
     }
-    for (uint8_t p = 0; p < 2; p++) {
+    if (s.game->players == 1) {
+        for (int i = 0; i < 3; i++) {
+            if (solo_result_tile(i).contains(x, y)) {
+                if (i == 2) {
+                    a.type = UiAction::EndDraw;
+                } else {
+                    a.type = UiAction::DeclareWinner;
+                    a.player = (uint8_t)i; // 0 = you won, 1 = they did
+                }
+                return a;
+            }
+        }
+    }
+    for (uint8_t p = 0; p < 2 && s.game->players > 1; p++) {
         if (winner_tile(p).contains(x, y)) {
             a.type = UiAction::DeclareWinner;
             a.player = p;
@@ -2086,7 +2161,748 @@ UiAction kind_hit(const UiState &s, uint8_t p, int x, int y)
     return a;
 }
 
+
+// ---- Pop-up screens (overlays) ----------------------------------------------
+
+// Official Riftbound Champion Legends. Stable order (by set), so codes saved in
+// the history keep meaning the same legend: add new sets at the end only.
+const char *const kLegends[] = {
+    // Origins
+    "Ahri", "Darius", "Jinx", "Kai'Sa", "Lee Sin", "Leona", "Miss Fortune", "Sett", "Teemo", "Viktor",
+    "Volibear", "Yasuo",
+    // Proving Grounds
+    "Annie", "Garen", "Lux", "Master Yi",
+    // Spiritforged
+    "Azir", "Draven", "Ezreal", "Fiora", "Irelia", "Jax", "Lucian", "Ornn", "Rek'Sai", "Renata Glasc",
+    "Rumble", "Sivir",
+    // Unleashed (Master Yi is above)
+    "Diana", "Ivern", "Jhin", "Kha'Zix", "LeBlanc", "Lillia", "Poppy", "Pyke", "Rengar", "Vex", "Vi",
+    // Vendetta
+    "Akali", "Ambessa", "Jayce", "Kennen", "Mel", "Nasus", "Renekton", "Shen", "Zed",
+    // Radiance
+    "Ekko", "Evelynn", "Jarvan IV", "K'Sante", "Mordekaiser", "Orianna", "Riven", "Seraphine", "Ziggs",
+};
+constexpr size_t kLegendCount = sizeof(kLegends) / sizeof(kLegends[0]);
+
+// Official legends sorted A-Z for the picker (indexes into kLegends).
+const uint8_t *legends_sorted()
+{
+    static uint8_t order[kLegendCount];
+    static bool ready = false;
+    if (!ready) {
+        for (size_t i = 0; i < kLegendCount; i++) {
+            order[i] = (uint8_t)i;
+        }
+        for (size_t i = 1; i < kLegendCount; i++) { // insertion sort, once
+            uint8_t v = order[i];
+            size_t j = i;
+            while (j > 0 && strcasecmp(kLegends[order[j - 1]], kLegends[v]) > 0) {
+                order[j] = order[j - 1];
+                j--;
+            }
+            order[j] = v;
+        }
+        ready = true;
+    }
+    return order;
+}
+
+// The picker lists the player's own legends first, then the official ones A-Z.
+int picker_legend_count(const UiState &s)
+{
+    return s.custom_legend_count + (int)kLegendCount;
+}
+
+uint8_t picker_legend_code(const UiState &s, int i)
+{
+    if (i < s.custom_legend_count) {
+        return (uint8_t)(kCustomLegend + i);
+    }
+    return legends_sorted()[i - s.custom_legend_count];
+}
+
+void fill_tile(LGFX_Sprite &f, const Theme &t, const Rect &r, uint32_t edge, bool selected = false, int radius = 8)
+{
+    f.fillRoundRect(r.x, r.y, r.w, r.h, radius, selected ? mix(t.surface, edge, 150) : t.surface);
+    f.drawRoundRect(r.x, r.y, r.w, r.h, radius, edge);
+}
+
+void tile_text(LGFX_Sprite &f, const Rect &r, const char *text, uint32_t color, int max_w = 0)
+{
+    fit_font(f, text, max_w ? max_w : r.w - 10);
+    if (f.getFont() == &fonts::FreeSansBold12pt7b && r.h < 40) {
+        f.setFont(&fonts::FreeSansBold9pt7b);
+    }
+    f.setTextColor(color);
+    f.setTextDatum(textdatum_t::middle_center);
+    f.drawString(text, r.cx(), r.cy() + 1);
+}
+
+// Quick menu.
+Rect quick_tile(int i)
+{
+    return {6 + (i % 2) * 156, 30 + (i / 2) * 68, 152, 64};
+}
+
+void draw_quick(LGFX_Sprite &f, const Theme &t)
+{
+    static const char *const kLabels[] = {"Undo", "Dice", "Menu", "Turn off"};
+    draw_close_mark(f, t);
+    for (int i = 0; i < 4; i++) {
+        Rect r = quick_tile(i);
+        fill_tile(f, t, r, mix(t.surface, t.accent, 150), false, 10);
+        f.setFont(&fonts::FreeSansBold12pt7b);
+        f.setTextSize(1);
+        f.setTextDatum(textdatum_t::middle_center);
+        draw_text_glow(f, t, kLabels[i], r.cx(), r.cy(), i == 3 ? kLoss : t.accent);
+    }
+}
+
+UiAction quick_hit(int x, int y)
+{
+    UiAction a;
+    a.type = UiAction::QuickClose;
+    if (y < kHeaderH) {
+        return a;
+    }
+    for (int i = 0; i < 4; i++) {
+        if (quick_tile(i).contains(x, y)) {
+            a.type = UiAction::QuickPick;
+            a.kind = (uint8_t)i;
+            return a;
+        }
+    }
+    a.type = UiAction::None;
+    return a;
+}
+
+// Turn off?
+constexpr Rect kOffNo = {6, 96, 150, 64};
+constexpr Rect kOffYes = {164, 96, 150, 64};
+
+void draw_off_prompt(LGFX_Sprite &f, const Theme &t)
+{
+    draw_close_mark(f, t);
+    f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextSize(1);
+    f.setTextColor(t.text);
+    f.setTextDatum(textdatum_t::middle_center);
+    f.drawString("The game is kept.", kWidth / 2, 46);
+    f.setTextColor(t.muted);
+    f.drawString("Press the top button to wake it.", kWidth / 2, 70);
+    fill_tile(f, t, kOffNo, mix(t.surface, t.accent, 120), false, 10);
+    fill_tile(f, t, kOffYes, kLoss, false, 10);
+    f.setFont(&fonts::FreeSansBold12pt7b);
+    draw_text_glow(f, t, "No", kOffNo.cx(), kOffNo.cy(), t.accent);
+    draw_text_glow(f, t, "Turn off", kOffYes.cx(), kOffYes.cy(), kLoss);
+}
+
+UiAction off_hit(int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH || kOffNo.contains(x, y)) {
+        a.type = UiAction::OffNo;
+    } else if (kOffYes.contains(x, y)) {
+        a.type = UiAction::OffYes;
+    }
+    return a;
+}
+
+void draw_sleeping(LGFX_Sprite &f, const Theme &t)
+{
+    f.fillScreen(0x000000u);
+    f.setFont(&fonts::FreeSansBold12pt7b);
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::middle_center);
+    f.setTextColor(t.accent);
+    f.drawString("Turning off", kWidth / 2, 70);
+    f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextColor(t.muted);
+    f.drawString("Top button wakes it", kWidth / 2, 104);
+}
+
+// Setting editor.
+constexpr Rect kStepMinus = {14, 34, 64, 44};
+constexpr Rect kStepPlus = {242, 34, 64, 44};
+constexpr int kSliderX = 24;
+constexpr int kSliderW = 272;
+constexpr int kSliderY = 98;
+
+Rect preset_chip(int i, int n)
+{
+    int w = (308 - (n - 1) * 4) / n;
+    return {6 + i * (w + 4), 128, w, 34};
+}
+
+void draw_editor(LGFX_Sprite &f, const Theme &t, const EditorView &e)
+{
+    draw_close_mark(f, t);
+    f.setFont(&fonts::FreeSansBold18pt7b);
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::middle_center);
+    draw_text_glow(f, t, e.value, kWidth / 2, 57, t.text);
+
+    if (e.slider) {
+        int knob = kSliderX + e.frac * kSliderW / 1000;
+        f.fillRoundRect(kSliderX, kSliderY - 4, kSliderW, 8, 4, mix(t.surface, t.muted, 60));
+        f.fillRoundRect(kSliderX, kSliderY - 4, knob - kSliderX + 4, 8, 4, t.accent);
+        f.fillCircle(knob, kSliderY, 11, t.accent);
+        f.fillCircle(knob, kSliderY, 6, t.surface);
+    } else {
+        for (int k = 0; k < 2; k++) {
+            const Rect &r = k ? kStepPlus : kStepMinus;
+            fill_tile(f, t, r, mix(t.surface, t.accent, 140), false, 10);
+            f.fillRect(r.cx() - 10, r.cy() - 2, 20, 4, t.accent);
+            if (k) {
+                f.fillRect(r.cx() - 2, r.cy() - 10, 4, 20, t.accent);
+            }
+        }
+        f.setFont(&fonts::Font2);
+        f.setTextColor(t.muted);
+        f.drawString("hold to change faster", kWidth / 2, 96);
+    }
+
+    for (int i = 0; i < e.preset_count; i++) {
+        Rect r = preset_chip(i, e.preset_count);
+        bool sel = i == e.preset_sel;
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 8, sel ? t.accent : t.surface);
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, 140));
+        tile_text(f, r, e.presets[i], sel ? kInk : t.text);
+    }
+}
+
+UiAction editor_hit(const EditorView &e, int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = UiAction::EditorClose;
+        return a;
+    }
+    for (int i = 0; i < e.preset_count; i++) {
+        Rect r = preset_chip(i, e.preset_count);
+        Rect padded{r.x - 2, r.y - 3, r.w + 4, r.h + 6};
+        if (padded.contains(x, y)) {
+            a.type = UiAction::EditorPreset;
+            a.kind = (uint8_t)i;
+            return a;
+        }
+    }
+    if (e.slider) {
+        if (y >= kSliderY - 22 && y <= kSliderY + 22) {
+            a.type = UiAction::EditorSlide;
+            int v = (x - kSliderX) * 1000 / kSliderW;
+            a.delta = (int16_t)(v < 0 ? 0 : v > 1000 ? 1000 : v);
+        }
+        return a;
+    }
+    Rect minus{kStepMinus.x - 6, kStepMinus.y - 4, kStepMinus.w + 12, kStepMinus.h + 20};
+    Rect plus{kStepPlus.x - 6, kStepPlus.y - 4, kStepPlus.w + 12, kStepPlus.h + 20};
+    if (minus.contains(x, y) || plus.contains(x, y)) {
+        a.type = UiAction::EditorStep;
+        a.delta = plus.contains(x, y) ? 1 : -1;
+        a.repeat = true;
+    }
+    return a;
+}
+
+// History.
+constexpr int kHistoryRows = 3;
+constexpr Rect kPagePrev = {6, 147, 64, 21};
+constexpr Rect kPageNext = {250, 147, 64, 21};
+
+Rect history_row(int i)
+{
+    return {6, 28 + i * 40, 308, 37};
+}
+
+bool entry_has_kinds(const HistoryEntry &e)
+{
+    return bb_profile_at(e.profile_index)->kind_count >= 2;
+}
+
+// "Won 8-6", "Lost", "Draw", "A won 11-9".
+uint32_t history_result(const Theme &t, const HistoryEntry &e, char *buf, size_t n)
+{
+    const bb_profile_t *p = bb_profile_at(e.profile_index);
+    const char *word = e.result == 2 ? "Draw" : e.result == 0 ? "Won" : "Lost";
+    if (p->teams && e.result < 2) {
+        word = e.result == 0 ? "A won" : "B won";
+    }
+    if (e.players >= 2) {
+        snprintf(buf, n, "%s %d-%d", word, e.value[0], e.value[1]);
+    } else {
+        snprintf(buf, n, "%s %d", word, e.value[0]);
+    }
+    return e.result == 2 || p->teams ? t.text : e.result == 0 ? kGain : kLoss;
+}
+
+void draw_pager(LGFX_Sprite &f, const Theme &t, int page, int pages)
+{
+    char buf[12];
+    for (int k = 0; k < 2; k++) {
+        const Rect &r = k ? kPageNext : kPagePrev;
+        bool on = k ? page < pages - 1 : page > 0;
+        fill_tile(f, t, r, mix(t.surface, t.accent, on ? 140 : 40), false, 6);
+        f.setFont(&fonts::FreeSansBold9pt7b);
+        f.setTextColor(on ? t.accent : t.muted);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(k ? ">" : "<", r.cx(), r.cy());
+    }
+    snprintf(buf, sizeof(buf), "%d / %d", page + 1, pages < 1 ? 1 : pages);
+    f.setFont(&fonts::Font2);
+    f.setTextColor(t.muted);
+    f.drawString(buf, kWidth / 2, kPagePrev.cy());
+}
+
+void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    draw_close_mark(f, t);
+    if (s.history_count == 0) {
+        f.setFont(&fonts::FreeSans9pt7b);
+        f.setTextSize(1);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString("No games yet", kWidth / 2, 70);
+        f.setFont(&fonts::Font2);
+        f.drawString("Finish a game (End game > result) to record it", kWidth / 2, 96);
+        return;
+    }
+    char buf[40];
+    int pages = (s.history_count + kHistoryRows - 1) / kHistoryRows;
+    for (int i = 0; i < kHistoryRows; i++) {
+        int idx = s.history_page * kHistoryRows + i;
+        if (idx >= s.history_count) {
+            break;
+        }
+        const HistoryEntry &e = s.history[idx];
+        Rect r = history_row(i);
+        fill_tile(f, t, r, mix(t.surface, t.accent, 90), false, 6);
+        const bb_profile_t *p = bb_profile_at(e.profile_index);
+        f.setFont(&fonts::FreeSansBold9pt7b);
+        f.setTextSize(1);
+        f.setTextDatum(textdatum_t::top_left);
+        f.setTextColor(t.text);
+        snprintf(buf, sizeof(buf), "#%u %s", e.number, p->short_name ? p->short_name : p->name);
+        f.drawString(buf, r.x + 8, r.y + 3);
+        uint32_t c = history_result(t, e, buf, sizeof(buf));
+        f.setTextColor(c);
+        f.setTextDatum(textdatum_t::top_right);
+        f.drawString(buf, r.x + r.w - 8, r.y + 3);
+
+        f.setFont(&fonts::Font2);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::bottom_left);
+        if (entry_has_kinds(e) && (e.legend[0] != kNoLegend || e.legend[1] != kNoLegend)) {
+            snprintf(buf, sizeof(buf), "%s v %s", ui_legend_name(s, e.legend[0]), ui_legend_name(s, e.legend[1]));
+        } else if (e.best_of > 1) {
+            snprintf(buf, sizeof(buf), "Bo%u game %u", e.best_of, e.game_in_match);
+        } else {
+            buf[0] = 0;
+        }
+        f.drawString(buf, r.x + 8, r.y + r.h - 1);
+        if (e.minutes) {
+            snprintf(buf, sizeof(buf), "%u min", e.minutes);
+            f.setTextDatum(textdatum_t::bottom_right);
+            f.drawString(buf, r.x + r.w - 8, r.y + r.h - 1);
+        }
+    }
+    draw_pager(f, t, s.history_page, pages);
+}
+
+UiAction history_hit(const UiState &s, int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = UiAction::HistoryClose;
+        return a;
+    }
+    if (kPagePrev.contains(x, y) || kPageNext.contains(x, y)) {
+        a.type = UiAction::HistoryPage;
+        a.delta = kPageNext.contains(x, y) ? 1 : -1;
+        return a;
+    }
+    for (int i = 0; i < kHistoryRows; i++) {
+        int idx = s.history_page * kHistoryRows + i;
+        if (idx < s.history_count && history_row(i).contains(x, y)) {
+            a.type = UiAction::HistoryOpen;
+            a.kind = (uint8_t)idx;
+            return a;
+        }
+    }
+    return a;
+}
+
+Rect detail_tile(int i)
+{
+    return {6 + i * 104, 124, 100, 40};
+}
+
+void draw_history_detail(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    draw_close_mark(f, t);
+    if (s.history_sel < 0 || s.history_sel >= s.history_count) {
+        return;
+    }
+    const HistoryEntry &e = s.history[s.history_sel];
+    const bb_profile_t *p = bb_profile_at(e.profile_index);
+    char buf[48];
+
+    f.setFont(&fonts::FreeSans9pt7b);
+    f.setTextSize(1);
+    f.setTextColor(t.muted);
+    f.setTextDatum(textdatum_t::middle_left);
+    if (e.best_of > 1) {
+        snprintf(buf, sizeof(buf), "%s - Bo%u game %u", p->name, e.best_of, e.game_in_match);
+    } else {
+        snprintf(buf, sizeof(buf), "%s", p->name);
+    }
+    f.drawString(buf, 8, 38);
+    if (e.minutes) {
+        snprintf(buf, sizeof(buf), "%u min", e.minutes);
+        f.setTextDatum(textdatum_t::middle_right);
+        f.drawString(buf, kWidth - 8, 38);
+    }
+
+    uint32_t c = history_result(t, e, buf, sizeof(buf));
+    f.setFont(&fonts::FreeSansBold12pt7b);
+    f.setTextDatum(textdatum_t::middle_left);
+    draw_text_glow(f, t, buf, 8, 62, c);
+
+    if (entry_has_kinds(e)) {
+        f.setFont(&fonts::Font2);
+        f.setTextColor(t.text);
+        f.setTextDatum(textdatum_t::middle_left);
+        for (int side = 0; side < (e.players >= 2 ? 2 : 1); side++) {
+            snprintf(buf, sizeof(buf), "%s: %d %s, %d %s", side == 0 ? (p->teams ? "Team A" : "You")
+                                                                     : (p->teams ? "Team B" : "Opp"),
+                     e.tally[side][0], p->kinds[0], e.tally[side][1], p->kinds[1]);
+            f.drawString(buf, 8, 88 + side * 17);
+        }
+        for (int side = 0; side < 2; side++) {
+            Rect r = detail_tile(side);
+            fill_tile(f, t, r, mix(t.surface, t.accent, 140));
+            f.setFont(&fonts::Font2);
+            f.setTextColor(t.muted);
+            f.setTextDatum(textdatum_t::top_left);
+            f.drawString(side == 0 ? "Your legend" : "Their legend", r.x + 6, r.y + 2);
+            Rect v{r.x, r.y + 14, r.w, r.h - 14};
+            tile_text(f, v, ui_legend_name(s, e.legend[side]), t.accent);
+        }
+    }
+    Rect r = detail_tile(2);
+    fill_tile(f, t, r, s.history_delete_armed ? kLoss : mix(t.surface, kLoss, 120), s.history_delete_armed);
+    tile_text(f, r, s.history_delete_armed ? "Sure?" : "Delete", s.history_delete_armed ? t.text : kLoss);
+}
+
+UiAction history_detail_hit(const UiState &s, int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = UiAction::DetailBack;
+        return a;
+    }
+    if (s.history_sel < 0 || s.history_sel >= s.history_count) {
+        return a;
+    }
+    const HistoryEntry &e = s.history[s.history_sel];
+    for (int i = 0; i < 3; i++) {
+        Rect r = detail_tile(i);
+        Rect padded{r.x - 2, r.y - 4, r.w + 4, r.h + 6};
+        if (!padded.contains(x, y)) {
+            continue;
+        }
+        if (i == 2) {
+            a.type = UiAction::HistoryDelete;
+        } else if (entry_has_kinds(e)) {
+            a.type = UiAction::HistoryLegend;
+            a.player = (uint8_t)i;
+        }
+        return a;
+    }
+    return a;
+}
+
+// Legend picker.
+constexpr int kLegendCols = 3;
+constexpr int kLegendRowsPerPage = 4;
+constexpr int kLegendsPerPage = kLegendCols * kLegendRowsPerPage;
+constexpr Rect kLegendNone = {74, 147, 84, 21};
+constexpr Rect kLegendAdd = {162, 147, 84, 21};
+
+Rect legend_tile(int i)
+{
+    return {6 + (i % kLegendCols) * 104, 28 + (i / kLegendCols) * 29, 100, 26};
+}
+
+void draw_legends(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    draw_close_mark(f, t);
+    int n = picker_legend_count(s);
+    int pages = (n + kLegendsPerPage - 1) / kLegendsPerPage;
+    for (int i = 0; i < kLegendsPerPage; i++) {
+        int idx = s.legend_page * kLegendsPerPage + i;
+        if (idx >= n) {
+            break;
+        }
+        uint8_t code = picker_legend_code(s, idx);
+        Rect r = legend_tile(i);
+        bool sel = code == s.legend_current;
+        bool own = code >= kCustomLegend;
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 6, sel ? t.accent : t.surface);
+        f.drawRoundRect(r.x, r.y, r.w, r.h, 6, mix(t.surface, own ? kWinColor : t.accent, 120));
+        const char *name = ui_legend_name(s, code);
+        f.setTextSize(1);
+        f.setFont(&fonts::FreeSans9pt7b);
+        if (f.textWidth(name) > r.w - 8) {
+            f.setFont(&fonts::Font2);
+        }
+        f.setTextColor(sel ? kInk : t.text);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(name, r.cx(), r.cy() + 1);
+    }
+    // Pager arrows sit at the ends of the bottom row, None and New between them.
+    char buf[12];
+    for (int k = 0; k < 2; k++) {
+        const Rect &r = k ? kPageNext : kPagePrev;
+        bool on = k ? s.legend_page < pages - 1 : s.legend_page > 0;
+        fill_tile(f, t, r, mix(t.surface, t.accent, on ? 140 : 40), false, 6);
+        f.setFont(&fonts::FreeSansBold9pt7b);
+        f.setTextColor(on ? t.accent : t.muted);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(k ? ">" : "<", r.cx(), r.cy());
+    }
+    fill_tile(f, t, kLegendNone, mix(t.surface, t.accent, 100), s.legend_current == kNoLegend, 6);
+    tile_text(f, kLegendNone, "None", t.text);
+    fill_tile(f, t, kLegendAdd, mix(t.surface, kWinColor, 120), false, 6);
+    tile_text(f, kLegendAdd, "+ New", kWinColor);
+    snprintf(buf, sizeof(buf), "%d/%d", s.legend_page + 1, pages);
+    f.setFont(&fonts::Font2);
+    f.setTextColor(t.muted);
+    f.setTextDatum(textdatum_t::middle_right);
+    f.drawString(buf, kWidth - 62, kHeaderH / 2);
+}
+
+UiAction legends_hit(const UiState &s, int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = UiAction::LegendClose;
+        return a;
+    }
+    if (kPagePrev.contains(x, y) || kPageNext.contains(x, y)) {
+        a.type = UiAction::LegendPage;
+        a.delta = kPageNext.contains(x, y) ? 1 : -1;
+        return a;
+    }
+    if (kLegendNone.contains(x, y)) {
+        a.type = UiAction::LegendPick;
+        a.kind = kNoLegend;
+        return a;
+    }
+    if (kLegendAdd.contains(x, y)) {
+        a.type = UiAction::LegendAdd;
+        return a;
+    }
+    int n = picker_legend_count(s);
+    for (int i = 0; i < kLegendsPerPage; i++) {
+        int idx = s.legend_page * kLegendsPerPage + i;
+        Rect r = legend_tile(i);
+        Rect padded{r.x - 2, r.y - 1, r.w + 4, r.h + 3};
+        if (idx < n && padded.contains(x, y)) {
+            a.type = UiAction::LegendPick;
+            a.kind = picker_legend_code(s, idx);
+            return a;
+        }
+    }
+    return a;
+}
+
+// Keyboard for a new legend's name.
+const char *const kKeyRows[] = {"QWERTYUIOP", "ASDFGHJKL'", "ZXCVBNM-."};
+constexpr Rect kKeySpace = {6, 140, 150, 26};
+constexpr Rect kKeyDel = {160, 140, 74, 26};
+constexpr Rect kKeyDone = {238, 140, 76, 26};
+
+Rect keyboard_key(int row, int col)
+{
+    return {6 + col * 31 + (row == 2 ? 15 : 0), 56 + row * 28, 29, 25};
+}
+
+void draw_keyboard(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    draw_close_mark(f, t);
+    Rect box{6, 27, 308, 25};
+    f.fillRoundRect(box.x, box.y, box.w, box.h, 6, t.surface);
+    f.drawRoundRect(box.x, box.y, box.w, box.h, 6, t.accent);
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::middle_left);
+    const char *text = s.keyboard_text ? s.keyboard_text : "";
+    f.setTextColor(text[0] ? t.text : t.muted);
+    int w = f.drawString(text[0] ? text : "Legend name", box.x + 8, box.cy() + 1);
+    if (text[0]) {
+        f.fillRect(box.x + 10 + w, box.y + 5, 2, box.h - 10, t.accent);
+    }
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; kKeyRows[row][col]; col++) {
+            Rect r = keyboard_key(row, col);
+            f.fillRoundRect(r.x, r.y, r.w, r.h, 5, t.surface);
+            f.drawRoundRect(r.x, r.y, r.w, r.h, 5, mix(t.surface, t.accent, 90));
+            char label[2] = {kKeyRows[row][col], 0};
+            f.setFont(&fonts::FreeSansBold9pt7b);
+            f.setTextColor(t.text);
+            f.setTextDatum(textdatum_t::middle_center);
+            f.drawString(label, r.cx(), r.cy() + 1);
+        }
+    }
+    fill_tile(f, t, kKeySpace, mix(t.surface, t.accent, 90), false, 5);
+    tile_text(f, kKeySpace, "space", t.muted);
+    fill_tile(f, t, kKeyDel, mix(t.surface, t.accent, 90), false, 5);
+    tile_text(f, kKeyDel, "DEL", t.muted);
+    fill_tile(f, t, kKeyDone, t.accent, true, 5);
+    tile_text(f, kKeyDone, "Done", t.text);
+}
+
+UiAction keyboard_hit(int x, int y)
+{
+    UiAction a;
+    if (y < kHeaderH) {
+        a.type = UiAction::KeyCancel;
+        return a;
+    }
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; kKeyRows[row][col]; col++) {
+            Rect r = keyboard_key(row, col);
+            Rect padded{r.x - 1, r.y - 1, r.w + 2, r.h + 3};
+            if (padded.contains(x, y)) {
+                a.type = UiAction::KeyChar;
+                a.kind = (uint8_t)kKeyRows[row][col];
+                return a;
+            }
+        }
+    }
+    if (kKeySpace.contains(x, y)) {
+        a.type = UiAction::KeyChar;
+        a.kind = ' ';
+    } else if (kKeyDel.contains(x, y)) {
+        a.type = UiAction::KeyDelete;
+        a.repeat = true;
+    } else if (kKeyDone.contains(x, y)) {
+        a.type = UiAction::KeyDone;
+    }
+    return a;
+}
+
+const char *overlay_title(const UiState &s)
+{
+    switch (s.overlay) {
+    case Overlay::Quick:
+        return "QUICK";
+    case Overlay::OffPrompt:
+        return "TURN OFF?";
+    case Overlay::Editor:
+        return s.editor ? s.editor->title : "";
+    case Overlay::History:
+        return "HISTORY";
+    case Overlay::HistoryDetail: {
+        static char buf[16];
+        snprintf(buf, sizeof(buf), "GAME #%u",
+                 s.history_sel >= 0 && s.history_sel < s.history_count ? s.history[s.history_sel].number : 0);
+        return buf;
+    }
+    case Overlay::Legends:
+        return s.legend_side == 0 ? "YOUR LEGEND" : "THEIR LEGEND";
+    case Overlay::Keyboard:
+        return "NEW LEGEND";
+    default:
+        return "";
+    }
+}
+
+void draw_overlay(LGFX_Sprite &f, const Theme &t, const UiState &s)
+{
+    if (s.overlay == Overlay::Sleeping) {
+        draw_sleeping(f, t);
+        return;
+    }
+    draw_background(f, t, false);
+    UiState hs = s;
+    hs.menu = true; // header without the match clock
+    draw_header(f, t, hs, overlay_title(s));
+    switch (s.overlay) {
+    case Overlay::Quick:
+        draw_quick(f, t);
+        break;
+    case Overlay::OffPrompt:
+        draw_off_prompt(f, t);
+        break;
+    case Overlay::Editor:
+        if (s.editor) {
+            draw_editor(f, t, *s.editor);
+        }
+        break;
+    case Overlay::History:
+        draw_history(f, t, s);
+        break;
+    case Overlay::HistoryDetail:
+        draw_history_detail(f, t, s);
+        break;
+    case Overlay::Legends:
+        draw_legends(f, t, s);
+        break;
+    case Overlay::Keyboard:
+        draw_keyboard(f, t, s);
+        break;
+    default:
+        break;
+    }
+}
+
+UiAction overlay_hit(const UiState &s, int x, int y)
+{
+    switch (s.overlay) {
+    case Overlay::Quick:
+        return quick_hit(x, y);
+    case Overlay::OffPrompt:
+        return off_hit(x, y);
+    case Overlay::Editor:
+        return s.editor ? editor_hit(*s.editor, x, y) : UiAction();
+    case Overlay::History:
+        return history_hit(s, x, y);
+    case Overlay::HistoryDetail:
+        return history_detail_hit(s, x, y);
+    case Overlay::Legends:
+        return legends_hit(s, x, y);
+    case Overlay::Keyboard:
+        return keyboard_hit(x, y);
+    default:
+        return UiAction();
+    }
+}
+
 } // namespace
+
+size_t ui_legend_count()
+{
+    return kLegendCount;
+}
+
+const char *ui_legend_official(size_t i)
+{
+    return i < kLegendCount ? kLegends[i] : "?";
+}
+
+const char *ui_legend_name(const UiState &s, uint8_t code)
+{
+    if (code == kNoLegend) {
+        return "-";
+    }
+    if (code >= kCustomLegend) {
+        int i = code - kCustomLegend;
+        return s.custom_legends && i < s.custom_legend_count ? s.custom_legends[i] : "?";
+    }
+    return ui_legend_official(code);
+}
 
 const char *ui_player_label(const bb_game_t &game, uint8_t player)
 {
@@ -2125,9 +2941,14 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
 {
     const Theme t = styled(theme_for(state.game->profile), state.vivid);
 
+    if (state.overlay != Overlay::None) {
+        draw_overlay(frame, t, state);
+        return;
+    }
+
     if (state.end_prompt) {
         draw_background(frame, t, false);
-        draw_header(frame, t, state, "WHO WON?");
+        draw_header(frame, t, state, state.game->players == 1 ? "RESULT" : "WHO WON?");
         draw_end_prompt(frame, t, state);
         return;
     }
@@ -2181,7 +3002,7 @@ void ui_draw(LGFX_Sprite &frame, const UiState &state)
     // in place of the game name.
     bool toast_in_header = state.toast && !state.menu && has_kinds(*state.game) && state.game->players == 2;
     draw_header(frame, t, state,
-                state.menu ? (state.menu_page == 2 ? "SCREEN" : state.menu_page ? "MORE" : "MENU") : toast_in_header ? "" : state.game->profile->name,
+                state.menu ? menu_title(state.menu_page) : toast_in_header ? "" : state.game->profile->name,
                 !state.menu);
 
     if (state.menu) {
@@ -2228,6 +3049,10 @@ UiAction ui_hit(const UiState &state, int x, int y)
     const bb_game_t &g = *state.game;
     UiAction a;
 
+    if (state.overlay != Overlay::None) {
+        return overlay_hit(state, x, y);
+    }
+
     if (state.menu) {
         if (y < kHeaderH) {
             a.type = UiAction::MenuClose;
@@ -2243,6 +3068,7 @@ UiAction ui_hit(const UiState &state, int x, int y)
             if (padded.contains(x, y)) {
                 if (tiles[i].label && tiles[i].enabled) {
                     a.type = tiles[i].action;
+                    a.kind = (uint8_t)i;
                 }
                 return a;
             }
@@ -2251,7 +3077,7 @@ UiAction ui_hit(const UiState &state, int x, int y)
     }
 
     if (state.end_prompt) {
-        return end_prompt_hit(x, y);
+        return end_prompt_hit(state, x, y);
     }
     if (state.picker) {
         return picker_hit(state, x, y);
