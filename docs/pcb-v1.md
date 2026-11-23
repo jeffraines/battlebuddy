@@ -42,7 +42,11 @@ reason to evaluate the reflective panel from the test kit.
 |---|---|---|
 | Must | MCU as a pre-certified module | Makes radio certification (KC / FCC / CE) much easier. Open: ESP32-S3 module (Wi-Fi + BLE, more headroom) vs nRF52840 module (best battery). See `roadmap.md` |
 | Must | Display + capacitive touch on FPC connectors | Size from the display test kit (~2.0-2.8"). Connectors, not solder, so the screen is replaceable |
-| Must | Physical buttons | At least wake/menu and undo (BOOT/KEY roles today). Sealed caps or a membrane |
+| Must | Physical buttons | At least A and B (today's KEY / BOOT), labelled neutrally because they're remappable; ideally one more, or a matching pair on each side. All read by the firmware (unlike the LilyGO's RST). Sealed caps or a membrane. Place them clear of the display and its touch area: on the LilyGO the buttons sit ~2 mm from the glass, which forced the case's thin walls and covering the touch key |
+| Must | **Real-time clock that survives a battery swap** | So games in the history get a real date and time. The ESP32-S3's own RTC keeps counting in deep sleep (accurate with a 32.768 kHz crystal) but is lost on any power cut or reset, and the battery is user-replaceable. Candidates: RV-3028-C7 (~45 nA, factory-calibrated, has a backup-supply switch for a small supercap or MLCC to ride through a battery swap) or PCF85063A. Time is set by the user on the device (date entry screen) and later synced from the companion app over BLE |
+| Must | **Power button with a true off** | A firmware-read power button. "Off" cuts power to almost everything (charger ship mode or a load switch), like a phone, so a forgotten device doesn't drain a cell flat; deep sleep stays for standby between games. Hold ~10 s for a hardware forced restart (many chargers / PMICs do this), so no separate reset button is needed in normal use |
+| Must | Hidden reset / recovery | Pinhole or test pad for reset and boot mode, for recovering bad firmware; not a normal button |
+| Must | **Charging detection** | Charger status pin(s) to GPIO, so the firmware knows "charging / full / on battery" instead of guessing from the voltage (needed for "time since last charge") |
 | Must | Unique device ID | From the chip; needed for the tournament kit |
 | Should | Accelerometer | e.g. LIS3DH: face-down to sleep, wake on pick-up, auto-rotate |
 | Maybe | I2C expansion header (Qwiic style) | Handy for development and add-ons |
@@ -73,4 +77,6 @@ reason to evaluate the reflective panel from the test kit.
 - Display size and type (test kit).
 - Battery format (flat pack on contacts vs plug).
 - Fuel gauge: MAX17048 vs BQ27441.
+- RTC chip and its backup: RV-3028-C7 + supercap vs PCF85063A + MLCC (how long must time survive a battery swap?).
+- Button count and placement (A/B only, a third, or a pair on each side).
 - Wireless charging: per-slot Qi vs one resonant tray coil vs pogo pins.

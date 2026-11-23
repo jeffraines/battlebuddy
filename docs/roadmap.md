@@ -66,6 +66,20 @@ That matters if this is ever sold in Europe, and principle 1 already covers it.
 5. **Configuration:** phone/web configurator, custom game profiles, sharing.
 6. **Tournament kit:** hub, server and dashboard, pairings import, charging tray.
 
+## Firmware to-do
+
+- **Date and time.** A date/time entry screen (More > Date & time) so games in
+  the history get a real date. On the prototype the ESP32's clock survives
+  sleep but not a reset or a flat battery, so after a power loss it asks for the
+  date again (or marks times as unknown). PCB v1 adds a real-time clock that
+  survives a battery swap; the companion app can set the time over BLE.
+- **Languages.** Riftbound is in English, Simplified Chinese and French, with
+  Korean announced. Plan: move all on-screen text into a translation table,
+  add a Language setting, add fonts that cover accents, Chinese and Korean,
+  and use Riot's official localised legend names.
+- **History upload.** Send finished games to the companion app / an online
+  record (the history format already keeps enough to do this).
+
 ## Tournament mode (concept)
 
 - A tournament server (laptop, Raspberry Pi or cloud) holds players, pairings
