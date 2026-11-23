@@ -48,6 +48,18 @@ struct EntryState {
     int32_t amount = 0;
 };
 
+// Menu: four tabs down the left, and sub-pages opened from a tab.
+enum MenuPage : int {
+    kMenuPlay,
+    kMenuMatch,
+    kMenuLook,
+    kMenuSystem,
+    kMenuTabCount,
+    kMenuDisplay = kMenuTabCount, // from Look
+    kMenuControls,                // from System
+    kMenuBattery,                 // from System
+};
+
 // Pop-up screens drawn over everything else.
 enum class Overlay : uint8_t {
     None,
@@ -77,6 +89,8 @@ constexpr uint8_t kCustomLegend = 0x80; // codes from here up are the player's o
 constexpr int kMaxCustomLegends = 12;
 constexpr int kLegendNameLen = 15;      // characters, plus the terminator
 
+constexpr int kHistoryEvents = 30; // scoring changes kept per game
+
 // One finished game, as kept in the history.
 struct HistoryEntry {
     uint16_t number;      // counts up from the first game recorded
@@ -89,7 +103,25 @@ struct HistoryEntry {
     uint16_t minutes;     // how long the game took
     int16_t value[2];     // final scores (side 1 is 0 with one counter)
     int16_t tally[2][2];  // per side, per kind (Riftbound: Conquer, Hold)
+    uint16_t match_no;    // games of one best-of share this (0 = not known)
+    uint8_t event_count;
+    uint8_t events[kHistoryEvents]; // scoring in order: see ui_history_event()
 };
+
+// One scoring change in a recorded game.
+struct HistoryEvent {
+    uint8_t player; // 0 or 1
+    uint8_t kind;   // 0 or 1 (Riftbound: Conquer, Hold)
+    int8_t delta;
+};
+uint8_t ui_history_pack(uint8_t player, uint8_t kind, int delta);
+HistoryEvent ui_history_event(uint8_t packed);
+
+// History entries are newest first; the games of one match sit next to each
+// other. These walk them as matches ("groups").
+int ui_history_group_end(const HistoryEntry *h, int count, int start); // index after the group
+int ui_history_group_count(const HistoryEntry *h, int count);
+int ui_history_group_start(const HistoryEntry *h, int count, int n);  // entry index of group n
 
 // Official Riftbound legends, A-Z. legend_name() also resolves the player's own.
 size_t ui_legend_count();
@@ -105,7 +137,7 @@ struct UiState {
     bool flipped;        // whole screen rotated 180 degrees (menu label only)
     bool vivid;          // Look setting: vivid colors and glows instead of subdued
     bool menu;           // menu screen instead of the counter
-    int menu_page;       // 0 = main, 1 = more, 2 = screen, 3 = controls, 4 = battery
+    int menu_page;       // MenuPage: a tab (Play / Match / Look / System) or a sub-page
     int counter_style;   // Counter setting: 0 = themed (each game's own look), 1 = d20, 2 = digits
     const uint16_t *spin;  // per-player change animation progress (0..1000, 1000 = still), or nullptr
     const int8_t *spin_dir; // per-player direction of the last change (+1 / -1)
@@ -117,6 +149,7 @@ struct UiState {
     int best_of;             // menu value: 0 = off, 1 / 3 / 5
     int timer_minutes;       // menu value: 0 = off
     bool timer_running;      // show the countdown
+    uint8_t timer_state = 1; // 0 = waiting for a tap to start, 1 = running, 2 = paused
     int32_t timer_left_s;    // seconds left; negative = over time
 
     const DiceState *dice; // dice screen instead of the counter, or nullptr
@@ -146,12 +179,14 @@ struct UiState {
     const HistoryEntry *history = nullptr; // newest first
     int history_count = 0;
     int history_page = 0;
-    int history_sel = -1;           // the game shown in HistoryDetail
+    int history_sel = -1;           // first entry of the match shown in HistoryDetail
+    int history_detail_page = 0;    // which 3 games of a best-of-5 are shown
     bool history_delete_armed = false;
     uint8_t match_legend[2] = {kNoLegend, kNoLegend}; // legends for the match being played
     uint8_t legend_side = 0;        // whose legend the picker is choosing
     uint8_t legend_current = kNoLegend;
     int legend_page = 0;
+    uint8_t legend_sort = 0;        // 0 = A-Z, 1 = by set (oldest set first)
     const char (*custom_legends)[kLegendNameLen + 1] = nullptr;
     int custom_legend_count = 0;
     const char *keyboard_text = "";
@@ -189,6 +224,8 @@ struct UiAction {
         MenuBack,
         MenuCounter,
         MenuUndo,
+        MenuTab,         // switch to menu tab `kind`
+        TimerTap,        // start / pause / resume the timer
         MenuScreen,      // open the Screen settings page
         MenuControls,    // open the Controls page
         MenuBattery,     // open the Battery page
@@ -211,11 +248,13 @@ struct UiAction {
         HistoryClose,
         HistoryLegend,   // edit side `player`'s legend for the open game
         HistoryDelete,   // first tap arms, second deletes
+        HistoryGames,    // show the next games of a long match
         DetailBack,
         LegendPick,      // legend code `kind`
         LegendPage,      // page by `delta`
         LegendAdd,       // open the keyboard
         LegendClose,
+        LegendSort,      // toggle A-Z / by set
         KeyChar,         // type character `kind`
         KeyDelete,
         KeyDone,

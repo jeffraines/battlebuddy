@@ -439,6 +439,39 @@ int main(int argc, char **argv)
         save(frame, s, "new-menu-legends");
         s.menu = false;
 
+        {
+            static const char *names[] = {"tab-play", "tab-match", "tab-look", "tab-system",
+                                          "sub-screen", "sub-controls", "sub-battery"};
+            s.menu = true;
+            s.button_hint = "A Undo  B Menu";
+            s.card_lang_text = "English";
+            s.brightness_text = "80%";
+            s.dim_after_text = "1 min";
+            s.dim_to_text = "8%";
+            s.sleep_after_text = "30 min";
+            s.best_of = 3;
+            s.timer_minutes = 50;
+            for (int pg = 0; pg <= kMenuBattery; pg++) {
+                s.menu_page = pg;
+                save(frame, s, names[pg]);
+            }
+            s.menu = false;
+            s.menu_page = 0;
+        }
+        {
+            bb_match_t tm;
+            bb_match_init(&tm, 3);
+            UiState ts = s;
+            ts.match = &tm;
+            ts.timer_running = true;
+            ts.timer_minutes = 50;
+            ts.timer_left_s = 50 * 60;
+            ts.timer_state = 0;
+            save(frame, ts, "timer-waiting");
+            ts.timer_state = 2;
+            ts.timer_left_s = 31 * 60 + 12;
+            save(frame, ts, "timer-paused");
+        }
         s.overlay = Overlay::Quick;
         save(frame, s, "new-quick");
         s.overlay = Overlay::OffPrompt;
@@ -486,7 +519,20 @@ int main(int argc, char **argv)
             h[i].value[1] = (int16_t)(6 + i);
             h[i].tally[0][0] = 5; h[i].tally[0][1] = 3;
             h[i].tally[1][0] = 2; h[i].tally[1][1] = 4;
+            h[i].match_no = (uint16_t)(i < 3 ? 7 : 6);
+            h[i].legend[1] = 1;
+            // A plausible scoring order: alternating bursts of Conquer / Hold.
+            const char *seq = i == 0 ? "aAbaBAabaAbBaA" : i == 1 ? "bBaAbbABaBb" : i == 2 ? "AaBbaAbBAaBb" : "aaBA";
+            h[i].event_count = 0;
+            for (const char *c = seq; *c; c++) {
+                uint8_t player = (*c == 'b' || *c == 'B') ? 1 : 0;
+                uint8_t kind = (*c >= 'A' && *c <= 'Z') ? 1 : 0;
+                h[i].events[h[i].event_count++] = ui_history_pack(player, kind, 1);
+            }
         }
+        h[0].result = 0; h[1].result = 1; h[2].result = 0; h[3].result = 0;
+        h[0].game_in_match = 3; h[1].game_in_match = 2; h[2].game_in_match = 1;
+        h[3].best_of = 1; h[3].game_in_match = 1;
         static char custom[1][kLegendNameLen + 1] = {"Mega Teemo"};
         s.custom_legends = custom;
         s.custom_legend_count = 1;
@@ -503,6 +549,9 @@ int main(int argc, char **argv)
         s.legend_side = 1;
         s.legend_current = 1;
         save(frame, s, "new-legends");
+        s.legend_sort = 1;
+        save(frame, s, "legends-by-set");
+        s.legend_sort = 0;
         s.legend_page = 2;
         save(frame, s, "new-legends-p3");
         s.legend_page = 3;

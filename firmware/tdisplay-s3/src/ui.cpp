@@ -181,9 +181,30 @@ Rect kind_button(const UiState &s, uint8_t p, uint8_t kind)
 
 constexpr int kMenuTiles = 9;
 
-Rect menu_tile(int i)
+// Menu: tab rail on the left, tiles in the panel on the right.
+constexpr int kRailW = 64;
+constexpr int kPanelX = kRailW + 6;
+constexpr int kPanelW = kWidth - kPanelX - 6;
+
+Rect menu_tab_rect(int i)
 {
-    return {6 + (i % 3) * 104, 28 + (i / 3) * 47, 100, 44};
+    return {4, 28 + i * 35, kRailW - 4, 32};
+}
+
+// Up to 6 tiles: 2 columns of big tiles; more: 3 columns.
+Rect menu_tile(int i, int count)
+{
+    int cols = count > 6 ? 3 : 2;
+    int w = (kPanelW - (cols - 1) * 4) / cols;
+    return {kPanelX + (i % cols) * (w + 4), 28 + (i / cols) * 47, w, 44};
+}
+
+int menu_parent_tab(int page)
+{
+    if (page < kMenuTabCount) {
+        return page;
+    }
+    return page == kMenuDisplay ? kMenuLook : kMenuSystem;
 }
 
 // ---- Drawing helpers --------------------------------------------------------
@@ -256,8 +277,13 @@ bool match_info(const UiState &s, char *score, size_t score_n, char *clock, size
     if (s.timer_running) {
         int32_t left = s.timer_left_s;
         int32_t a = left < 0 ? -left : left;
-        snprintf(clock, clock_n, "%s%ld:%02ld", left < 0 ? "+" : "", (long)(a / 60), (long)(a % 60));
-        *clock_color = left < 0 ? kLoss : left < 5 * 60 ? t.accent : t.text;
+        const char *prefix = s.timer_state == 0 ? "Start " : s.timer_state == 2 ? "Paused " : "";
+        snprintf(clock, clock_n, "%s%s%ld:%02ld", prefix, left < 0 ? "+" : "", (long)(a / 60), (long)(a % 60));
+        *clock_color = s.timer_state == 0   ? kGain
+                       : s.timer_state == 2 ? t.muted
+                       : left < 0           ? kLoss
+                       : left < 5 * 60      ? t.accent
+                                            : t.text;
     }
     return score[0] || clock[0];
 }
@@ -287,7 +313,7 @@ void draw_header(LGFX_Sprite &f, const Theme &t, const UiState &s, const char *t
     if (s.menu || s.dice || s.picker || s.entry || s.end_prompt) {
         return;
     }
-    char score[8], clock[12];
+    char score[8], clock[20];
     uint32_t clock_color = t.text;
     if (!match_info(s, score, sizeof(score), clock, sizeof(clock), &clock_color, t)) {
         return;
@@ -308,7 +334,7 @@ void draw_header(LGFX_Sprite &f, const Theme &t, const UiState &s, const char *t
 // without a header.
 void draw_info_pill(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
-    char score[8], clock[12], text[24];
+    char score[8], clock[20], text[32];
     uint32_t clock_color = t.text;
     if (!match_info(s, score, sizeof(score), clock, sizeof(clock), &clock_color, t)) {
         return;
@@ -321,7 +347,7 @@ void draw_info_pill(LGFX_Sprite &f, const Theme &t, const UiState &s)
     f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
     f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, 160));
     f.setTextDatum(textdatum_t::middle_center);
-    f.setTextColor(clock[0] && s.timer_left_s < 0 ? clock_color : t.text);
+    f.setTextColor(clock[0] && (s.timer_left_s < 0 || s.timer_state != 1) ? clock_color : t.text);
     f.drawString(text, r.cx(), r.cy());
 }
 
@@ -1234,7 +1260,8 @@ bool counter_style_plain(const bb_game_t &g)
     return g.profile->style == BB_STYLE_COUNTER && g.profile->kind_count == 0;
 }
 
-void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
+// Fills out[] for the current page; returns how many tiles there are.
+int menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
 {
     static const char *const kCounterNames[] = {"Themed", "d20", "Digits"};
     const bb_game_t &g = *s.game;
@@ -1243,109 +1270,139 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
     const char *players = g.profile->teams ? kTeamNames[(g.players - 1) & 1] : kPlayerNames[g.players - 1];
     const char *name = g.profile->short_name ? g.profile->short_name : g.profile->name;
     sprintf(match, s.best_of ? "Bo%d" : "Off", s.best_of);
-    sprintf(timer, s.timer_minutes ? "%d min" : "Off", s.timer_minutes);
+    if (s.timer_minutes == 0) {
+        sprintf(timer, "Off");
+    } else {
+        sprintf(timer, "%d min", s.timer_minutes);
+    }
     bool gauge = gauge_style(g);
+    auto v = [](const char *t) { return t ? t : "-"; };
+    int n = 0;
+    auto add = [&](const char *label, const char *value, UiAction::Type action, bool enabled) {
+        out[n++] = {label, value, action, enabled};
+    };
 
-    const MenuTile blank = {nullptr, nullptr, UiAction::None, false};
-    const MenuTile back = {"Back", "<", UiAction::MenuBack, true};
-
-    if (s.menu_page == 0) {
+    switch (s.menu_page) {
+    case kMenuPlay: {
         bool ending = g.players <= 2; // results can be recorded with or without a match
-        bool riftbound = has_kinds(g);
-        static char legends[64];
-        if (s.match_legend[0] == kNoLegend && s.match_legend[1] == kNoLegend) {
-            snprintf(legends, sizeof(legends), "Pick");
-        } else {
-            char a[32], b[32];
-            snprintf(legends, sizeof(legends), "%s v %s", ui_legend_label(s, s.match_legend[0], a, sizeof(a)),
-                     ui_legend_label(s, s.match_legend[1], b, sizeof(b)));
+        add("Game", name, UiAction::MenuGame, true);
+        add("Players", players, UiAction::MenuPlayers, !gauge);
+        add("Layout", g.players > 1 && !gauge ? ui_layout_name(g, s.layout) : "-", UiAction::MenuLayout,
+            g.players > 1 && !gauge);
+        if (has_kinds(g)) {
+            static char legends[64];
+            if (s.match_legend[0] == kNoLegend && s.match_legend[1] == kNoLegend) {
+                snprintf(legends, sizeof(legends), "Pick");
+            } else {
+                char a[32], b[32];
+                snprintf(legends, sizeof(legends), "%s v %s", ui_legend_label(s, s.match_legend[0], a, sizeof(a)),
+                         ui_legend_label(s, s.match_legend[1], b, sizeof(b)));
+            }
+            add("Legends", legends, UiAction::MenuLegends, true);
         }
-        MenuTile tiles[kMenuTiles] = {
-            {"Game", name, UiAction::MenuGame, true},
-            {"Players", players, UiAction::MenuPlayers, !gauge},
-            {"Layout", g.players > 1 && !gauge ? ui_layout_name(g, s.layout) : "-", UiAction::MenuLayout,
-             g.players > 1 && !gauge},
-            {"Match", g.players <= 2 ? match : "-", UiAction::MenuMatch, g.players <= 2},
-            {"Timer", timer, UiAction::MenuTimer, true},
-            {ending ? "End game" : "Restart", ending ? "Who won?" : "New",
-             ending ? UiAction::MenuEnd : UiAction::MenuRestart, true},
-            {"Dice", "Roll", UiAction::MenuDice, true},
-            riftbound ? MenuTile{"Legends", legends, UiAction::MenuLegends, true}
-                      : MenuTile{"Undo", "Last", UiAction::MenuUndo, true},
-            {"More", ">", UiAction::MenuMore, true},
-        };
-        memcpy(out, tiles, sizeof(tiles));
-    } else if (s.menu_page == 2) {
-        auto v = [](const char *t) { return t ? t : "-"; };
-        MenuTile tiles[kMenuTiles] = {
-            {"Brightness", v(s.brightness_text), UiAction::ScreenOpen, true},
-            {"Dim after", v(s.dim_after_text), UiAction::ScreenOpen, true},
-            {"Dim to", v(s.dim_to_text), UiAction::ScreenOpen, true},
-            {"Sleep after", v(s.sleep_after_text), UiAction::ScreenOpen, true},
-            {"Card names", v(s.card_lang_text), UiAction::CardLangNext, true},
-            blank, blank, blank, back,
-        };
-        memcpy(out, tiles, sizeof(tiles));
-    } else if (s.menu_page == 3) {
+        add(ending ? "End game" : "Restart", ending ? "Who won?" : "New",
+            ending ? UiAction::MenuEnd : UiAction::MenuRestart, true);
+        add("Dice", "Roll", UiAction::MenuDice, true);
+        break;
+    }
+    case kMenuMatch:
+        add("Best of", g.players <= 2 ? match : "-", UiAction::MenuMatch, g.players <= 2);
+        add("Timer", timer, UiAction::MenuTimer, true);
+        add("New match", "Restart", UiAction::MenuRestart, true);
+        add("History", "Games", UiAction::MenuHistory, true);
+        add("Undo", "Last", UiAction::MenuUndo, true);
+        break;
+    case kMenuLook:
+        add("Look", s.vivid ? "Vivid" : "Subdued", UiAction::MenuLook, true);
+        add("Counter", counter_style_plain(g) ? kCounterNames[s.counter_style % 3] : "-", UiAction::MenuCounter,
+            counter_style_plain(g));
+        add("Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true);
+        add("Card names", v(s.card_lang_text), UiAction::CardLangNext, true);
+        add("Screen", s.always_on ? "Always on" : "Brightness >", UiAction::MenuScreen, true);
+        break;
+    case kMenuSystem:
+        add("Controls", "Buttons >", UiAction::MenuControls, true);
+        add("Battery", s.battery_percent < 0 ? "Charging" : "Info >", UiAction::MenuBattery, true);
+        add("Turn off", "Sleep", UiAction::MenuOff, true);
+        break;
+    case kMenuDisplay:
+        add("Brightness", v(s.brightness_text), UiAction::ScreenOpen, true);
+        add("Dim after", v(s.dim_after_text), UiAction::ScreenOpen, true);
+        add("Dim to", v(s.dim_to_text), UiAction::ScreenOpen, true);
+        add("Sleep after", v(s.sleep_after_text), UiAction::ScreenOpen, true);
+        add("Back", "<", UiAction::MenuBack, true);
+        break;
+    case kMenuControls: {
         static const char *const kLabels[8] = {"A press", "A hold", "B press", "B hold",
                                                "Swipe up", "Swipe down", "Swipe left", "Swipe right"};
         for (int i = 0; i < 8; i++) {
-            out[i] = {kLabels[i], s.controls[i] ? s.controls[i] : "-", UiAction::ControlCycle, true};
+            add(kLabels[i], v(s.controls[i]), UiAction::ControlCycle, true);
         }
-        out[8] = back;
-    } else if (s.menu_page == 4) {
-        MenuTile tiles[kMenuTiles] = {
-            {"On battery", s.battery_percent < 0 ? "Charging" : s.since_charge ? s.since_charge : "-",
-             UiAction::None, false},
-            {"Battery test", s.test_text ? s.test_text : "Start", UiAction::MenuBatteryTest, true},
-            {"Last test", s.last_test ? s.last_test : "-", UiAction::None, false},
-            blank, blank, blank, blank, blank, back,
-        };
-        memcpy(out, tiles, sizeof(tiles));
-    } else {
-        MenuTile tiles[kMenuTiles] = {
-            {"Look", s.vivid ? "Vivid" : "Subdued", UiAction::MenuLook, true},
-            {"Counter", counter_style_plain(g) ? kCounterNames[s.counter_style % 3] : "-", UiAction::MenuCounter,
-             counter_style_plain(g)},
-            {"Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true},
-            {"Display", s.always_on ? "Always on" : "Screen, lang", UiAction::MenuScreen, true},
-            {"Controls", "Buttons", UiAction::MenuControls, true},
-            {"Battery", s.battery_percent < 0 ? "Charging" : "Info", UiAction::MenuBattery, true},
-            {"History", "Games", UiAction::MenuHistory, true},
-            {"Turn off", "Sleep", UiAction::MenuOff, true},
-            back,
-        };
-        memcpy(out, tiles, sizeof(tiles));
+        add("Back", "<", UiAction::MenuBack, true);
+        break;
     }
+    case kMenuBattery:
+        add("On battery", s.battery_percent < 0 ? "Charging" : v(s.since_charge), UiAction::None, false);
+        add("Battery test", s.test_text ? s.test_text : "Start", UiAction::MenuBatteryTest, true);
+        add("Last test", v(s.last_test), UiAction::None, false);
+        add("Back", "<", UiAction::MenuBack, true);
+        break;
+    default:
+        break;
+    }
+    return n;
 }
 
 const char *menu_title(int page)
 {
-    static const char *const kTitles[] = {"MENU", "MORE", "DISPLAY", "CONTROLS", "BATTERY"};
-    return page >= 0 && page < 5 ? kTitles[page] : "MENU";
+    static const char *const kTitles[] = {"MENU", "MENU", "MENU", "MENU", "SCREEN", "CONTROLS", "BATTERY"};
+    return page >= 0 && page <= kMenuBattery ? kTitles[page] : "MENU";
 }
 
 void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
     // What the A / B buttons do right now (they can be remapped in Controls).
-    if (s.menu_page == 0 && s.button_hint) {
+    if (s.button_hint) {
         f.setFont(&fonts::Font2);
         f.setTextSize(1);
         f.setTextColor(t.muted);
         f.setTextDatum(textdatum_t::middle_right);
         f.drawString(s.button_hint, kWidth - 60, kHeaderH / 2);
     }
-    MenuTile tiles[kMenuTiles];
-    char match[8], timer[12];
-    menu_tiles(s, tiles, match, timer);
     draw_close_mark(f, t);
 
-    for (int i = 0; i < kMenuTiles; i++) {
-        const MenuTile &mt = tiles[i];
-        if (!mt.label) {
-            continue;
+    // Tab rail.
+    static const char *const kTabs[kMenuTabCount] = {"Play", "Match", "Look", "System"};
+    int current = menu_parent_tab(s.menu_page);
+    for (int i = 0; i < kMenuTabCount; i++) {
+        Rect r = menu_tab_rect(i);
+        bool on = i == current;
+        f.fillRoundRect(r.x, r.y, r.w, r.h, 8, on ? t.accent : t.surface);
+        if (!on) {
+            f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, 70));
         }
-        Rect r = menu_tile(i);
+        f.setFont(&fonts::FreeSansBold9pt7b);
+        f.setTextSize(1);
+        if (f.textWidth(kTabs[i]) > r.w - 6) {
+            f.setFont(&fonts::FreeSans9pt7b);
+            if (f.textWidth(kTabs[i]) > r.w - 6) {
+                f.setFont(&fonts::Font2);
+            }
+        }
+        f.setTextColor(on ? kInk : t.muted);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(kTabs[i], r.cx(), r.cy() + 1);
+    }
+    // A thin rule between the rail and the panel.
+    f.drawFastVLine(kRailW + 2, 30, kHeight - 36, mix(t.bg_bottom, t.accent, 60));
+
+    MenuTile tiles[kMenuTiles];
+    char match[8], timer[12];
+    int n = menu_tiles(s, tiles, match, timer);
+    bool narrow = n > 6;
+    for (int i = 0; i < n; i++) {
+        const MenuTile &mt = tiles[i];
+        Rect r = menu_tile(i, n);
         f.fillRoundRect(r.x, r.y, r.w, r.h, 8, t.surface);
         f.drawRoundRect(r.x, r.y, r.w, r.h, 8, mix(t.surface, t.accent, mt.enabled ? 140 : 40));
 
@@ -1353,11 +1410,11 @@ void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextSize(1);
         f.setTextColor(t.muted);
         f.setTextDatum(textdatum_t::middle_left);
-        f.drawString(mt.label, r.x + 8, r.y + 11);
+        f.drawString(mt.label, r.x + 7, r.y + 11);
 
-        fit_font(f, mt.value, r.w - 12);
-        if (f.getFont() == &fonts::FreeSansBold12pt7b) {
-            f.setFont(&fonts::FreeSansBold9pt7b); // keep values to one size in the short tiles
+        fit_font(f, mt.value, r.w - 10);
+        if (f.getFont() == &fonts::FreeSansBold12pt7b && narrow) {
+            f.setFont(&fonts::FreeSansBold9pt7b); // keep values to one size in the small tiles
         }
         f.setTextColor(mt.enabled ? t.accent : t.muted);
         f.setTextDatum(textdatum_t::middle_center);
@@ -2255,25 +2312,33 @@ const char *legend_card_name(size_t i, uint8_t lang)
 }
 
 uint8_t sort_lang = 0;
+bool sort_by_set = false;
 
-// By name in the card language (A-Z, or 가나다 order), then by set (oldest first).
+// By name in the card language (A-Z, or 가나다 order), then by set (oldest
+// first); or by set first, then name.
 bool legend_before(uint8_t a, uint8_t b)
 {
+    if (sort_by_set && kLegends[a].set != kLegends[b].set) {
+        return kLegends[a].set < kLegends[b].set;
+    }
     const char *na = legend_card_name(a, sort_lang);
     const char *nb = legend_card_name(b, sort_lang);
     int c = sort_lang == kCardEnglish ? strcasecmp(na, nb) : strcmp(na, nb); // UTF-8 keeps Hangul order
     return c < 0 || (c == 0 && kLegends[a].set < kLegends[b].set);
 }
 
-// Official legends sorted for the picker (indexes into kLegends), per card language.
-const uint8_t *legends_sorted(uint8_t lang)
+// Official legends sorted for the picker (indexes into kLegends), per card
+// language and sort order.
+const uint8_t *legends_sorted(uint8_t lang, uint8_t by_set)
 {
-    static uint8_t orders[kCardLangCount][kLegendCount];
-    static bool ready[kCardLangCount] = {};
+    static uint8_t orders[kCardLangCount][2][kLegendCount];
+    static bool ready[kCardLangCount][2] = {};
     lang = lang < kCardLangCount ? lang : 0;
-    uint8_t *order = orders[lang];
+    by_set = by_set ? 1 : 0;
+    uint8_t *order = orders[lang][by_set];
     sort_lang = lang;
-    if (!ready[lang]) {
+    sort_by_set = by_set;
+    if (!ready[lang][by_set]) {
         for (size_t i = 0; i < kLegendCount; i++) {
             order[i] = (uint8_t)i;
         }
@@ -2286,7 +2351,7 @@ const uint8_t *legends_sorted(uint8_t lang)
             }
             order[j] = v;
         }
-        ready[lang] = true;
+        ready[lang][by_set] = true;
     }
     return order;
 }
@@ -2302,7 +2367,7 @@ uint8_t picker_legend_code(const UiState &s, int i)
     if (i < s.custom_legend_count) {
         return (uint8_t)(kCustomLegend + i);
     }
-    return legends_sorted(s.card_lang)[i - s.custom_legend_count];
+    return legends_sorted(s.card_lang, s.legend_sort)[i - s.custom_legend_count];
 }
 
 void fill_tile(LGFX_Sprite &f, const Theme &t, const Rect &r, uint32_t edge, bool selected = false, int radius = 8)
@@ -2489,7 +2554,8 @@ UiAction editor_hit(const EditorView &e, int x, int y)
     return a;
 }
 
-// History.
+// History: the list shows matches (a best-of's games together); a match's
+// page shows each game with the order the points came in.
 constexpr int kHistoryRows = 3;
 constexpr Rect kPagePrev = {6, 147, 64, 21};
 constexpr Rect kPageNext = {250, 147, 64, 21};
@@ -2504,7 +2570,7 @@ bool entry_has_kinds(const HistoryEntry &e)
     return bb_profile_at(e.profile_index)->kind_count >= 2;
 }
 
-// "Won 8-6", "Lost", "Draw", "A won 11-9".
+// One game: "Won 8-6", "Lost 3", "Draw 6-6", "A won 11-9".
 uint32_t history_result(const Theme &t, const HistoryEntry &e, char *buf, size_t n)
 {
     const bb_profile_t *p = bb_profile_at(e.profile_index);
@@ -2518,6 +2584,30 @@ uint32_t history_result(const Theme &t, const HistoryEntry &e, char *buf, size_t
         snprintf(buf, n, "%s %d", word, e.value[0]);
     }
     return e.result == 2 || p->teams ? t.text : e.result == 0 ? kGain : kLoss;
+}
+
+// A whole match: "Won 2-1", "Lost 0-2", "1-1" (unfinished), or the one game's result.
+uint32_t match_result(const Theme &t, const HistoryEntry *h, int start, int end, char *buf, size_t n)
+{
+    const HistoryEntry &first = h[end - 1];
+    if (end - start == 1 && first.best_of <= 1) {
+        return history_result(t, first, buf, n);
+    }
+    int w[2] = {0, 0};
+    for (int i = start; i < end; i++) {
+        if (h[i].result < 2) {
+            w[h[i].result]++;
+        }
+    }
+    int need = first.best_of / 2 + 1;
+    const bb_profile_t *p = bb_profile_at(first.profile_index);
+    if (w[0] >= need || w[1] >= need) {
+        const char *word = p->teams ? (w[0] > w[1] ? "A won" : "B won") : (w[0] > w[1] ? "Won" : "Lost");
+        snprintf(buf, n, "%s %d-%d", word, w[0], w[1]);
+        return p->teams ? t.text : w[0] > w[1] ? kGain : kLoss;
+    }
+    snprintf(buf, n, "%d-%d so far", w[0], w[1]);
+    return t.text;
 }
 
 void draw_pager(LGFX_Sprite &f, const Theme &t, int page, int pages)
@@ -2538,6 +2628,13 @@ void draw_pager(LGFX_Sprite &f, const Theme &t, int page, int pages)
     f.drawString(buf, kWidth / 2, kPagePrev.cy());
 }
 
+void legends_line(const UiState &s, const HistoryEntry &e, char *buf, size_t n)
+{
+    char a[32], b[32];
+    snprintf(buf, n, "%s v %s", ui_legend_label(s, e.legend[0], a, sizeof(a)),
+             ui_legend_label(s, e.legend[1], b, sizeof(b)));
+}
+
 void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
     draw_close_mark(f, t);
@@ -2551,14 +2648,17 @@ void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.drawString("Finish a game (End game > result) to record it", kWidth / 2, 96);
         return;
     }
-    char buf[40];
-    int pages = (s.history_count + kHistoryRows - 1) / kHistoryRows;
+    char buf[64];
+    int groups = ui_history_group_count(s.history, s.history_count);
+    int pages = (groups + kHistoryRows - 1) / kHistoryRows;
     for (int i = 0; i < kHistoryRows; i++) {
-        int idx = s.history_page * kHistoryRows + i;
-        if (idx >= s.history_count) {
+        int gi = s.history_page * kHistoryRows + i;
+        if (gi >= groups) {
             break;
         }
-        const HistoryEntry &e = s.history[idx];
+        int start = ui_history_group_start(s.history, s.history_count, gi);
+        int end = ui_history_group_end(s.history, s.history_count, start);
+        const HistoryEntry &e = s.history[end - 1]; // the match's first game
         Rect r = history_row(i);
         fill_tile(f, t, r, mix(t.surface, t.accent, 90), false, 6);
         const bb_profile_t *p = bb_profile_at(e.profile_index);
@@ -2566,19 +2666,21 @@ void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextSize(1);
         f.setTextDatum(textdatum_t::top_left);
         f.setTextColor(t.text);
-        snprintf(buf, sizeof(buf), "#%u %s", e.number, p->short_name ? p->short_name : p->name);
+        if (e.best_of > 1) {
+            snprintf(buf, sizeof(buf), "#%u %s Bo%u", e.number, p->short_name ? p->short_name : p->name, e.best_of);
+        } else {
+            snprintf(buf, sizeof(buf), "#%u %s", e.number, p->short_name ? p->short_name : p->name);
+        }
         f.drawString(buf, r.x + 8, r.y + 3);
-        uint32_t c = history_result(t, e, buf, sizeof(buf));
+        uint32_t c = match_result(t, s.history, start, end, buf, sizeof(buf));
         f.setTextColor(c);
         f.setTextDatum(textdatum_t::top_right);
         f.drawString(buf, r.x + r.w - 8, r.y + 3);
 
         if (entry_has_kinds(e) && (e.legend[0] != kNoLegend || e.legend[1] != kNoLegend)) {
-            char a[32], b[32];
-            snprintf(buf, sizeof(buf), "%s v %s", ui_legend_label(s, e.legend[0], a, sizeof(a)),
-                     ui_legend_label(s, e.legend[1], b, sizeof(b)));
-        } else if (e.best_of > 1) {
-            snprintf(buf, sizeof(buf), "Bo%u game %u", e.best_of, e.game_in_match);
+            legends_line(s, e, buf, sizeof(buf));
+        } else if (end - start > 1) {
+            snprintf(buf, sizeof(buf), "%d games", end - start);
         } else {
             buf[0] = 0;
         }
@@ -2586,9 +2688,13 @@ void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextColor(t.muted);
         f.setTextDatum(textdatum_t::bottom_left);
         f.drawString(buf, r.x + 8, r.y + r.h - 1);
-        f.setFont(&fonts::Font2);
-        if (e.minutes) {
-            snprintf(buf, sizeof(buf), "%u min", e.minutes);
+        int minutes = 0;
+        for (int k = start; k < end; k++) {
+            minutes += s.history[k].minutes;
+        }
+        if (minutes) {
+            snprintf(buf, sizeof(buf), "%d min", minutes);
+            f.setFont(&fonts::Font2);
             f.setTextDatum(textdatum_t::bottom_right);
             f.drawString(buf, r.x + r.w - 8, r.y + r.h - 1);
         }
@@ -2608,20 +2714,75 @@ UiAction history_hit(const UiState &s, int x, int y)
         a.delta = kPageNext.contains(x, y) ? 1 : -1;
         return a;
     }
+    int groups = ui_history_group_count(s.history, s.history_count);
     for (int i = 0; i < kHistoryRows; i++) {
-        int idx = s.history_page * kHistoryRows + i;
-        if (idx < s.history_count && history_row(i).contains(x, y)) {
+        int gi = s.history_page * kHistoryRows + i;
+        if (gi < groups && history_row(i).contains(x, y)) {
             a.type = UiAction::HistoryOpen;
-            a.kind = (uint8_t)idx;
+            a.kind = (uint8_t)ui_history_group_start(s.history, s.history_count, gi);
             return a;
         }
     }
     return a;
 }
 
+constexpr int kDetailRows = 3;
+constexpr Rect kDetailGames = {0, 26, kWidth, 98};
+
 Rect detail_tile(int i)
 {
-    return {6 + i * 104, 124, 100, 40};
+    return {6 + i * 104, 126, 100, 40};
+}
+
+// One game of the match: result, length, and a chip per scoring change in
+// order (your colour / their colour, with the kind's first letter).
+void draw_detail_game(LGFX_Sprite &f, const Theme &t, const UiState &s, const HistoryEntry &e, int game_no, int y)
+{
+    const bb_profile_t *p = bb_profile_at(e.profile_index);
+    char buf[40], res[24];
+    uint32_t c = history_result(t, e, res, sizeof(res));
+    f.setFont(&fonts::FreeSansBold9pt7b);
+    f.setTextSize(1);
+    f.setTextDatum(textdatum_t::top_left);
+    f.setTextColor(t.muted);
+    snprintf(buf, sizeof(buf), "G%d", game_no);
+    int x = 8 + f.drawString(buf, 8, y) + 8;
+    f.setTextColor(c);
+    x += f.drawString(res, x, y) + 10;
+    f.setFont(&fonts::Font2);
+    f.setTextColor(t.muted);
+    if (e.minutes) {
+        snprintf(buf, sizeof(buf), "%u min", e.minutes);
+        f.setTextDatum(textdatum_t::top_right);
+        f.drawString(buf, kWidth - 8, y + 1);
+    }
+    // Timeline.
+    int cy = y + 17;
+    if (e.event_count == 0) {
+        f.setTextDatum(textdatum_t::top_left);
+        f.drawString(entry_has_kinds(e) ? "(scoring order not recorded)" : "", 8, cy - 1);
+        return;
+    }
+    for (int i = 0; i < e.event_count && i < kHistoryEvents; i++) {
+        HistoryEvent ev = ui_history_event(e.events[i]);
+        uint32_t pc = player_color(t, ev.player);
+        Rect r{8 + i * 10, cy, 9, 12};
+        if (ev.delta > 0) {
+            f.fillRoundRect(r.x, r.y, r.w, r.h, 2, pc);
+        } else {
+            f.drawRoundRect(r.x, r.y, r.w, r.h, 2, pc); // a point taken back
+        }
+        char label[4];
+        if (p->kind_count >= 2) {
+            snprintf(label, sizeof(label), "%c", p->kinds[ev.kind % 2][0]);
+        } else {
+            snprintf(label, sizeof(label), "%c", ev.delta > 0 ? '+' : '-');
+        }
+        f.setFont(&fonts::Font0);
+        f.setTextColor(ev.delta > 0 ? kInk : pc);
+        f.setTextDatum(textdatum_t::middle_center);
+        f.drawString(label, r.cx() + 1, r.cy() + 1);
+    }
 }
 
 void draw_history_detail(LGFX_Sprite &f, const Theme &t, const UiState &s)
@@ -2630,41 +2791,38 @@ void draw_history_detail(LGFX_Sprite &f, const Theme &t, const UiState &s)
     if (s.history_sel < 0 || s.history_sel >= s.history_count) {
         return;
     }
-    const HistoryEntry &e = s.history[s.history_sel];
-    const bb_profile_t *p = bb_profile_at(e.profile_index);
+    int start = s.history_sel;
+    int end = ui_history_group_end(s.history, s.history_count, start);
+    int games = end - start;
+    const HistoryEntry &first = s.history[end - 1];
     char buf[48];
 
-    f.setFont(&fonts::FreeSans9pt7b);
+    // Match result in the header, beside the title.
+    uint32_t c = match_result(t, s.history, start, end, buf, sizeof(buf));
+    f.setFont(&fonts::FreeSansBold9pt7b);
     f.setTextSize(1);
-    f.setTextColor(t.muted);
-    f.setTextDatum(textdatum_t::middle_left);
-    if (e.best_of > 1) {
-        snprintf(buf, sizeof(buf), "%s - Bo%u game %u", p->name, e.best_of, e.game_in_match);
-    } else {
-        snprintf(buf, sizeof(buf), "%s", p->name);
+    f.setTextColor(c);
+    f.setTextDatum(textdatum_t::middle_right);
+    f.drawString(buf, kWidth - 60, kHeaderH / 2);
+
+    int offset = games > kDetailRows ? s.history_detail_page * kDetailRows : 0;
+    if (offset >= games) {
+        offset = 0;
     }
-    f.drawString(buf, 8, 38);
-    if (e.minutes) {
-        snprintf(buf, sizeof(buf), "%u min", e.minutes);
-        f.setTextDatum(textdatum_t::middle_right);
-        f.drawString(buf, kWidth - 8, 38);
+    for (int row = 0; row < kDetailRows && offset + row < games; row++) {
+        int k = offset + row;                  // game k+1 of the match
+        const HistoryEntry &e = s.history[end - 1 - k];
+        draw_detail_game(f, t, s, e, e.game_in_match ? e.game_in_match : k + 1, 28 + row * 32);
+    }
+    if (games > kDetailRows) {
+        f.setFont(&fonts::Font0);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::bottom_right);
+        snprintf(buf, sizeof(buf), "tap for more (%d games)", games);
+        f.drawString(buf, kWidth - 8, 124);
     }
 
-    uint32_t c = history_result(t, e, buf, sizeof(buf));
-    f.setFont(&fonts::FreeSansBold12pt7b);
-    f.setTextDatum(textdatum_t::middle_left);
-    draw_text_glow(f, t, buf, 8, 62, c);
-
-    if (entry_has_kinds(e)) {
-        f.setFont(&fonts::Font2);
-        f.setTextColor(t.text);
-        f.setTextDatum(textdatum_t::middle_left);
-        for (int side = 0; side < (e.players >= 2 ? 2 : 1); side++) {
-            snprintf(buf, sizeof(buf), "%s: %d %s, %d %s", side == 0 ? (p->teams ? "Team A" : "You")
-                                                                     : (p->teams ? "Team B" : "Opp"),
-                     e.tally[side][0], p->kinds[0], e.tally[side][1], p->kinds[1]);
-            f.drawString(buf, 8, 88 + side * 17);
-        }
+    if (entry_has_kinds(first)) {
         for (int side = 0; side < 2; side++) {
             Rect r = detail_tile(side);
             fill_tile(f, t, r, mix(t.surface, t.accent, 140));
@@ -2673,16 +2831,17 @@ void draw_history_detail(LGFX_Sprite &f, const Theme &t, const UiState &s)
             f.setTextDatum(textdatum_t::top_left);
             f.drawString(side == 0 ? "Your legend" : "Their legend", r.x + 6, r.y + 2);
             Rect v{r.x, r.y + 14, r.w, r.h - 14};
-            tile_text(f, v, ui_legend_name(s, e.legend[side]), t.accent, r.w - 30);
+            tile_text(f, v, ui_legend_name(s, first.legend[side]), t.accent, r.w - 30);
             f.setFont(&fonts::Font0);
             f.setTextColor(t.muted);
-            f.setTextDatum(textdatum_t::top_right);
-            f.drawString(ui_legend_set(e.legend[side]), r.x + r.w - 5, r.y + 4);
+            f.setTextDatum(textdatum_t::bottom_right);
+            f.drawString(ui_legend_set(first.legend[side]), r.x + r.w - 4, r.y + r.h - 2);
         }
     }
     Rect r = detail_tile(2);
     fill_tile(f, t, r, s.history_delete_armed ? kLoss : mix(t.surface, kLoss, 120), s.history_delete_armed);
-    tile_text(f, r, s.history_delete_armed ? "Sure?" : "Delete", s.history_delete_armed ? t.text : kLoss);
+    tile_text(f, r, s.history_delete_armed ? "Sure?" : games > 1 ? "Delete all" : "Delete",
+              s.history_delete_armed ? t.text : kLoss);
 }
 
 UiAction history_detail_hit(const UiState &s, int x, int y)
@@ -2695,7 +2854,12 @@ UiAction history_detail_hit(const UiState &s, int x, int y)
     if (s.history_sel < 0 || s.history_sel >= s.history_count) {
         return a;
     }
-    const HistoryEntry &e = s.history[s.history_sel];
+    int end = ui_history_group_end(s.history, s.history_count, s.history_sel);
+    const HistoryEntry &first = s.history[end - 1];
+    if (kDetailGames.contains(x, y) && end - s.history_sel > kDetailRows) {
+        a.type = UiAction::HistoryGames;
+        return a;
+    }
     for (int i = 0; i < 3; i++) {
         Rect r = detail_tile(i);
         Rect padded{r.x - 2, r.y - 4, r.w + 4, r.h + 6};
@@ -2704,7 +2868,7 @@ UiAction history_detail_hit(const UiState &s, int x, int y)
         }
         if (i == 2) {
             a.type = UiAction::HistoryDelete;
-        } else if (entry_has_kinds(e)) {
+        } else if (entry_has_kinds(first)) {
             a.type = UiAction::HistoryLegend;
             a.player = (uint8_t)i;
         }
@@ -2717,8 +2881,9 @@ UiAction history_detail_hit(const UiState &s, int x, int y)
 constexpr int kLegendCols = 3;
 constexpr int kLegendRowsPerPage = 4;
 constexpr int kLegendsPerPage = kLegendCols * kLegendRowsPerPage;
-constexpr Rect kLegendNone = {74, 147, 84, 21};
-constexpr Rect kLegendAdd = {162, 147, 84, 21};
+constexpr Rect kLegendNone = {74, 147, 54, 21};
+constexpr Rect kLegendAdd = {132, 147, 54, 21};
+constexpr Rect kLegendSortChip = {190, 147, 56, 21};
 
 Rect legend_tile(int i)
 {
@@ -2774,6 +2939,8 @@ void draw_legends(LGFX_Sprite &f, const Theme &t, const UiState &s)
     tile_text(f, kLegendNone, "None", t.text);
     fill_tile(f, t, kLegendAdd, mix(t.surface, kWinColor, 120), false, 6);
     tile_text(f, kLegendAdd, "+ New", kWinColor);
+    fill_tile(f, t, kLegendSortChip, mix(t.surface, t.accent, 140), false, 6);
+    tile_text(f, kLegendSortChip, s.legend_sort ? "By set" : "A-Z", t.accent);
     snprintf(buf, sizeof(buf), "%d/%d", s.legend_page + 1, pages);
     f.setFont(&fonts::Font2);
     f.setTextColor(t.muted);
@@ -2800,6 +2967,10 @@ UiAction legends_hit(const UiState &s, int x, int y)
     }
     if (kLegendAdd.contains(x, y)) {
         a.type = UiAction::LegendAdd;
+        return a;
+    }
+    if (kLegendSortChip.contains(x, y)) {
+        a.type = UiAction::LegendSort;
         return a;
     }
     int n = picker_legend_count(s);
@@ -2905,8 +3076,11 @@ const char *overlay_title(const UiState &s)
         return "HISTORY";
     case Overlay::HistoryDetail: {
         static char buf[16];
-        snprintf(buf, sizeof(buf), "GAME #%u",
-                 s.history_sel >= 0 && s.history_sel < s.history_count ? s.history[s.history_sel].number : 0);
+        if (s.history_sel < 0 || s.history_sel >= s.history_count) {
+            return "MATCH";
+        }
+        int end = ui_history_group_end(s.history, s.history_count, s.history_sel);
+        snprintf(buf, sizeof(buf), end - s.history_sel > 1 ? "MATCH #%u" : "GAME #%u", s.history[end - 1].number);
         return buf;
     }
     case Overlay::Legends:
@@ -3008,6 +3182,56 @@ const char *ui_legend_label(const UiState &s, uint8_t code, char *buf, size_t n)
         snprintf(buf, n, "%s", name);
     }
     return buf;
+}
+
+uint8_t ui_history_pack(uint8_t player, uint8_t kind, int delta)
+{
+    if (delta > 31) {
+        delta = 31;
+    } else if (delta < -32) {
+        delta = -32;
+    }
+    return (uint8_t)(((player & 1) << 7) | ((kind & 1) << 6) | (delta & 0x3F));
+}
+
+HistoryEvent ui_history_event(uint8_t b)
+{
+    HistoryEvent e;
+    e.player = b >> 7;
+    e.kind = (b >> 6) & 1;
+    int d = b & 0x3F;
+    e.delta = (int8_t)(d >= 32 ? d - 64 : d);
+    return e;
+}
+
+int ui_history_group_end(const HistoryEntry *h, int count, int start)
+{
+    int end = start + 1;
+    if (h[start].match_no == 0) {
+        return end;
+    }
+    while (end < count && h[end].match_no == h[start].match_no && h[end].profile_index == h[start].profile_index) {
+        end++;
+    }
+    return end;
+}
+
+int ui_history_group_count(const HistoryEntry *h, int count)
+{
+    int n = 0;
+    for (int i = 0; i < count; i = ui_history_group_end(h, count, i)) {
+        n++;
+    }
+    return n;
+}
+
+int ui_history_group_start(const HistoryEntry *h, int count, int n)
+{
+    int i = 0;
+    while (n-- > 0 && i < count) {
+        i = ui_history_group_end(h, count, i);
+    }
+    return i;
 }
 
 const char *ui_legend_set(uint8_t code)
@@ -3187,15 +3411,24 @@ UiAction ui_hit(const UiState &state, int x, int y)
             a.type = UiAction::MenuClose;
             return a;
         }
+        for (int i = 0; i < kMenuTabCount; i++) {
+            Rect r = menu_tab_rect(i);
+            Rect padded{0, r.y - 1, r.w + 6, r.h + 3};
+            if (padded.contains(x, y)) {
+                a.type = UiAction::MenuTab;
+                a.kind = (uint8_t)i;
+                return a;
+            }
+        }
         MenuTile tiles[kMenuTiles];
         char match[8], timer[12];
-        menu_tiles(state, tiles, match, timer);
-        for (int i = 0; i < kMenuTiles; i++) {
-            Rect r = menu_tile(i);
+        int n = menu_tiles(state, tiles, match, timer);
+        for (int i = 0; i < n; i++) {
+            Rect r = menu_tile(i, n);
             // Tiles are hit-tested with the gaps included so near-misses still count.
             Rect padded{r.x - 2, r.y - 1, r.w + 4, r.h + 3};
             if (padded.contains(x, y)) {
-                if (tiles[i].label && tiles[i].enabled) {
+                if (tiles[i].enabled) {
                     a.type = tiles[i].action;
                     a.kind = (uint8_t)i;
                 }
@@ -3231,6 +3464,17 @@ UiAction ui_hit(const UiState &state, int x, int y)
         }
         a.type = UiAction::DiceRoll;
         return a;
+    }
+
+    // The match clock: tap to start, pause or resume. In the header for most
+    // layouts, in the pill on the row divider for facing / 3-4 players.
+    if (state.timer_running && state.timer_minutes > 0) {
+        bool divider = !gauge_style(g) && (facing(state) || quads(state));
+        Rect clock = divider ? Rect{kWidth / 2 - 70, kStripH - 14, 140, 28} : Rect{120, 0, kWidth - 156, kHeaderH};
+        if (clock.contains(x, y)) {
+            a.type = UiAction::TimerTap;
+            return a;
+        }
     }
 
     // While the game-over banner shows, any tap moves on to the next game.

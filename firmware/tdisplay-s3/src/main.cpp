@@ -65,7 +65,7 @@ constexpr uint32_t kSpinMs = 420;      // counter change animation (roll, spin, 
 // Raw touch y at or beyond this is the circle key below the visible screen.
 constexpr int kRawHomeKeyY = 320;
 
-constexpr uint32_t kSavedMagic = 0xBB0B000B;
+constexpr uint32_t kSavedMagic = 0xBB0B000D;
 constexpr uint32_t kTestSaveS = 60; // battery test: save progress to flash this often
 
 constexpr uint8_t kBestOfChoices[] = {0, 1, 3, 5}; // 0 = off
@@ -81,9 +81,11 @@ struct Saved {
     uint8_t counter_style; // 0 = themed, 1 = d20, 2 = digits
     uint8_t best_of;       // 0 = match tracking off
     uint8_t timer_minutes; // 0 = no timer
-    uint32_t match_start;  // RTC seconds when the timer started; 0 = not yet
+    uint32_t match_start;  // RTC seconds when the timer started; 0 = waiting for a tap
+    uint32_t timer_paused_at; // RTC seconds when it was paused; 0 = not paused
     uint32_t game_start;   // RTC seconds at the game's first change; 0 = not yet
     uint8_t legend[2];     // Riftbound legends for this match (kNoLegend = not picked)
+    uint16_t match_no;     // counts up with each new match (history groups games by it)
     bb_match_t match;
     bb_game_t game;
 };
@@ -152,11 +154,13 @@ int history_count = 0;
 uint16_t history_next = 1;
 int history_page = 0;
 int history_sel = -1;
+int history_detail_page = 0;
 bool history_delete_armed = false;
 char custom_legends[kMaxCustomLegends][kLegendNameLen + 1];
 int custom_legend_count = 0;
 uint8_t legend_side = 0;
 int legend_page = 0;
+uint8_t legend_sort = 0; // saved to flash
 bool legend_for_history = false; // editing a past game's legend, not this match's
 bool legend_chain = false;       // after picking yours, go on to theirs
 char keyboard_text[kLegendNameLen + 1];
@@ -188,7 +192,6 @@ struct BatteryTest {
 BatteryTest test;
 RTC_DATA_ATTR uint32_t test_tick_s = 0; // RTC seconds when test.secs was last advanced
 uint32_t test_saved_s = 0;
-Preferences prefs;
 char test_text[16];
 char last_test_text[16];
 
@@ -229,13 +232,23 @@ int32_t timer_left_s()
     if (saved.match_start == 0) {
         return total;
     }
-    return total - (int32_t)(now_s() - saved.match_start);
+    uint32_t now = saved.timer_paused_at ? saved.timer_paused_at : now_s();
+    return total - (int32_t)(now - saved.match_start);
 }
+
+Preferences prefs;
 
 void new_match()
 {
+    uint16_t n = (uint16_t)(prefs.getUShort("match_n", 0) + 1);
+    if (n == 0) {
+        n = 1;
+    }
+    prefs.putUShort("match_n", n);
+    saved.match_no = n;
     bb_match_init(&saved.match, saved.best_of ? saved.best_of : 1);
     saved.match_start = 0;
+    saved.timer_paused_at = 0;
 }
 
 bool screen_always_on();
@@ -262,6 +275,7 @@ UiState ui_state()
     s.timer_minutes = saved.timer_minutes;
     s.timer_running = saved.timer_minutes > 0;
     s.timer_left_s = timer_left_s();
+    s.timer_state = saved.match_start == 0 ? 0 : saved.timer_paused_at ? 2 : 1;
     s.dice = dice_open ? &dice : nullptr;
     s.picker = picker_open ? &picker : nullptr;
     s.entry = entry_open ? &entry : nullptr;
@@ -286,6 +300,7 @@ UiState ui_state()
     s.history_count = history_count;
     s.history_page = history_page;
     s.history_sel = history_sel;
+    s.history_detail_page = history_detail_page;
     s.history_delete_armed = history_delete_armed;
     s.match_legend[0] = saved.legend[0];
     s.match_legend[1] = saved.legend[1];
@@ -293,6 +308,7 @@ UiState ui_state()
     s.legend_current = legend_for_history && history_sel >= 0 ? history[history_sel].legend[legend_side]
                                                               : saved.legend[legend_side];
     s.legend_page = legend_page;
+    s.legend_sort = legend_sort;
     s.custom_legends = custom_legends;
     s.custom_legend_count = custom_legend_count;
     s.keyboard_text = keyboard_text;
@@ -493,6 +509,18 @@ void controls_save()
     prefs.putBytes("ctl", controls, sizeof(controls));
 }
 
+void history_save();
+
+// History as saved before r33 (no match number or scoring order).
+struct HistoryEntryV1 {
+    uint16_t number;
+    uint8_t profile_index, players, result, best_of, game_in_match;
+    uint8_t legend[2];
+    uint16_t minutes;
+    int16_t value[2];
+    int16_t tally[2][2];
+};
+
 void history_load()
 {
     history_count = 0;
@@ -500,6 +528,26 @@ void history_load()
     if (len > 0 && len % sizeof(HistoryEntry) == 0 && len <= sizeof(history)) {
         prefs.getBytes("hist", history, len);
         history_count = (int)(len / sizeof(HistoryEntry));
+    } else if (len > 0 && len % sizeof(HistoryEntryV1) == 0 && len / sizeof(HistoryEntryV1) <= kMaxHistory) {
+        static HistoryEntryV1 old[kMaxHistory];
+        prefs.getBytes("hist", old, len);
+        history_count = (int)(len / sizeof(HistoryEntryV1));
+        for (int i = 0; i < history_count; i++) {
+            HistoryEntry &e = history[i];
+            e = HistoryEntry();
+            e.number = old[i].number;
+            e.profile_index = old[i].profile_index;
+            e.players = old[i].players;
+            e.result = old[i].result;
+            e.best_of = old[i].best_of;
+            e.game_in_match = old[i].game_in_match;
+            e.legend[0] = old[i].legend[0];
+            e.legend[1] = old[i].legend[1];
+            e.minutes = old[i].minutes;
+            memcpy(e.value, old[i].value, sizeof(e.value));
+            memcpy(e.tally, old[i].tally, sizeof(e.tally));
+        }
+        history_save(); // in the new format from now on
     }
     history_next = prefs.getUShort("hist_n", 1);
 }
@@ -567,6 +615,7 @@ bool game_restore()
     game.profile = bb_profile_at(saved.profile_index);
     // The RTC clock restarted, so times measured on it are gone.
     saved.match_start = 0;
+    saved.timer_paused_at = 0;
     saved.game_start = 0;
     return true;
 }
@@ -898,6 +947,16 @@ void record_result(uint8_t result)
         e.tally[side][0] = game.tally[side][0];
         e.tally[side][1] = game.profile->kind_count >= 2 ? game.tally[side][1] : 0;
     }
+    e.match_no = saved.match_no;
+    // The scoring in order (the game's undo history is newest first).
+    bb_game_commit(&game);
+    static bb_entry_t past[BB_HISTORY_LEN];
+    size_t n = bb_game_history(&game, past, BB_HISTORY_LEN);
+    for (size_t i = n; i-- > 0 && e.event_count < kHistoryEvents;) {
+        if (past[i].player < 2 && past[i].delta != 0) {
+            e.events[e.event_count++] = ui_history_pack(past[i].player, past[i].kind, past[i].delta);
+        }
+    }
     int keep = history_count < kMaxHistory ? history_count : kMaxHistory - 1;
     memmove(&history[1], &history[0], keep * sizeof(HistoryEntry));
     history[0] = e;
@@ -920,7 +979,10 @@ void set_legend(uint8_t code)
 {
     if (legend_for_history) {
         if (history_sel >= 0 && history_sel < history_count) {
-            history[history_sel].legend[legend_side] = code;
+            int end = ui_history_group_end(history, history_count, history_sel);
+            for (int i = history_sel; i < end; i++) {
+                history[i].legend[legend_side] = code; // every game of the match
+            }
             history_save();
         }
         overlay = Overlay::HistoryDetail;
@@ -1100,7 +1162,8 @@ void perform(const UiAction &a, uint32_t now)
             i++;
         }
         saved.timer_minutes = kTimerChoices[(i + 1) % sizeof(kTimerChoices)];
-        saved.match_start = 0; // restarts with the next change
+        saved.match_start = 0; // waits for a tap (or the first change)
+        saved.timer_paused_at = 0;
         dirty = true;
         break;
     }
@@ -1122,12 +1185,33 @@ void perform(const UiAction &a, uint32_t now)
         saved.layout = ui_next_layout(game, saved.layout);
         dirty = true;
         break;
+    case UiAction::TimerTap: {
+        uint32_t t = now_s();
+        if (saved.match_start == 0) {
+            saved.match_start = t;
+            saved.timer_paused_at = 0;
+            show_toast("Timer started", now);
+        } else if (saved.timer_paused_at) {
+            saved.match_start += t - saved.timer_paused_at;
+            saved.timer_paused_at = 0;
+            show_toast("Timer running", now);
+        } else {
+            saved.timer_paused_at = t;
+            show_toast("Timer paused - tap to resume", now);
+        }
+        dirty = true;
+        break;
+    }
+    case UiAction::MenuTab:
+        menu_page = a.kind;
+        dirty = true;
+        break;
     case UiAction::MenuMore:
-        menu_page = 1;
+        menu_page = kMenuLook;
         dirty = true;
         break;
     case UiAction::MenuBack:
-        menu_page = menu_page >= 2 ? 1 : 0;
+        menu_page = menu_page == kMenuDisplay ? kMenuLook : kMenuSystem;
         dirty = true;
         break;
     case UiAction::MenuCounter:
@@ -1139,11 +1223,11 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuControls:
-        menu_page = 3;
+        menu_page = kMenuControls;
         dirty = true;
         break;
     case UiAction::MenuBattery:
-        menu_page = 4;
+        menu_page = kMenuBattery;
         dirty = true;
         break;
     case UiAction::MenuHistory:
@@ -1244,13 +1328,20 @@ void perform(const UiAction &a, uint32_t now)
     case UiAction::HistoryOpen:
         if (a.kind < history_count) {
             history_sel = a.kind;
+            history_detail_page = 0;
             history_delete_armed = false;
             overlay = Overlay::HistoryDetail;
             dirty = true;
         }
         break;
+    case UiAction::HistoryGames: {
+        int games = ui_history_group_end(history, history_count, history_sel) - history_sel;
+        history_detail_page = (history_detail_page + 1) * 3 < games ? history_detail_page + 1 : 0;
+        dirty = true;
+        break;
+    }
     case UiAction::HistoryPage: {
-        int pages = (history_count + 2) / 3;
+        int pages = (ui_history_group_count(history, history_count) + 2) / 3;
         history_page = constrain(history_page + a.delta, 0, pages > 0 ? pages - 1 : 0);
         dirty = true;
         break;
@@ -1270,13 +1361,13 @@ void perform(const UiAction &a, uint32_t now)
         if (!history_delete_armed) {
             history_delete_armed = true;
         } else if (history_sel >= 0 && history_sel < history_count) {
-            memmove(&history[history_sel], &history[history_sel + 1],
-                    (history_count - history_sel - 1) * sizeof(HistoryEntry));
-            history_count--;
+            int end = ui_history_group_end(history, history_count, history_sel); // the whole match
+            memmove(&history[history_sel], &history[end], (history_count - end) * sizeof(HistoryEntry));
+            history_count -= end - history_sel;
             history_save();
             history_sel = -1;
             history_delete_armed = false;
-            int pages = (history_count + 2) / 3;
+            int pages = (ui_history_group_count(history, history_count) + 2) / 3;
             history_page = constrain(history_page, 0, pages > 0 ? pages - 1 : 0);
             overlay = Overlay::History;
         }
@@ -1292,6 +1383,12 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     }
+    case UiAction::LegendSort:
+        legend_sort = legend_sort ? 0 : 1;
+        legend_page = 0;
+        prefs.putUChar("lg_sort", legend_sort);
+        dirty = true;
+        break;
     case UiAction::LegendAdd:
         if (custom_legend_count >= kMaxCustomLegends) {
             show_toast("12 own legends max", now);
@@ -1407,7 +1504,7 @@ void perform(const UiAction &a, uint32_t now)
         dirty = true;
         break;
     case UiAction::MenuScreen:
-        menu_page = 2;
+        menu_page = kMenuDisplay;
         dirty = true;
         break;
     case UiAction::MenuBatteryTest:
@@ -1668,6 +1765,7 @@ void setup()
     prefs.begin("bb", false); // (already open after a cold start; opening twice is harmless)
     controls_load();
     card_lang = prefs.getUChar("lang_card", kCardEnglish) % kCardLangCount;
+    legend_sort = prefs.getUChar("lg_sort", 0) ? 1 : 0;
     history_load();
     legends_load();
     charge_load(woke);
@@ -1756,7 +1854,7 @@ void loop()
 
     // Redraw once a second while the timer is counting.
     static int32_t shown_timer_s = 0;
-    if (saved.timer_minutes && saved.match_start) {
+    if (saved.timer_minutes && saved.match_start && !saved.timer_paused_at) {
         int32_t left = timer_left_s();
         if (left != shown_timer_s) {
             shown_timer_s = left;
