@@ -78,6 +78,7 @@ print can be traced back to its design.
 | r31 | Faceplate: neutral "A" (top) and "B" (bottom) letters beside the buttons instead of undo / menu symbols, since what they do can be remapped. Only the faceplate changed |
 | r32 | Faceplate A/B letters 0.6 mm deep (3 layers) and exported as their own part (`faceplate_letters`) to fill them in a second colour; `make_3mf.py` builds the one-plate 3MF with faceplate + letters and badges as two-part objects |
 | r32b | Reset button on its own (`reset_pin` part) with a longer inside nub to try: 2.1 / 2.5 / 2.9 mm (was 1.7; too short). Print only the pins |
+| r33 | Reset button removed (`rst_style = "none"`; A wakes it, and reset is reachable by taking the faceplate off); badges centred on both sides at full size (56 × 7.6, one line). Variant files for a two-line badge ("BATTLE" over "BUDDY", 27 × 13.2; `badge_lines = 2`) |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

@@ -96,7 +96,7 @@ symbol_gap = 4.4;         // symbol centre this far from its button's centre, to
 // Reset (RST): a side-push switch on the back of the board, on the +y long
 // edge near the USB end. A pinhole slot in the wall (press it with a
 // paperclip; a pinhole avoids accidental resets). Position estimated from photos.
-rst_style = "plunger";    // "plunger": small T-shaped button through the wall; "flex": press tab (r23-24, didn't work); "pin": paperclip slot; "none"
+rst_style = "none";       // "plunger": small T-shaped button through the wall; "flex": press tab (r23-24, didn't work); "pin": paperclip slot; "none"
 rst_from_usb = 10.8;      // board's USB end to the switch centre
 rst_z_above_back = 2.5;     // switch centre above the back of the board pocket
 rst_slot = [2.2, 3.5];    // "pin": slot size (along the case, up-down): room for estimate error
@@ -129,10 +129,11 @@ rst_nub_h = 1.7;          // nub on the head toward the switch (r27: the PCB is 
 // the letters start, then tape or glue it into the recess.
 label_text = "BATTLE BUDDY";
 label_font = "Liberation Sans:style=Bold";
-label_size = 3.8;         // letter height
+badge_lines = 1;          // 1: "BATTLE BUDDY" in one line; 2: "BATTLE" over "BUDDY"
+label_size = badge_lines == 2 ? 4.4 : 4.6;   // letter height
+label_line_gap = 1.4;     // two-line badge: space between the lines
 label_depth = 0.8;        // recess depth in the wall (1.6 mm wall)
-badge = [44, 6.8];        // recess size (along the case, up-down); one on each long side
-badge_end_gap = 5;        // badge ends this far from the far end (the reset button is near the USB end)
+badge = badge_lines == 2 ? [27, 13.2] : [56, 7.6];   // recess size (along the case, up-down); one on each long side, centred
 badge_r = 1.2;            // recess corner radius
 badge_t = 0.6;            // badge plate (sits 0.2 mm below the wall: room for tape)
 badge_letters = 0.4;      // letters raised on the plate (colour change at badge_t)
@@ -649,10 +650,17 @@ module faceplate() {
 }
 
 module label_2d(g = 0) {
-    offset(delta = g) text(label_text, size = label_size, font = label_font, halign = "center", valign = "center");
+    if (badge_lines == 2) {
+        for (k = [0, 1])
+            translate([0, (k == 0 ? 1 : -1) * (label_size + label_line_gap) / 2])
+                offset(delta = g) text(k == 0 ? "BATTLE" : "BUDDY", size = label_size, font = label_font,
+                                       halign = "center", valign = "center");
+    } else {
+        offset(delta = g) text(label_text, size = label_size, font = label_font, halign = "center", valign = "center");
+    }
 }
 
-badge_x = out_l - badge_end_gap - badge[0] / 2;
+badge_x = out_l / 2; // centred (r33: the reset button is gone from that side)
 
 
 module badge_2d(g = 0) {
