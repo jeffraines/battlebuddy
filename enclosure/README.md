@@ -65,6 +65,7 @@ print can be traced back to its design.
 | r26 | Side label is a one-piece badge: 56 × 7.6 mm rounded recess (0.8 deep) + badge plate 0.6 mm with letters raised 0.4 mm (two-colour print with a colour change) |
 | r27 | Reset button reaches ~1.75 mm in (nub 1.7) and stands 1.5 mm proud; separator rails off (the PCB is ~2 mm narrower than the glass each side), 2 mm pad under the board's far end instead; face plungers 0.8 mm longer, ±0.4 variants. Body, faceplate, lid unchanged |
 | r28 | Lid snaps on (tab + barb at each end, grooves in the end walls, pry notch), screw holes kept for plain pan-head M2, chamfered lid edge; face buttons keyed (flat on the display side so they can't turn), tighter (0.15 mm), 0.4 mm longer; circle key covered with a plain rounded window; undo / menu symbols pressed into the faceplate beside the buttons; badge recess on both long sides (44 × 6.8 mm, toward the far end clear of the reset button) |
+| r29 | Lid: channel round the outside face (1.6 wide, 1.0 deep, inside the screw holes) for thin silicone cord or strip instead of stick-on feet; lid 1.4 → 1.8 mm. Only the lid changed |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 
@@ -110,7 +111,9 @@ Then export a new revision (it never overwrites an existing one):
    off, pry at the notch on the seam at the far end.
 6. Lay the battery in the bay from the back and press the lid on until both
    ends click (pry at the notch at the far end to open). Screws optional.
-   Stick four 8 mm rubber feet into the recesses.
+   Press 1.5 mm silicone cord (or a strip cut from 1-1.5 mm silicone sheet)
+   into the channel round the lid's outside face for grip; a dab of glue
+   holds it. (`grip_channel = false` gives the old 8 mm foot recesses.)
 7. Optional: tape or glue a badge into each side recess.
 
 To reset the board, press the small button on the side wall.

@@ -203,7 +203,7 @@ edge_ch = 1.0;    // chamfer round the front edge so the case looks thinner
 shelf = 1.2;      // separator plate between board and battery
 wire_notch_x = 10;   // where the battery wire passes the separator, mm from the USB end
 wire_notch = [6, 4]; // notch size (along the case, across)
-lid_t = 1.4;
+lid_t = 1.8;     // r29: 1.4 -> 1.8 to make room for the grip channel
 // Lid snaps (r28): a tab at each short end rises into the bay and clicks into a
 // groove in the end wall. Screws are optional (plain M2 pan-head or self-tapping).
 lid_tab = [14, 0.8, 5];   // tab width, thickness, height above the lid
@@ -212,6 +212,14 @@ lid_barb_z = 3.4;         // flat catch face this far above the lid's inside fac
 lid_barb_ramp = 0.9;
 lid_edge_ch = 0.8;        // chamfer round the lid's outside edge
 lid_screws = true;        // keep the screw holes (pan-head screws, no countersink needed)
+// Grip (r29): a channel round the outside face of the lid for thin silicone
+// (1.5 mm silicone cord, or a strip cut from a 1-1.5 mm sheet). It runs inside
+// the screw holes and stands ~0.5 mm proud, so the case grips the table but
+// stays flat in a bag. Set grip_channel = false for the old 8 mm foot recesses.
+grip_channel = true;
+grip_w = 1.6;             // channel width
+grip_d = 1.0;             // channel depth
+grip_inset = 6;           // channel's outer edge this far in from the lid's edge (clear of the screws)
 clr = clr_default; // clearance around board and battery
 corner_r = 4;
 usb_w = 9.6;      // USB-C opening: just the plug's metal shell (8.4 x 2.6) plus room for error
@@ -528,9 +536,21 @@ module lid() {
         if (lid_screws)
             for (p = boss_xy)
                 translate([p[0], p[1], -1]) cylinder(d = screw_clear, h = lid_t + 2);
-        // Recesses for four 8 mm stick-on rubber feet.
-        for (x = [10, out_l - 10], y = [9, out_w - 9])
-            translate([x, y, -1]) cylinder(d = 8.6, h = 1.6);
+        if (grip_channel) {
+            // Channel for silicone cord / strip, round the outside face.
+            translate([0, 0, -1]) linear_extrude(grip_d + 1) difference() {
+                translate([grip_inset, grip_inset])
+                    offset(r = corner_r) offset(delta = -corner_r)
+                        square([out_l - 2 * grip_inset, out_w - 2 * grip_inset]);
+                translate([grip_inset + grip_w, grip_inset + grip_w])
+                    offset(r = max(corner_r - grip_w, 0.5)) offset(delta = -max(corner_r - grip_w, 0.5))
+                        square([out_l - 2 * (grip_inset + grip_w), out_w - 2 * (grip_inset + grip_w)]);
+            }
+        } else {
+            // Recesses for four 8 mm stick-on rubber feet.
+            for (x = [10, out_l - 10], y = [9, out_w - 9])
+                translate([x, y, -1]) cylinder(d = 8.6, h = 1.6);
+        }
         // Pry notch at the far end, for a fingernail or coin.
         translate([out_l - 1.2, out_w / 2 - 4, lid_t - 0.8]) cube([2, 8, 1]);
     }
