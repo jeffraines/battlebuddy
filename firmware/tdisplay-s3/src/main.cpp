@@ -169,6 +169,10 @@ uint32_t charge_saved_s = 0;
 uint8_t charge_rises = 0;
 char since_charge_text[16];
 
+// Card-name language (Display > Card names), saved to flash.
+uint8_t card_lang = kCardEnglish;
+const char *const kCardLangNames[] = {"English", "한국어"};
+
 // Battery test: runs the screen always on and counts how long the battery
 // lasts. Progress is saved to flash every minute, so when the battery dies the
 // total survives; the next power-up files it as the last test.
@@ -292,6 +296,8 @@ UiState ui_state()
     s.custom_legends = custom_legends;
     s.custom_legend_count = custom_legend_count;
     s.keyboard_text = keyboard_text;
+    s.card_lang = card_lang;
+    s.card_lang_text = kCardLangNames[card_lang % kCardLangCount];
     return s;
 }
 
@@ -1386,6 +1392,11 @@ void perform(const UiAction &a, uint32_t now)
         show_toast(msg, now);
         break;
     }
+    case UiAction::CardLangNext:
+        card_lang = (uint8_t)((card_lang + 1) % kCardLangCount);
+        prefs.putUChar("lang_card", card_lang);
+        dirty = true;
+        break;
     case UiAction::EndRestart:
         bb_game_reset(&game);
         end_prompt = false;
@@ -1656,6 +1667,7 @@ void setup()
 
     prefs.begin("bb", false); // (already open after a cold start; opening twice is harmless)
     controls_load();
+    card_lang = prefs.getUChar("lang_card", kCardEnglish) % kCardLangCount;
     history_load();
     legends_load();
     charge_load(woke);

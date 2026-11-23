@@ -73,10 +73,19 @@ That matters if this is ever sold in Europe, and principle 1 already covers it.
   sleep but not a reset or a flat battery, so after a power loss it asks for the
   date again (or marks times as unknown). PCB v1 adds a real-time clock that
   survives a battery swap; the companion app can set the time over BLE.
-- **Languages.** Riftbound is in English, Simplified Chinese and French, with
-  Korean announced. Plan: move all on-screen text into a translation table,
-  add a Language setting, add fonts that cover accents, Chinese and Korean,
-  and use Riot's official localised legend names.
+- **Languages.** Two separate settings, because players mix them: the
+  **menu language** (what you read) and the **card language** (names of game
+  characters, matching the cards on the table). A Japanese player at a Korean
+  event might want Japanese menus with Korean card names.
+  - Menus: English, Korean, Simplified Chinese, Japanese, French, Spanish,
+    German first (maybe one or two more).
+  - Card names: per game, in the languages that game is printed in.
+    Riftbound: English, Korean, Simplified Chinese, French.
+  - Done: card language setting (Display > Card names) with Korean Riftbound
+    legend names and Korean fonts. Next: menus into a translation table, a
+    Menu language setting, then Chinese / Japanese fonts and the other
+    languages. Translations need a native-speaker check; card names should come
+    from the official localised cards.
 - **History upload.** Send finished games to the companion app / an online
   record (the history format already keeps enough to do this).
 

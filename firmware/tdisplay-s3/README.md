@@ -35,6 +35,7 @@ Hold the board landscape, USB port on the right.
 | More → Screen | Brightness and Dim to: drag the slider or tap a preset. Dim after and Sleep after: - / + (hold to change faster) or a preset. Saved across power-off |
 | More → Controls | What button A (top, KEY) and button B (bottom, BOOT) do on a press and on a hold, and what each swipe does: Undo, Menu, Quick menu, Dice, Turn off or None. Defaults: A press undo, A hold quick menu, B press menu, B hold Turn off?, swipe up menu, swipe down dice. The case labels the buttons A and B (not by what they do), and the main menu's header shows what A and B are set to |
 | More → Battery | Time on battery since the last charge (spotted from the voltage rising), the battery test and its last result |
+| More → Display → Card names | Language of game character names (Riftbound legends): English or 한국어 (Korean). Separate from the menu language, so you can match the cards on the table |
 | More → History | Every finished game, newest first: result, score, Riftbound Conquer/Hold split, legends, length. Tap one to see it, change its legends or delete it |
 | More → Turn off | "Turn off?" then deep sleep; A wakes it with the game as it was |
 | Menu → Legends (Riftbound) | Pick your legend, then theirs (all official Champion Legends A-Z, plus your own via + New and an on-screen keyboard). Saved with each game |

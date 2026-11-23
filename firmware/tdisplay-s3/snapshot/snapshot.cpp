@@ -509,6 +509,24 @@ int main(int argc, char **argv)
         s.legend_current = 57; // Master Yi (Unleashed)
         save(frame, s, "new-legends-yi");
         s.legend_current = 1;
+        s.card_lang = kCardKorean;
+        s.legend_page = 0;
+        save(frame, s, "new-legends-ko");
+        s.overlay = Overlay::History;
+        save(frame, s, "new-history-ko");
+        s.overlay = Overlay::None;
+        s.menu = true;
+        s.menu_page = 2;
+        s.card_lang_text = "한국어";
+        s.brightness_text = "80%";
+        s.dim_after_text = "1 min";
+        s.dim_to_text = "8%";
+        s.sleep_after_text = "30 min";
+        save(frame, s, "new-display-ko");
+        s.menu_page = 0;
+        save(frame, s, "new-menu-ko");
+        s.menu = false;
+        s.card_lang = kCardEnglish;
         s.overlay = Overlay::Keyboard;
         s.keyboard_text = "MEGA TEE";
         save(frame, s, "new-keyboard");

@@ -371,9 +371,40 @@ void draw_banner(LGFX_Sprite &f, const Theme &t, const UiState &s, int winner)
     f.drawString(line3, r.cx(), r.y + 84);
 }
 
+// True if text has characters beyond ASCII (Korean, accents...): the GFX
+// fonts above only have ASCII, so such text uses the efont fonts.
+bool wide_text(const char *text)
+{
+    for (const char *p = text; *p; p++) {
+        if ((uint8_t)*p >= 0x80) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Small single-line text (labels, second lines).
+void small_font(LGFX_Sprite &f, const char *text)
+{
+    f.setTextSize(1);
+    f.setFont(wide_text(text) ? (const lgfx::IFont *)&fonts::efontKR_12 : &fonts::Font2);
+}
+
 // Picks the largest of a few fonts that fits text into max_w.
 void fit_font(LGFX_Sprite &f, const char *text, int max_w)
 {
+    if (wide_text(text)) {
+        static const lgfx::IFont *const kWide[] = {&fonts::efontKR_16_b, &fonts::efontKR_14_b, &fonts::efontKR_12_b,
+                                                   &fonts::efontKR_12, &fonts::efontKR_10};
+        f.setTextSize(1);
+        for (const lgfx::IFont *font : kWide) {
+            f.setFont(font);
+            if (f.textWidth(text) <= max_w) {
+                return;
+            }
+        }
+        return;
+    }
     static const lgfx::IFont *const kFonts[] = {
         &fonts::FreeSansBold12pt7b, &fonts::FreeSansBold9pt7b, &fonts::FreeSans9pt7b, &fonts::Font2};
     f.setTextSize(1);
@@ -1221,11 +1252,11 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
     if (s.menu_page == 0) {
         bool ending = g.players <= 2; // results can be recorded with or without a match
         bool riftbound = has_kinds(g);
-        static char legends[24];
+        static char legends[64];
         if (s.match_legend[0] == kNoLegend && s.match_legend[1] == kNoLegend) {
             snprintf(legends, sizeof(legends), "Pick");
         } else {
-            char a[24], b[24];
+            char a[32], b[32];
             snprintf(legends, sizeof(legends), "%s v %s", ui_legend_label(s, s.match_legend[0], a, sizeof(a)),
                      ui_legend_label(s, s.match_legend[1], b, sizeof(b)));
         }
@@ -1251,7 +1282,8 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
             {"Dim after", v(s.dim_after_text), UiAction::ScreenOpen, true},
             {"Dim to", v(s.dim_to_text), UiAction::ScreenOpen, true},
             {"Sleep after", v(s.sleep_after_text), UiAction::ScreenOpen, true},
-            blank, blank, blank, blank, back,
+            {"Card names", v(s.card_lang_text), UiAction::CardLangNext, true},
+            blank, blank, blank, back,
         };
         memcpy(out, tiles, sizeof(tiles));
     } else if (s.menu_page == 3) {
@@ -1276,7 +1308,7 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
             {"Counter", counter_style_plain(g) ? kCounterNames[s.counter_style % 3] : "-", UiAction::MenuCounter,
              counter_style_plain(g)},
             {"Flip", s.flipped ? "On" : "Off", UiAction::MenuFlip, true},
-            {"Screen", s.always_on ? "Always on" : "Settings", UiAction::MenuScreen, true},
+            {"Display", s.always_on ? "Always on" : "Screen, lang", UiAction::MenuScreen, true},
             {"Controls", "Buttons", UiAction::MenuControls, true},
             {"Battery", s.battery_percent < 0 ? "Charging" : "Info", UiAction::MenuBattery, true},
             {"History", "Games", UiAction::MenuHistory, true},
@@ -1289,7 +1321,7 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
 
 const char *menu_title(int page)
 {
-    static const char *const kTitles[] = {"MENU", "MORE", "SCREEN", "CONTROLS", "BATTERY"};
+    static const char *const kTitles[] = {"MENU", "MORE", "DISPLAY", "CONTROLS", "BATTERY"};
     return page >= 0 && page < 5 ? kTitles[page] : "MENU";
 }
 
@@ -2182,46 +2214,66 @@ UiAction kind_hit(const UiState &s, uint8_t p, int x, int y)
 const char *const kSetCodes[] = {"OGN", "OGS", "SFD", "UNL", "VEN", "RAD"};
 
 struct LegendCard {
-    const char *name;
-    uint8_t set; // index into kSetCodes
+    const char *name; // English
+    uint8_t set;      // index into kSetCodes
+    const char *ko;   // Korean (League of Legends Korean champion names)
 };
 
 const LegendCard kLegends[] = {
     // Origins
-    {"Ahri", 0}, {"Darius", 0}, {"Jinx", 0}, {"Kai'Sa", 0}, {"Lee Sin", 0}, {"Leona", 0},
-    {"Miss Fortune", 0}, {"Sett", 0}, {"Teemo", 0}, {"Viktor", 0}, {"Volibear", 0}, {"Yasuo", 0},
+    {"Ahri", 0, "아리"}, {"Darius", 0, "다리우스"}, {"Jinx", 0, "징크스"}, {"Kai'Sa", 0, "카이사"},
+    {"Lee Sin", 0, "리 신"}, {"Leona", 0, "레오나"}, {"Miss Fortune", 0, "미스 포츈"}, {"Sett", 0, "세트"},
+    {"Teemo", 0, "티모"}, {"Viktor", 0, "빅토르"}, {"Volibear", 0, "볼리베어"}, {"Yasuo", 0, "야스오"},
     // Proving Grounds
-    {"Annie", 1}, {"Garen", 1}, {"Lux", 1}, {"Master Yi", 1},
+    {"Annie", 1, "애니"}, {"Garen", 1, "가렌"}, {"Lux", 1, "럭스"}, {"Master Yi", 1, "마스터 이"},
     // Spiritforged
-    {"Azir", 2}, {"Draven", 2}, {"Ezreal", 2}, {"Fiora", 2}, {"Irelia", 2}, {"Jax", 2}, {"Lucian", 2},
-    {"Ornn", 2}, {"Rek'Sai", 2}, {"Renata Glasc", 2}, {"Rumble", 2}, {"Sivir", 2},
+    {"Azir", 2, "아지르"}, {"Draven", 2, "드레이븐"}, {"Ezreal", 2, "이즈리얼"}, {"Fiora", 2, "피오라"},
+    {"Irelia", 2, "이렐리아"}, {"Jax", 2, "잭스"}, {"Lucian", 2, "루시안"}, {"Ornn", 2, "오른"},
+    {"Rek'Sai", 2, "렉사이"}, {"Renata Glasc", 2, "레나타 글라스크"}, {"Rumble", 2, "럼블"}, {"Sivir", 2, "시비르"},
     // Unleashed (its Master Yi is at the end: added later, codes must not move)
-    {"Diana", 3}, {"Ivern", 3}, {"Jhin", 3}, {"Kha'Zix", 3}, {"LeBlanc", 3}, {"Lillia", 3}, {"Poppy", 3},
-    {"Pyke", 3}, {"Rengar", 3}, {"Vex", 3}, {"Vi", 3},
+    {"Diana", 3, "다이애나"}, {"Ivern", 3, "아이번"}, {"Jhin", 3, "진"}, {"Kha'Zix", 3, "카직스"},
+    {"LeBlanc", 3, "르블랑"}, {"Lillia", 3, "릴리아"}, {"Poppy", 3, "뽀삐"}, {"Pyke", 3, "파이크"},
+    {"Rengar", 3, "렝가"}, {"Vex", 3, "벡스"}, {"Vi", 3, "바이"},
     // Vendetta
-    {"Akali", 4}, {"Ambessa", 4}, {"Jayce", 4}, {"Kennen", 4}, {"Mel", 4}, {"Nasus", 4}, {"Renekton", 4},
-    {"Shen", 4}, {"Zed", 4},
+    {"Akali", 4, "아칼리"}, {"Ambessa", 4, "암베사"}, {"Jayce", 4, "제이스"}, {"Kennen", 4, "케넨"},
+    {"Mel", 4, "멜"}, {"Nasus", 4, "나서스"}, {"Renekton", 4, "레넥톤"}, {"Shen", 4, "쉔"}, {"Zed", 4, "제드"},
     // Radiance
-    {"Ekko", 5}, {"Evelynn", 5}, {"Jarvan IV", 5}, {"K'Sante", 5}, {"Mordekaiser", 5}, {"Orianna", 5},
-    {"Riven", 5}, {"Seraphine", 5}, {"Ziggs", 5},
+    {"Ekko", 5, "에코"}, {"Evelynn", 5, "이블린"}, {"Jarvan IV", 5, "자르반 4세"}, {"K'Sante", 5, "크산테"},
+    {"Mordekaiser", 5, "모데카이저"}, {"Orianna", 5, "오리아나"}, {"Riven", 5, "리븐"}, {"Seraphine", 5, "세라핀"},
+    {"Ziggs", 5, "직스"},
     // Added later
-    {"Master Yi", 3},
+    {"Master Yi", 3, "마스터 이"},
 };
 constexpr size_t kLegendCount = sizeof(kLegends) / sizeof(kLegends[0]);
 
-// A-Z by name, then by set (oldest first).
+const char *legend_card_name(size_t i, uint8_t lang)
+{
+    if (i >= kLegendCount) {
+        return "?";
+    }
+    return lang == kCardKorean && kLegends[i].ko ? kLegends[i].ko : kLegends[i].name;
+}
+
+uint8_t sort_lang = 0;
+
+// By name in the card language (A-Z, or 가나다 order), then by set (oldest first).
 bool legend_before(uint8_t a, uint8_t b)
 {
-    int c = strcasecmp(kLegends[a].name, kLegends[b].name);
+    const char *na = legend_card_name(a, sort_lang);
+    const char *nb = legend_card_name(b, sort_lang);
+    int c = sort_lang == kCardEnglish ? strcasecmp(na, nb) : strcmp(na, nb); // UTF-8 keeps Hangul order
     return c < 0 || (c == 0 && kLegends[a].set < kLegends[b].set);
 }
 
-// Official legends sorted A-Z for the picker (indexes into kLegends).
-const uint8_t *legends_sorted()
+// Official legends sorted for the picker (indexes into kLegends), per card language.
+const uint8_t *legends_sorted(uint8_t lang)
 {
-    static uint8_t order[kLegendCount];
-    static bool ready = false;
-    if (!ready) {
+    static uint8_t orders[kCardLangCount][kLegendCount];
+    static bool ready[kCardLangCount] = {};
+    lang = lang < kCardLangCount ? lang : 0;
+    uint8_t *order = orders[lang];
+    sort_lang = lang;
+    if (!ready[lang]) {
         for (size_t i = 0; i < kLegendCount; i++) {
             order[i] = (uint8_t)i;
         }
@@ -2234,7 +2286,7 @@ const uint8_t *legends_sorted()
             }
             order[j] = v;
         }
-        ready = true;
+        ready[lang] = true;
     }
     return order;
 }
@@ -2250,7 +2302,7 @@ uint8_t picker_legend_code(const UiState &s, int i)
     if (i < s.custom_legend_count) {
         return (uint8_t)(kCustomLegend + i);
     }
-    return legends_sorted()[i - s.custom_legend_count];
+    return legends_sorted(s.card_lang)[i - s.custom_legend_count];
 }
 
 void fill_tile(LGFX_Sprite &f, const Theme &t, const Rect &r, uint32_t edge, bool selected = false, int radius = 8)
@@ -2521,11 +2573,8 @@ void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.setTextDatum(textdatum_t::top_right);
         f.drawString(buf, r.x + r.w - 8, r.y + 3);
 
-        f.setFont(&fonts::Font2);
-        f.setTextColor(t.muted);
-        f.setTextDatum(textdatum_t::bottom_left);
         if (entry_has_kinds(e) && (e.legend[0] != kNoLegend || e.legend[1] != kNoLegend)) {
-            char a[24], b[24];
+            char a[32], b[32];
             snprintf(buf, sizeof(buf), "%s v %s", ui_legend_label(s, e.legend[0], a, sizeof(a)),
                      ui_legend_label(s, e.legend[1], b, sizeof(b)));
         } else if (e.best_of > 1) {
@@ -2533,7 +2582,11 @@ void draw_history(LGFX_Sprite &f, const Theme &t, const UiState &s)
         } else {
             buf[0] = 0;
         }
+        small_font(f, buf);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::bottom_left);
         f.drawString(buf, r.x + 8, r.y + r.h - 1);
+        f.setFont(&fonts::Font2);
         if (e.minutes) {
             snprintf(buf, sizeof(buf), "%u min", e.minutes);
             f.setTextDatum(textdatum_t::bottom_right);
@@ -2690,9 +2743,13 @@ void draw_legends(LGFX_Sprite &f, const Theme &t, const UiState &s)
         f.drawRoundRect(r.x, r.y, r.w, r.h, 6, mix(t.surface, own ? kWinColor : t.accent, 120));
         const char *name = ui_legend_name(s, code);
         f.setTextSize(1);
-        f.setFont(&fonts::FreeSans9pt7b);
-        if (f.textWidth(name) > r.w - 8) {
-            f.setFont(&fonts::Font2);
+        if (wide_text(name)) {
+            fit_font(f, name, r.w - 8);
+        } else {
+            f.setFont(&fonts::FreeSans9pt7b);
+            if (f.textWidth(name) > r.w - 8) {
+                f.setFont(&fonts::Font2);
+            }
         }
         f.setTextColor(sel ? kInk : t.text);
         f.setTextDatum(textdatum_t::middle_center);
@@ -2940,7 +2997,7 @@ const char *ui_legend_label(const UiState &s, uint8_t code, char *buf, size_t n)
     bool shared = false;
     if (code < kLegendCount) {
         for (size_t i = 0; i < kLegendCount; i++) {
-            if (i != code && strcmp(kLegends[i].name, name) == 0) {
+            if (i != code && strcmp(legend_card_name(i, s.card_lang), name) == 0) {
                 shared = true;
             }
         }
@@ -2973,7 +3030,7 @@ const char *ui_legend_name(const UiState &s, uint8_t code)
         int i = code - kCustomLegend;
         return s.custom_legends && i < s.custom_legend_count ? s.custom_legends[i] : "?";
     }
-    return ui_legend_official(code);
+    return legend_card_name(code, s.card_lang);
 }
 
 const char *ui_player_label(const bb_game_t &game, uint8_t player)

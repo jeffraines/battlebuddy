@@ -155,7 +155,15 @@ struct UiState {
     const char (*custom_legends)[kLegendNameLen + 1] = nullptr;
     int custom_legend_count = 0;
     const char *keyboard_text = "";
+
+    // Languages. Menus and card names are separate settings: you can read the
+    // menus in one language and play with cards printed in another.
+    uint8_t card_lang = 0;          // CardLang: names of game characters (legends)
+    const char *card_lang_text = nullptr;
 };
+
+// Card-name languages (more to come: Simplified Chinese, French).
+enum CardLang : uint8_t { kCardEnglish, kCardKorean, kCardLangCount };
 
 // Name for a legend code (kNoLegend gives "-").
 const char *ui_legend_name(const UiState &s, uint8_t code);
@@ -213,6 +221,7 @@ struct UiAction {
         KeyDone,
         KeyCancel,
         EndDraw,         // one-counter game: record a draw
+        CardLangNext,    // next card-name language
         MenuEnd,       // open the "who won?" screen
         DeclareWinner, // `player` won this game
         EndRestart,    // restart without recording a result
