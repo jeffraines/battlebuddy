@@ -52,7 +52,12 @@ constexpr int kSwipeMinX = 60;             // px of travel for a swipe
 constexpr int kSwipeMinY = 45;
 constexpr uint32_t kSwipeMaxMs = 800;
 constexpr int kMaxHistory = 40;
-constexpr uint32_t kBatteryPollMs = 5000;
+constexpr uint32_t kBatteryPollMs = 1000;
+// The LilyGO can't see whether a cable is plugged in; it is guessed from the
+// battery voltage: clearly high means a charger, and plugging / unplugging
+// shows up as a sudden step up / down.
+constexpr uint16_t kUsbSureMv = 4350;   // at or above: on a charger
+constexpr uint16_t kUsbStepMv = 70;     // a step this big between readings: cable in / out
 constexpr uint32_t kToastMs = 1500;
 constexpr uint32_t kRollMs = 900;      // tumble before showing a roll
 constexpr uint32_t kPopMs = 350;       // landing effect after a roll
@@ -1717,11 +1722,31 @@ void poll_battery(uint32_t now)
     }
     last_poll = now;
 
-    uint32_t mv = analogReadMilliVolts(PIN_BAT_VOLT) * 2;
+    // Average a few readings: single ADC samples are noisy.
+    uint32_t sum = 0;
+    for (int i = 0; i < 8; i++) {
+        sum += analogReadMilliVolts(PIN_BAT_VOLT);
+    }
+    uint32_t mv = sum / 8 * 2;
+
+    static bool on_usb = false;
+    static uint16_t prev_mv = 0;
+    if (mv >= kUsbSureMv) {
+        on_usb = true;
+    } else if (on_usb && prev_mv && prev_mv >= mv + kUsbStepMv) {
+        on_usb = false; // the voltage dropped: unplugged
+    } else if (!on_usb && prev_mv && mv >= prev_mv + kUsbStepMv) {
+        on_usb = true;  // the voltage jumped: plugged in
+    }
+    if (prev_mv && abs((int)mv - (int)prev_mv) >= 30) {
+        Serial.printf("battery %u -> %u mV%s\n", prev_mv, (unsigned)mv, on_usb ? " (usb)" : "");
+    }
+    prev_mv = (uint16_t)mv;
+
     battery_mv = (uint16_t)mv;
     test_tick();
     charge_track(battery_mv);
-    int percent = mv > 4300 ? -1 : constrain(((int)mv - 3300) * 100 / 900, 0, 100);
+    int percent = on_usb ? -1 : constrain(((int)mv - 3300) * 100 / 900, 0, 100);
     if (percent != battery_percent) {
         battery_percent = percent;
         dirty = true;
