@@ -30,11 +30,13 @@ Outer size about **66 x 36 x 24 mm**.
 | `stl/inlay_rNN_*.stl`, `stl/badge_plate_*`, `stl/badge_letters_*` | Print two (one for each side). One file with a colour change, or plate + letters as two parts for two filaments |
 | `stl/shell_*`, `stl/fitcheck_*` | r01-r23: one-piece shell and quick fit check (superseded) |
 
-`print/battlebuddy_r31_all-parts_one-plate.3mf` has every part laid out on one
+`print/battlebuddy_rNN_all-parts_one-plate.3mf` has every part laid out on one
 180 x 180 mm plate (Bambu A1 mini) in print orientation: body, faceplate, lid,
 separator, buttons in three lengths (each set with a reset button) and two
-badges. Each badge is one object made of two parts, plate and letters: give
-the letters part a second filament for two colours.
+badges. Two-colour pieces load as one object with two parts: the faceplate
+with its A/B letters (from r32), and each badge with its letters. Set the
+letters part to a second filament. `./make_3mf.py <rev> <description>` rebuilds
+it after an export.
 
 Use the files with the highest revision number. Older revisions stay so every
 print can be traced back to its design.
@@ -74,6 +76,7 @@ print can be traced back to its design.
 | r29 | Lid: channel round the outside face (1.6 wide, 1.0 deep, inside the screw holes) for thin silicone cord or strip instead of stick-on feet; lid 1.4 → 1.8 mm. Only the lid changed |
 | r30 | Lid grip: two straight dovetail channels along the long sides (4 mm wide at the opening, 4.6 at the bottom, 1 mm deep, 47.7 mm long) for strips of silicone sheet, instead of one loop. Only the lid changed |
 | r31 | Faceplate: neutral "A" (top) and "B" (bottom) letters beside the buttons instead of undo / menu symbols, since what they do can be remapped. Only the faceplate changed |
+| r32 | Faceplate A/B letters 0.6 mm deep (3 layers) and exported as their own part (`faceplate_letters`) to fill them in a second colour; `make_3mf.py` builds the one-plate 3MF with faceplate + letters and badges as two-part objects |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

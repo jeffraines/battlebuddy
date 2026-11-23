@@ -90,7 +90,7 @@ buttons = [["front", 2.75, "press", -9.3],   // KEY (GPIO14): top, undo
 button_symbols = true;    // "A" / "B" pressed into the faceplate next to the buttons (neutral: what they do is set in Controls)
 button_letters = ["A", "B"]; // top (KEY), bottom (BOOT)
 symbol_size = 3.4;
-symbol_depth = 0.4;
+symbol_depth = 0.6;       // 3 layers at 0.2 mm, so a second colour comes out solid
 symbol_gap = 4.4;         // symbol centre this far from its button's centre, toward the middle
 
 // Reset (RST): a side-push switch on the back of the board, on the +y long
@@ -471,12 +471,7 @@ module shell(with_slots = false) {
         }
         // Undo / menu symbols beside the face buttons.
         if (button_symbols)
-            for (i = [0, 1])
-                translate([board_x + buttons[i][1],
-                           board_y + board_w / 2 + buttons[i][3] + (i == 0 ? symbol_gap : -symbol_gap),
-                           out_h - symbol_depth])
-                    linear_extrude(symbol_depth + 1) rotate(180)   // reads upright with the USB on the right
-                        text(button_letters[i], size = symbol_size, font = label_font, halign = "center", valign = "center");
+            button_letters_3d(1);
     }
 
     // Side rails that centre the narrower board in the pocket.
@@ -626,6 +621,18 @@ module body() {
                 translate([0, 0, -ledge]) rotate([90, 0, 90]) linear_extrude(12) polygon([[0, 0], [ledge, ledge], [0, ledge]]);
 }
 
+// The A / B letters, symbol_depth deep from the front face (plus extra above
+// it when used as a cutter). Also printed as their own part to fill the cut in
+// a second colour.
+module button_letters_3d(extra = 0) {
+    for (i = [0, 1])
+        translate([board_x + buttons[i][1],
+                   board_y + board_w / 2 + buttons[i][3] + (i == 0 ? symbol_gap : -symbol_gap),
+                   out_h - symbol_depth])
+            linear_extrude(symbol_depth + extra) rotate(180)   // reads upright with the USB on the right
+                text(button_letters[i], size = symbol_size, font = label_font, halign = "center", valign = "center");
+}
+
 module faceplate() {
     difference() {
         intersection() { shell(); translate([-1, -1, split_z]) cube([out_l + 2, out_w + 2, out_h]); }
@@ -700,6 +707,9 @@ if (part == "shell") {
     // nothing (for including this file from another)
 } else if (part == "body") {
     body();   // printed as it sits: back on the bed
+} else if (part == "faceplate_letters") {
+    // Same place as in the face-down faceplate: the first layers on the bed.
+    translate([0, out_w, out_h]) rotate([180, 0, 0]) button_letters_3d(0);
 } else if (part == "faceplate") {
     translate([0, out_w, out_h]) rotate([180, 0, 0]) faceplate();   // face-down
 } else if (part == "badge_plate") {   // the badge split in two, for two filaments
