@@ -30,6 +30,12 @@ Outer size about **66 x 36 x 24 mm**.
 | `stl/inlay_rNN_*.stl`, `stl/badge_plate_*`, `stl/badge_letters_*` | Print two (one for each side). One file with a colour change, or plate + letters as two parts for two filaments |
 | `stl/shell_*`, `stl/fitcheck_*` | r01-r23: one-piece shell and quick fit check (superseded) |
 
+`print/battlebuddy_r31_all-parts_one-plate.3mf` has every part laid out on one
+180 x 180 mm plate (Bambu A1 mini) in print orientation: body, faceplate, lid,
+separator, buttons in three lengths (each set with a reset button) and two
+badges. Each badge is one object made of two parts, plate and letters: give
+the letters part a second filament for two colours.
+
 Use the files with the highest revision number. Older revisions stay so every
 print can be traced back to its design.
 
