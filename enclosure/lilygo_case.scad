@@ -212,14 +212,18 @@ lid_barb_z = 3.4;         // flat catch face this far above the lid's inside fac
 lid_barb_ramp = 0.9;
 lid_edge_ch = 0.8;        // chamfer round the lid's outside edge
 lid_screws = true;        // keep the screw holes (pan-head screws, no countersink needed)
-// Grip (r29): a channel round the outside face of the lid for thin silicone
-// (1.5 mm silicone cord, or a strip cut from a 1-1.5 mm sheet). It runs inside
-// the screw holes and stands ~0.5 mm proud, so the case grips the table but
-// stays flat in a bag. Set grip_channel = false for the old 8 mm foot recesses.
+// Grip (r30): two straight channels along the long sides of the lid's outside
+// face, for strips of silicone sheet (or anti-slip tape) 1-1.5 mm thick. Each
+// channel is a dovetail: wider at the bottom than at the opening, so a strip
+// cut to the bottom width squeezes in and stays without glue. The strips stand
+// ~0.5 mm proud: grips the table, flat in a bag. grip_channel = false gives
+// the old 8 mm foot recesses.
 grip_channel = true;
-grip_w = 1.6;             // channel width
+grip_w = 4;               // channel width at the opening
+grip_undercut = 0.3;      // wider by this much each side at the bottom (cut strips grip_w + 2 x this)
 grip_d = 1.0;             // channel depth
-grip_inset = 6;           // channel's outer edge this far in from the lid's edge (clear of the screws)
+grip_inset = 6;           // channel's outer edge this far in from the lid's long edges (clear of the screws)
+grip_end = 9;             // channels stop this far from the lid's ends
 clr = clr_default; // clearance around board and battery
 corner_r = 4;
 usb_w = 9.6;      // USB-C opening: just the plug's metal shell (8.4 x 2.6) plus room for error
@@ -537,15 +541,13 @@ module lid() {
             for (p = boss_xy)
                 translate([p[0], p[1], -1]) cylinder(d = screw_clear, h = lid_t + 2);
         if (grip_channel) {
-            // Channel for silicone cord / strip, round the outside face.
-            translate([0, 0, -1]) linear_extrude(grip_d + 1) difference() {
-                translate([grip_inset, grip_inset])
-                    offset(r = corner_r) offset(delta = -corner_r)
-                        square([out_l - 2 * grip_inset, out_w - 2 * grip_inset]);
-                translate([grip_inset + grip_w, grip_inset + grip_w])
-                    offset(r = max(corner_r - grip_w, 0.5)) offset(delta = -max(corner_r - grip_w, 0.5))
-                        square([out_l - 2 * (grip_inset + grip_w), out_w - 2 * (grip_inset + grip_w)]);
-            }
+            // Two dovetail channels for silicone strips, along the long sides.
+            for (y = [grip_inset, out_w - grip_inset - grip_w])
+                hull() {
+                    translate([grip_end, y, -1]) cube([out_l - 2 * grip_end, grip_w, 1.01]);
+                    translate([grip_end, y - grip_undercut, grip_d - 0.01])
+                        cube([out_l - 2 * grip_end, grip_w + 2 * grip_undercut, 0.01]);
+                }
         } else {
             // Recesses for four 8 mm stick-on rubber feet.
             for (x = [10, out_l - 10], y = [9, out_w - 9])
