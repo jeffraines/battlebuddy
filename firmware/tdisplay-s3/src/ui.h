@@ -132,9 +132,11 @@ struct UiState {
     const char *test_text = nullptr; // Battery test tile: "Start" or the time so far
     const char *last_test = nullptr; // Last test tile: how long the last test ran, or nullptr
     const char *since_charge = nullptr; // Battery page: time on battery since the last charge
+    const char *button_hint = nullptr;  // main menu header: what A and B do, e.g. "A Undo  B Menu"
 
     // Controls page: what each button press / hold and swipe does, as text
-    // (top press, top hold, bottom press, bottom hold, swipe up, down, left, right).
+    // (A press, A hold, B press, B hold, swipe up, down, left, right). A is the
+    // top button (KEY, also wakes the board), B the bottom one (BOOT).
     const char *controls[8] = {};
 
     Overlay overlay = Overlay::None;

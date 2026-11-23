@@ -67,6 +67,7 @@ print can be traced back to its design.
 | r28 | Lid snaps on (tab + barb at each end, grooves in the end walls, pry notch), screw holes kept for plain pan-head M2, chamfered lid edge; face buttons keyed (flat on the display side so they can't turn), tighter (0.15 mm), 0.4 mm longer; circle key covered with a plain rounded window; undo / menu symbols pressed into the faceplate beside the buttons; badge recess on both long sides (44 × 6.8 mm, toward the far end clear of the reset button) |
 | r29 | Lid: channel round the outside face (1.6 wide, 1.0 deep, inside the screw holes) for thin silicone cord or strip instead of stick-on feet; lid 1.4 → 1.8 mm. Only the lid changed |
 | r30 | Lid grip: two straight dovetail channels along the long sides (4 mm wide at the opening, 4.6 at the bottom, 1 mm deep, 47.7 mm long) for strips of silicone sheet, instead of one loop. Only the lid changed |
+| r31 | Faceplate: neutral "A" (top) and "B" (bottom) letters beside the buttons instead of undo / menu symbols, since what they do can be remapped. Only the faceplate changed |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

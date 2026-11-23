@@ -87,8 +87,9 @@ end_rib = 2 * board_clr + rib_squeeze + 0.15;  // (r20: +0.15, the board still s
 // the top: the top button is KEY (undo), the bottom one BOOT (menu).
 buttons = [["front", 2.75, "press", -9.3],   // KEY (GPIO14): top, undo
            ["front", 2.75, "press", 8.55]];  // BOOT (GPIO0): bottom, menu
-button_symbols = true;    // small undo / menu symbols pressed into the faceplate next to the buttons
-symbol_size = 3.6;
+button_symbols = true;    // "A" / "B" pressed into the faceplate next to the buttons (neutral: what they do is set in Controls)
+button_letters = ["A", "B"]; // top (KEY), bottom (BOOT)
+symbol_size = 3.4;
 symbol_depth = 0.4;
 symbol_gap = 4.4;         // symbol centre this far from its button's centre, toward the middle
 
@@ -469,13 +470,13 @@ module shell(with_slots = false) {
             for (b = buttons) button_hole(b);
         }
         // Undo / menu symbols beside the face buttons.
-        if (button_symbols) {
-            // buttons[0] is the top one (undo), buttons[1] the bottom one (menu).
-            translate([board_x + buttons[0][1], board_y + board_w / 2 + buttons[0][3] + symbol_gap, out_h - symbol_depth])
-                linear_extrude(symbol_depth + 1) rotate(180) undo_symbol();
-            translate([board_x + buttons[1][1], board_y + board_w / 2 + buttons[1][3] - symbol_gap, out_h - symbol_depth])
-                linear_extrude(symbol_depth + 1) menu_symbol();
-        }
+        if (button_symbols)
+            for (i = [0, 1])
+                translate([board_x + buttons[i][1],
+                           board_y + board_w / 2 + buttons[i][3] + (i == 0 ? symbol_gap : -symbol_gap),
+                           out_h - symbol_depth])
+                    linear_extrude(symbol_depth + 1) rotate(180)   // reads upright with the USB on the right
+                        text(button_letters[i], size = symbol_size, font = label_font, halign = "center", valign = "center");
     }
 
     // Side rails that centre the narrower board in the pocket.
@@ -640,29 +641,6 @@ module label_2d(g = 0) {
 
 badge_x = out_l - badge_end_gap - badge[0] / 2;
 
-// A curved arrow (undo) and three bars (menu), symbol_size across, centred.
-module undo_symbol() {
-    // Top half of a ring with the head on the left, pointing down (like a curved "back" arrow).
-    r = symbol_size / 2;
-    w = symbol_size * 0.18;
-    ro = r - 0.2;
-    rm = ro - w / 2;
-    translate([0.15 * r, -0.3 * r]) {
-        difference() {
-            circle(r = ro, $fn = 48);
-            circle(r = ro - w, $fn = 48);
-            translate([-2 * r, -2 * r]) square([4 * r, 2 * r]);
-        }
-        polygon([[-rm - w * 1.35, 0.01], [-rm + w * 1.35, 0.01], [-rm, -w * 1.8]]);
-    }
-}
-
-module menu_symbol() {
-    w = symbol_size * 0.85;
-    t = symbol_size * 0.16;
-    for (k = [-1, 0, 1])
-        translate([0, k * symbol_size * 0.32]) square([w, t], center = true);
-}
 
 module badge_2d(g = 0) {
     offset(r = badge_r + g) square([badge[0] - 2 * badge_r, badge[1] - 2 * badge_r], center = true);

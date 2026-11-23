@@ -1255,7 +1255,7 @@ void menu_tiles(const UiState &s, MenuTile *out, char *match, char *timer)
         };
         memcpy(out, tiles, sizeof(tiles));
     } else if (s.menu_page == 3) {
-        static const char *const kLabels[8] = {"Top press", "Top hold", "Bottom press", "Bottom hold",
+        static const char *const kLabels[8] = {"A press", "A hold", "B press", "B hold",
                                                "Swipe up", "Swipe down", "Swipe left", "Swipe right"};
         for (int i = 0; i < 8; i++) {
             out[i] = {kLabels[i], s.controls[i] ? s.controls[i] : "-", UiAction::ControlCycle, true};
@@ -1295,6 +1295,14 @@ const char *menu_title(int page)
 
 void draw_menu(LGFX_Sprite &f, const Theme &t, const UiState &s)
 {
+    // What the A / B buttons do right now (they can be remapped in Controls).
+    if (s.menu_page == 0 && s.button_hint) {
+        f.setFont(&fonts::Font2);
+        f.setTextSize(1);
+        f.setTextColor(t.muted);
+        f.setTextDatum(textdatum_t::middle_right);
+        f.drawString(s.button_hint, kWidth - 60, kHeaderH / 2);
+    }
     MenuTile tiles[kMenuTiles];
     char match[8], timer[12];
     menu_tiles(s, tiles, match, timer);
@@ -2313,7 +2321,7 @@ void draw_off_prompt(LGFX_Sprite &f, const Theme &t)
     f.setTextDatum(textdatum_t::middle_center);
     f.drawString("The game is kept.", kWidth / 2, 46);
     f.setTextColor(t.muted);
-    f.drawString("Press the top button to wake it.", kWidth / 2, 70);
+    f.drawString("Press A to wake it.", kWidth / 2, 70);
     fill_tile(f, t, kOffNo, mix(t.surface, t.accent, 120), false, 10);
     fill_tile(f, t, kOffYes, kLoss, false, 10);
     f.setFont(&fonts::FreeSansBold12pt7b);
@@ -2342,7 +2350,7 @@ void draw_sleeping(LGFX_Sprite &f, const Theme &t)
     f.drawString("Turning off", kWidth / 2, 70);
     f.setFont(&fonts::FreeSans9pt7b);
     f.setTextColor(t.muted);
-    f.drawString("Top button wakes it", kWidth / 2, 104);
+    f.drawString("A wakes it", kWidth / 2, 104);
 }
 
 // Setting editor.

@@ -33,10 +33,10 @@ Hold the board landscape, USB port on the right.
 | More → Counter | For plain life counters (Magic, Commander, Lorcana, FaB). *Themed* (default): each game's own look, below. *d20*: life on a d20 that spins a face toward each change. *Digits*: just the number |
 | More → Flip | Rotates the whole screen 180° (USB port on the left) |
 | More → Screen | Brightness and Dim to: drag the slider or tap a preset. Dim after and Sleep after: - / + (hold to change faster) or a preset. Saved across power-off |
-| More → Controls | What the top button (KEY) and bottom button (BOOT) do on a press and on a hold, and what each swipe does: Undo, Menu, Quick menu, Dice, Turn off or None. Defaults: top press undo, top hold quick menu, bottom press menu, bottom hold Turn off?, swipe up menu, swipe down dice |
+| More → Controls | What button A (top, KEY) and button B (bottom, BOOT) do on a press and on a hold, and what each swipe does: Undo, Menu, Quick menu, Dice, Turn off or None. Defaults: A press undo, A hold quick menu, B press menu, B hold Turn off?, swipe up menu, swipe down dice. The case labels the buttons A and B (not by what they do), and the main menu's header shows what A and B are set to |
 | More → Battery | Time on battery since the last charge (spotted from the voltage rising), the battery test and its last result |
 | More → History | Every finished game, newest first: result, score, Riftbound Conquer/Hold split, legends, length. Tap one to see it, change its legends or delete it |
-| More → Turn off | "Turn off?" then deep sleep; the top button wakes it with the game as it was |
+| More → Turn off | "Turn off?" then deep sleep; A wakes it with the game as it was |
 | Menu → Legends (Riftbound) | Pick your legend, then theirs (all official Champion Legends A-Z, plus your own via + New and an on-screen keyboard). Saved with each game |
 | Menu → End game | Who won? With one counter: Won / Lost / Draw, so a best-of works when only you are tracked |
 

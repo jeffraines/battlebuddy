@@ -2,8 +2,9 @@
 //
 // Buttons (board held landscape, USB on the right). What each press, hold and
 // swipe does is set in More > Controls; the defaults are:
-//   KEY (GPIO14, top):     press undo, hold quick menu; wakes from sleep
-//   BOOT (GPIO0, bottom):  press menu, hold "Turn off?"
+//   A = KEY (GPIO14, top):     press undo, hold quick menu; wakes from sleep
+//   B = BOOT (GPIO0, bottom):  press menu, hold "Turn off?"
+// The case labels the buttons A and B, not by what they do, since that can change.
 //   Swipe up: menu. Swipe down: dice.
 // While a menu, the dice, a picker or a pop-up is open, KEY / BOOT back out of
 // it instead (KEY rolls on the dice screen).
@@ -135,7 +136,7 @@ char brightness_text[8], dim_after_text[12], dim_to_text[8], sleep_after_text[12
 // What buttons and swipes do (More > Controls), saved to flash.
 enum Control : uint8_t { CtlNone, CtlUndo, CtlMenu, CtlQuick, CtlDice, CtlOff, CtlCount };
 const char *const kControlNames[] = {"None", "Undo", "Menu", "Quick menu", "Dice", "Turn off"};
-// top press, top hold, bottom press, bottom hold, swipe up, down, left, right
+// A press, A hold, B press, B hold, swipe up, down, left, right
 uint8_t controls[8] = {CtlUndo, CtlQuick, CtlMenu, CtlOff, CtlMenu, CtlDice, CtlNone, CtlNone};
 
 // Pop-ups.
@@ -268,6 +269,10 @@ UiState ui_state()
     s.test_text = test.running ? test_text : nullptr;
     s.last_test = test.last_secs ? last_test_text : nullptr;
     s.since_charge = since_charge_text;
+    static char hint[40];
+    snprintf(hint, sizeof(hint), "A %s  B %s", kControlNames[controls[0] % CtlCount],
+             kControlNames[controls[2] % CtlCount]);
+    s.button_hint = hint;
     for (int i = 0; i < 8; i++) {
         s.controls[i] = kControlNames[controls[i] % CtlCount];
     }
@@ -1679,7 +1684,7 @@ void loop()
     uint32_t now = millis();
 
     handle_touch(now);
-    // KEY = top button, BOOT = bottom (USB on the right).
+    // KEY = A (top button), BOOT = B (bottom), with the USB on the right.
     poll_button(
         key_button, now,
         [now] {

@@ -433,6 +433,7 @@ int main(int argc, char **argv)
         s.last_test = "9h 41m";
         save(frame, s, "new-battery");
         s.menu_page = 0;
+        s.button_hint = "A Undo  B Menu";
         s.match_legend[0] = 2;  // Jinx
         s.match_legend[1] = 1;  // Darius
         save(frame, s, "new-menu-legends");
