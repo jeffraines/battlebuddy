@@ -77,6 +77,7 @@ print can be traced back to its design.
 | r30 | Lid grip: two straight dovetail channels along the long sides (4 mm wide at the opening, 4.6 at the bottom, 1 mm deep, 47.7 mm long) for strips of silicone sheet, instead of one loop. Only the lid changed |
 | r31 | Faceplate: neutral "A" (top) and "B" (bottom) letters beside the buttons instead of undo / menu symbols, since what they do can be remapped. Only the faceplate changed |
 | r32 | Faceplate A/B letters 0.6 mm deep (3 layers) and exported as their own part (`faceplate_letters`) to fill them in a second colour; `make_3mf.py` builds the one-plate 3MF with faceplate + letters and badges as two-part objects |
+| r32b | Reset button on its own (`reset_pin` part) with a longer inside nub to try: 2.1 / 2.5 / 2.9 mm (was 1.7; too short). Print only the pins |
 
 (r01-r04 weren't exported with revision names; they're in git history.)
 

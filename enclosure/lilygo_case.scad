@@ -331,6 +331,12 @@ module reset_pin() {
     translate([0, 0, wall - rst_pocket + rst_head_t - 0.01]) cylinder(d = 2, h = rst_nub_h + 0.01, $fn = 24);
 }
 
+// Reset button on its own, stem-down (for trying nub lengths without reprinting anything else).
+module reset_pin_print()
+{
+    translate([0, 0, rst_proud]) reset_pin();
+}
+
 module plunger(b) {
     t = block_thick(b);
     w = wall_of(b);
@@ -707,6 +713,8 @@ if (part == "shell") {
     // nothing (for including this file from another)
 } else if (part == "body") {
     body();   // printed as it sits: back on the bed
+} else if (part == "reset_pin") {
+    reset_pin_print();
 } else if (part == "faceplate_letters") {
     // Same place as in the face-down faceplate: the first layers on the bed.
     translate([0, out_w, out_h]) rotate([180, 0, 0]) button_letters_3d(0);
