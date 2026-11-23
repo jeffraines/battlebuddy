@@ -110,6 +110,20 @@ it, power on, and More → Last test shows how long it lasted (to within a
 minute). The start and end battery voltages are printed on the serial port.
 Tapping Battery test again stops the test early and files it the same way.
 
+## Flash without installing anything (browser)
+
+1. Get a ready-made image: `./make_flash_image.sh` writes
+   `release/battlebuddy-tdisplay-s3-<commit>.bin` (or use one you were sent).
+2. In Chrome or Edge on a computer, open https://espressif.github.io/esptool-js/
+3. Plug the board in with a USB-C data cable, click **Connect** and pick the
+   board's port (usually "USB JTAG/serial debug unit").
+4. Set Flash Address to **0x0**, choose the .bin file, click **Program**.
+   Don't tick "Erase flash" unless you want to wipe saved settings and history.
+5. When it says done, press the board's reset button (or unplug and replug).
+
+If Connect can't find the board: hold BOOT (B), press and release RST, release
+BOOT, then Connect again.
+
 ## Build and flash
 
 Needs [PlatformIO](https://platformio.org/install) (VS Code extension or `pip install platformio`).
